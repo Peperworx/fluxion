@@ -1,6 +1,7 @@
 use std::any::Any;
 use tokio::sync::mpsc;
 use tokio::sync::broadcast;
+use tokio::sync::oneshot;
 use crate::system::{System, SystemEvent};
 
 /// This is defined separate from the Actor trait to allow us to include it in the
@@ -29,10 +30,18 @@ pub struct ActorContext {
     pub system: System,
 }
 
+/// This struct contains data surrounding a message
+/// If the `request` field is `Some`, then the contained oneshot channel
+/// will be called with the `Message::Response`
+struct MessageData<M: ActorMessage> {
+    message: M,
+    request: Option<oneshot::Sender<M::Response>>
+}
+
 /// The struct which is used to interface with an actor by other actors
 pub struct ActorHandle<M: ActorMessage, E: SystemEvent> {
     metadata: ActorMetadata,
-    message_sender: mpsc::Sender<M>,
+    message_sender: mpsc::Sender<MessageData<M>>,
     event_sender: broadcast::Sender<E>
 }
 
@@ -41,7 +50,7 @@ pub struct ActorHandle<M: ActorMessage, E: SystemEvent> {
 pub struct ActorSupervisor<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> {
     metadata: ActorMetadata,
     actor: A,
-    message_reciever: mpsc::Receiver<M>,
+    message_reciever: mpsc::Receiver<MessageData<M>>,
     event_reciever: broadcast::Receiver<E>
 }
 
@@ -91,7 +100,15 @@ impl<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> ActorSupervisor<A,M,E> {
             tokio::select! {
                 message = self.message_reciever.recv() => {
                     if let Some(m) = message {
-                        self.actor.message(&mut context, m).await;
+
+                        let res = self.actor.message(&mut context, m.message).await;
+
+                        if let Some(sender) = m.request {
+                            match sender.send(res) {
+                                Ok(_) => {},
+                                Err(_) => {} // Do this because we really don't care if another actor does nothing with our response
+                            }
+                        }
                     } else {
                         // If None is recieved from the message reciever, it means
                         // that all references to the actor's sender have been exhausted.
