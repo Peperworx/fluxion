@@ -1,11 +1,11 @@
-trait Actor {
-    /// This can be whatever your application needs
-	type Context;
 
-	/// This too can be whatever your application needs, but it is recommended
-	/// for it to be the same among all Actors
-	type Message;
+/// Represents an actor's id. Just string for now.
+pub type ActorID = String;
 
-	/// The main function, which is called every time the actor recieves a message
-	async fn handle_message(&mut self, msg: Self::Message, ctx: Option<Self::Context>) -> (Self::Message, Self::Context);
+
+
+/// The public-facing Actor trait, which is implemented by the user
+pub trait Actor {
+    /// Run when 
 }
+
