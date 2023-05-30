@@ -23,11 +23,11 @@ pub struct ActorMetadata {
 /// Contains information passed to an actor when it is called into.
 /// This provides the actor with both its metadata and system
 #[derive(Clone)]
-pub struct ActorContext {
+pub struct ActorContext<E: SystemEvent> {
     /// The actor's metadata
     pub metadata: ActorMetadata,
     /// The system the actor is being called from
-    pub system: System,
+    pub system: System<E>,
 }
 
 /// This struct contains data surrounding a message
@@ -40,11 +40,14 @@ struct MessageData<M: ActorMessage> {
 }
 
 /// The struct which is used to interface with an actor by other actors
+#[derive(Clone)]
 pub struct ActorHandle<M: ActorMessage, E: SystemEvent> {
     metadata: ActorMetadata,
     message_sender: mpsc::Sender<MessageData<M>>,
     event_sender: broadcast::Sender<E>
 }
+
+impl<M: ActorMessage, E: SystemEvent> ActorType for ActorHandle<M, E> {}
 
 impl<M: ActorMessage + std::fmt::Debug, E: SystemEvent> ActorHandle<M, E>
     where
@@ -95,6 +98,7 @@ pub struct ActorSupervisor<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> {
     event_reciever: broadcast::Receiver<E>
 }
 
+
 impl<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> ActorSupervisor<A,M,E> {
     pub fn new(actor: A, id: ActorID) -> (ActorSupervisor<A,M,E>, ActorHandle<M, E>) {
 
@@ -123,7 +127,7 @@ impl<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> ActorSupervisor<A,M,E> {
         (supervisor, handle)
     }
 
-    pub async fn run(&mut self, system: System) {
+    pub async fn run(&mut self, system: System<E>) {
 
         // Create an actor context
         let mut context = ActorContext {
@@ -131,11 +135,10 @@ impl<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> ActorSupervisor<A,M,E> {
             system: system.clone(),
         };
 
+        
         // Initialize the actor
         self.actor.initialize(&mut context).await;
-
-        
-
+        /*
         // Continuously recieve messages
         loop {
             tokio::select! {
@@ -166,37 +169,39 @@ impl<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> ActorSupervisor<A,M,E> {
                 }
             }
         }
+        
         // Deinitialize the actor
         self.actor.deinitialize(&mut context).await;
 
         // Cleanup the message reciever
-        self.message_reciever.close();
+        self.message_reciever.close();*/
     }
 }
 
 /// Represents a message that can be sent to a specific actor
-pub trait ActorMessage {
+pub trait ActorMessage: Clone + Send + Sync + 'static {
     /// The type that the actor will return in response to the message.
     /// Leave as the unit type () if no message is to be returned.
-    type Response;
+    type Response: Send + Sync + 'static;
 }
 
 
 /// The public-facing Actor trait, which is implemented by the user
-pub trait Actor<Message: ActorMessage, Event: SystemEvent> {
+#[async_trait]
+pub trait Actor<Message: ActorMessage, Event: SystemEvent>: Send + Sync + 'static {
 
 
     /// Run when the actor is started
-    async fn initialize(&mut self, context: &mut ActorContext) {}
+    async fn initialize(&mut self, _context: &mut ActorContext<Event>) {}
 
     /// Run when an actor is stopped
-    async fn deinitialize(&mut self, context: &mut ActorContext) {}
+    async fn deinitialize(&mut self, _context: &mut ActorContext<Event>) {}
 
     /// Run when the actor recieves a message
-    async fn message(&mut self, context: &mut ActorContext, message: Message) -> Message::Response;
+    async fn message(&mut self, context: &mut ActorContext<Event>, message: Message) -> Message::Response;
 
     /// Run when the actor recieves an event
-    async fn event(&mut self, context: &mut ActorContext, event: Event);
+    async fn event(&mut self, context: &mut ActorContext<Event>, event: Event);
 }
 
 

@@ -1,5 +1,8 @@
-#![feature(async_fn_in_trait)]
+
 #![feature(async_closure)]
+
+#[macro_use]
+extern crate async_trait;
 
 pub mod actor;
 
