@@ -21,5 +21,10 @@ pub struct System {
 
 impl System {
 
-    
+    pub fn new(id: SystemID) -> Self {
+        Self {
+            id,
+            actors: Arc::new(RwLock::new(HashMap::new()))
+        }
+    }
 }

@@ -33,6 +33,7 @@ pub struct ActorContext {
 /// This struct contains data surrounding a message
 /// If the `request` field is `Some`, then the contained oneshot channel
 /// will be called with the `Message::Response`
+#[derive(Debug)]
 struct MessageData<M: ActorMessage> {
     message: M,
     request: Option<oneshot::Sender<M::Response>>
@@ -43,6 +44,46 @@ pub struct ActorHandle<M: ActorMessage, E: SystemEvent> {
     metadata: ActorMetadata,
     message_sender: mpsc::Sender<MessageData<M>>,
     event_sender: broadcast::Sender<E>
+}
+
+impl<M: ActorMessage + std::fmt::Debug, E: SystemEvent> ActorHandle<M, E>
+    where
+    <M as ActorMessage>::Response: std::fmt::Debug {
+
+    pub fn get_metadata(&self) -> ActorMetadata {
+        self.metadata.clone()
+    }
+
+    pub async fn request(&self, message: M) -> M::Response {
+
+        // Create a oneshot that returns M::Response
+        let (tx, rx) = oneshot::channel::<M::Response>();
+
+        // Create the message data
+        let message_data = MessageData {
+            message,
+            request: Some(tx)
+        };
+
+        // Send a message with tx and message
+        // Todo: Proper error handling
+        self.message_sender.send(message_data).await.unwrap();
+
+        // Wait for the response
+        rx.await.unwrap()
+    }
+
+    pub async fn tell(&self, message: M) {
+        // Create the message data
+        let message_data = MessageData {
+            message,
+            request: None
+        };
+
+        // Send the message
+        // Todo: Proper error handling
+        self.message_sender.send(message_data).await.unwrap();
+    }
 }
 
 /// The struct in charge of handling an actor's lifecycle.
