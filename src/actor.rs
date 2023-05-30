@@ -2,6 +2,7 @@ use std::any::Any;
 use tokio::sync::mpsc;
 use tokio::sync::broadcast;
 use tokio::sync::oneshot;
+use async_trait::async_trait;
 use crate::system::{System, SystemEvent};
 
 /// This is defined separate from the Actor trait to allow us to include it in the
@@ -41,15 +42,14 @@ struct MessageData<M: ActorMessage> {
 
 /// The struct which is used to interface with an actor by other actors
 #[derive(Clone)]
-pub struct ActorHandle<M: ActorMessage, E: SystemEvent> {
+pub struct ActorHandle<M: ActorMessage> {
     metadata: ActorMetadata,
     message_sender: mpsc::Sender<MessageData<M>>,
-    event_sender: broadcast::Sender<E>
 }
 
-impl<M: ActorMessage, E: SystemEvent> ActorType for ActorHandle<M, E> {}
+impl<M: ActorMessage> ActorType for ActorHandle<M> {}
 
-impl<M: ActorMessage + std::fmt::Debug, E: SystemEvent> ActorHandle<M, E>
+impl<M: ActorMessage + std::fmt::Debug> ActorHandle<M>
     where
     <M as ActorMessage>::Response: std::fmt::Debug {
 
@@ -100,14 +100,13 @@ pub struct ActorSupervisor<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> {
 
 
 impl<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> ActorSupervisor<A,M,E> {
-    pub fn new(actor: A, id: ActorID) -> (ActorSupervisor<A,M,E>, ActorHandle<M, E>) {
+    pub fn new(actor: A, id: ActorID, system: System<E>) -> (ActorSupervisor<A,M,E>, ActorHandle<M>) {
 
         // Create a mpsc channel to send messages through
         let (mtx, mrx) = mpsc::channel(64);
 
-        // Create a broadcast channel to send events through
-        let (etx, erx) = broadcast::channel(64);
-
+        // Get the broadcast reciever from the system
+        let erx = system.event_sender.subscribe();
         
         // Create the supervisor
         let supervisor = ActorSupervisor {
@@ -121,7 +120,6 @@ impl<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> ActorSupervisor<A,M,E> {
         let handle = ActorHandle {
             metadata: ActorMetadata { id },
             message_sender: mtx,
-            event_sender: etx,
         };
 
         (supervisor, handle)
@@ -138,7 +136,7 @@ impl<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> ActorSupervisor<A,M,E> {
         
         // Initialize the actor
         self.actor.initialize(&mut context).await;
-        /*
+        
         // Continuously recieve messages
         loop {
             tokio::select! {
@@ -148,9 +146,9 @@ impl<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> ActorSupervisor<A,M,E> {
                         let res = self.actor.message(&mut context, m.message).await;
 
                         if let Some(sender) = m.request {
-                            match sender.send(res) {
-                                Ok(_) => {},
-                                Err(_) => {} // Do this because we really don't care if another actor does nothing with our response
+                            if sender.send(res).is_ok() {
+                                // Do this because we really don't care if another actor does nothing with our response
+                                // and we want to consume the result so the compiler does not complain.
                             }
                         }
                     } else {
@@ -163,6 +161,7 @@ impl<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> ActorSupervisor<A,M,E> {
                     }
                 },
                 event = self.event_reciever.recv() => {
+                    // We will default to being tolerant to missed events.
                     if let Ok(e) = event {
                         self.actor.event(&mut context, e).await;
                     }
@@ -174,7 +173,7 @@ impl<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> ActorSupervisor<A,M,E> {
         self.actor.deinitialize(&mut context).await;
 
         // Cleanup the message reciever
-        self.message_reciever.close();*/
+        self.message_reciever.close();
     }
 }
 

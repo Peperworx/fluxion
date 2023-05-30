@@ -1,9 +1,9 @@
-#![feature(async_fn_in_trait)]
 
-use fluxion::{actor::{Actor, ActorMessage, ActorID, ActorSupervisor}, system::{SystemEvent, System}};
+use async_trait::async_trait;
+use fluxion::{actor::{Actor, ActorMessage, ActorID}, system::{SystemEvent, System}};
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum TestMessage {
     Ping,
     Pong
@@ -22,16 +22,17 @@ struct TestActor {
     
 }
 
+#[async_trait]
 impl Actor<TestMessage, TestEvent> for TestActor {
-    async fn message(&mut self, context: &mut fluxion::actor::ActorContext, message: TestMessage) -> <TestMessage as ActorMessage>::Response {
+    async fn message(&mut self, _context: &mut fluxion::actor::ActorContext<TestEvent>, message: TestMessage) -> <TestMessage as ActorMessage>::Response {
         match message {
             TestMessage::Ping => TestMessage::Pong,
             TestMessage::Pong => TestMessage::Ping
         }
     }
 
-    async fn event(&mut self, context: &mut fluxion::actor::ActorContext, event: TestEvent) {
-        println!("Recieved event {:?}", event);
+    async fn event(&mut self, _context: &mut fluxion::actor::ActorContext<TestEvent>, event: TestEvent) {
+        println!("Recieved event {event:?}");
     }
 }
 
@@ -42,18 +43,5 @@ async fn main() {
     let actor = TestActor {};
     let id: ActorID = String::from("test");
 
-    let (mut runner, handle) = ActorSupervisor::new(actor, id);
-
-    tokio::spawn(async move {
-        runner.run(system.clone()).await;
-    });
-
-    loop {
-        let res = handle.request(TestMessage::Ping).await;
-        println!("{:?}", res);
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-        let res = handle.request(TestMessage::Pong).await;
-        println!("{:?}", res);
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-    }
+    let _ah = system.add_actor(actor, id).await;
 }

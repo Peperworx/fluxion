@@ -7,7 +7,7 @@ struct TestActor {
 }
 
 impl Actor for TestActor {
-    async fn handle_message(&mut self, msg: Message, ctx: Option<Context>) -> (Message, Context) {
+    async fn handle_message(&mut self, msg: Message, _ctx: Option<Context>) -> (Message, Context) {
         match msg {
             Message::Ping => (Message::Pong, Context::default()),
             Message::Pong => (Message::Ping, Context::default()),
@@ -70,6 +70,6 @@ async fn main() {
     sys.add_actor("a", new_actor);
 
     let (msg, ctx) = sys.request("a", Message::Pong, None).await;
-    println!("{:?}", msg);
-    println!("{:?}", ctx);
+    println!("{msg:?}");
+    println!("{ctx:?}");
 }
