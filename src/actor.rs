@@ -7,7 +7,7 @@ use crate::system::{System, SystemEvent};
 
 /// This is defined separate from the Actor trait to allow us to include it in the
 /// hashmap inside of System
-pub(crate) trait ActorType: Any + Send + Sync + 'static {}
+pub(crate) type ActorType = dyn Any + Send + Sync + 'static;
 
 /// An actor's ID. For now this is a String
 pub type ActorID = String;
@@ -46,8 +46,6 @@ pub struct ActorHandle<M: ActorMessage> {
     metadata: ActorMetadata,
     message_sender: mpsc::Sender<MessageData<M>>,
 }
-
-impl<M: ActorMessage> ActorType for ActorHandle<M> {}
 
 impl<M: ActorMessage + std::fmt::Debug> ActorHandle<M>
     where
@@ -95,7 +93,8 @@ pub struct ActorSupervisor<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> {
     metadata: ActorMetadata,
     actor: A,
     message_reciever: mpsc::Receiver<MessageData<M>>,
-    event_reciever: broadcast::Receiver<E>
+    event_reciever: broadcast::Receiver<E>,
+    shutdown_reciever: broadcast::Receiver<()>,
 }
 
 
@@ -105,15 +104,13 @@ impl<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> ActorSupervisor<A,M,E> {
         // Create a mpsc channel to send messages through
         let (mtx, mrx) = mpsc::channel(64);
 
-        // Get the broadcast reciever from the system
-        let erx = system.event_sender.subscribe();
-        
         // Create the supervisor
         let supervisor = ActorSupervisor {
             metadata: ActorMetadata { id: id.clone() },
             actor,
             message_reciever: mrx,
-            event_reciever: erx
+            event_reciever: system.event_sender.subscribe(),
+            shutdown_reciever: system.shutdown_sender.subscribe()
         };
 
         // Create the handle
@@ -165,6 +162,10 @@ impl<A: Actor<M, E>, M: ActorMessage, E: SystemEvent> ActorSupervisor<A,M,E> {
                     if let Ok(e) = event {
                         self.actor.event(&mut context, e).await;
                     }
+                },
+                _shutdown = self.shutdown_reciever.recv() => {
+                    // If we recieve anything, just break
+                    break;
                 }
             }
         }
