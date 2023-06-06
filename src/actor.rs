@@ -1,18 +1,24 @@
+use std::f32::consts::E;
+
 use async_trait::async_trait;
 
 
 
 pub struct Context;
+
+#[derive(Debug)]
 pub struct ActorError;
 
 pub trait ActorMessage {
     type Response;
 }
 
-pub trait SystemEvent {}
+pub trait SystemEvent: Send + Sync + 'static {}
+
+impl<T> SystemEvent for T where T: Send + Sync + 'static {}
 
 #[async_trait]
-pub trait Actor {
+pub trait Actor: Send + Sync + 'static {
     /// The message sent to the actor
     type Message: ActorMessage;
 
@@ -40,3 +46,4 @@ pub trait Handler<E: SystemEvent> {
     /// Called when the actor recieves an event
     async fn event(&mut self, context: Context, event: E) -> Result<(), ActorError>;
 }
+
