@@ -1,72 +1,39 @@
 
 use async_trait::async_trait;
-use fluxion::{actor::{Actor, ActorMessage, ActorID, ActorContext}, system::{SystemEvent, System}};
+use fluxion::actor::{Actor, ActorMessage, ActorError, Context};
 
-
-#[derive(Clone, Debug)]
-enum TestMessage {
-    Ping,
-    Pong
-}
+struct TestMessage;
 
 impl ActorMessage for TestMessage {
-    type Response = TestMessage;
+    type Response = ();
 }
 
-#[derive(Debug, Clone)]
-struct TestEvent;
-
-impl SystemEvent for TestEvent {}
-
-struct TestActor {
-    
-}
+struct TestActor;
 
 #[async_trait]
-impl Actor<TestMessage, TestEvent> for TestActor {
-    /// Run when the actor is started
-    async fn initialize(&mut self, context: &mut ActorContext<TestEvent>) {
-        let id = context.metadata.id.clone();
-        println!("Initialized actor {id}");
+impl Actor for TestActor {
+    type Message = TestMessage;
+    type Notify = ();
+    type Dynamic = ();
+
+    async fn initialize(&mut self, _context: Context) -> Result<(), ActorError> {
+        Ok(())
     }
 
-    /// Run when an actor is stopped
-    async fn deinitialize(&mut self, context: &mut ActorContext<TestEvent>) {
-        let id = context.metadata.id.clone();
-        println!("Deinitialized actor {id}");
+    async fn deinitialize(&mut self, _context: Context) -> Result<(), ActorError> {
+        Ok(())
     }
 
-    async fn message(&mut self, context: &mut ActorContext<TestEvent>, message: TestMessage) -> <TestMessage as ActorMessage>::Response {
-        let id = context.metadata.id.clone();
-        println!("Actor {id} recieved Message {message:?}");
-        match message {
-            TestMessage::Ping => TestMessage::Pong,
-            TestMessage::Pong => TestMessage::Ping
-        }
+    async fn notify(&mut self, _context: Context, _notify: Self::Notify) -> Result<(), ActorError> {
+        Ok(())
     }
 
-    async fn event(&mut self, context: &mut ActorContext<TestEvent>, event: TestEvent) {
-        let id = context.metadata.id.clone();
-        println!("Actor {id} recieved event {event:?}");
+    async fn message(&mut self, _context: Context, _message: Self::Message) -> Result<<Self::Message as ActorMessage>::Response, ActorError> {
+        Ok(())
     }
 }
 
 #[tokio::main]
 async fn main() {
-    let system = System::new(String::from("sys1"));
 
-    let actor = TestActor {};
-    let id: ActorID = String::from("test");
-
-    let ah = system.add_actor(actor, id.clone()).await;
-
-    println!("{:?}", ah.request(TestMessage::Ping).await);
-
-    system.remove_actor(&id).await;
-
-    system.send_event(TestEvent {}).await;
-
-    // Queue the system for shutdown.
-    // Cleanup will happen when it is dropped
-    system.shutdown().await;
 }
