@@ -2,7 +2,7 @@ use std::{any::Any, collections::HashMap, sync::Arc};
 
 use tokio::sync::{RwLock, broadcast};
 
-use crate::{actor::{ActorID, handle::ActorHandle, Actor, supervisor::ActorSupervisor}, error::SystemError};
+use crate::{actor::{ActorID, handle::ActorHandle, Actor, supervisor::ActorSupervisor, NotifyHandler}, error::{SystemError, ErrorPolicyCollection}};
 
 /// # SystemNotification
 /// This marker trait should be implemented for any type which will be used as a system notification.
@@ -52,7 +52,7 @@ impl<N: SystemNotification> System<N> {
     }
 
     /// Adds an actor to the system
-    pub async fn add_actor<A: Actor>(&self, actor: A, id: ActorID) -> Result<ActorHandle, SystemError> {
+    pub async fn add_actor<A: Actor + NotifyHandler<N>>(&self, actor: A, id: ActorID, error_policy: ErrorPolicyCollection) -> Result<ActorHandle, SystemError> {
 
         // Lock write access to the actor map
         let mut actors = self.actors.write().await;
@@ -66,7 +66,7 @@ impl<N: SystemNotification> System<N> {
         let system = self.clone();
 
         // Initialize the supervisor
-        let (mut supervisor, handle) = ActorSupervisor::new(actor, id.clone(), system.clone());
+        let (mut supervisor, handle) = ActorSupervisor::new(actor, id.clone(), system.clone(), error_policy);
 
         // Start the supervisor task
         tokio::spawn(async move {

@@ -1,4 +1,4 @@
-use super::ActorMetadata;
+use super::{ActorMetadata, ActorID};
 
 
 
@@ -15,5 +15,10 @@ impl ActorHandle {
         Self {
             metadata,
         }
+    }
+
+    /// Retrieves the actor's id
+    pub fn get_id(&self) -> ActorID {
+        self.metadata.id.clone()
     }
 }

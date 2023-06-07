@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::{error::ActorError, system::SystemNotification};
+use crate::{error::{ActorError, ErrorPolicyCollection}, system::SystemNotification};
 
 use self::context::ActorContext;
 
@@ -21,7 +21,10 @@ pub type ActorID = String;
 /// Contains the metadata of a specific actor.
 #[derive(Clone, Debug)]
 pub struct ActorMetadata {
-    id: ActorID
+    /// The id of the actor
+    id: ActorID,
+    /// The error policy collection of the actor
+    error_policy: ErrorPolicyCollection,
 }
 
 /// # ActorMessage
