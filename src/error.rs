@@ -1,3 +1,5 @@
+use std::io::Error;
+
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -30,6 +32,7 @@ impl Default for ErrorPolicy {
 }
 
 
+
 /// # ErrorPolicyCollection
 /// Contains a collection of error policies for different situations.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -44,6 +47,10 @@ pub struct ErrorPolicyCollection {
     pub notify_closed: ErrorPolicy,
     /// The error policy used when a notification handler fails
     pub notify_handler: ErrorPolicy,
+    /// The error policy used when the federated message channel is closed
+    pub federated_closed: ErrorPolicy,
+    /// The error policy used when a federated message handler fials
+    pub federated_handler: ErrorPolicy
 }
 
 impl Default for ErrorPolicyCollection {
@@ -53,7 +60,9 @@ impl Default for ErrorPolicyCollection {
             deinitialize: Default::default(),
             notify_lag: ErrorPolicy::Ignore,
             notify_closed: ErrorPolicy::Shutdown,
-            notify_handler: ErrorPolicy::Ignore
+            notify_handler: ErrorPolicy::Ignore,
+            federated_closed: ErrorPolicy::Shutdown,
+            federated_handler: ErrorPolicy::Ignore
         }
     }
 }

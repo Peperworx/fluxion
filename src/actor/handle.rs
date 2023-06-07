@@ -1,6 +1,6 @@
 use tokio::sync::mpsc;
 
-use super::{ActorMetadata, ActorID, MessageHandler, ActorMessage};
+use super::{ActorMetadata, ActorID, ActorMessage, MessageType};
 
 
 
@@ -11,7 +11,7 @@ pub struct ActorHandle<F: ActorMessage> {
     /// The metadata of the referenced actor
     pub(crate) metadata: ActorMetadata,
     /// The mpsc sender for the federated message
-    pub(crate) federated_sender: mpsc::Sender<F>,
+    pub(crate) federated_sender: mpsc::Sender<MessageType<F>>,
 }
 
 impl<F: ActorMessage> ActorHandle<F> {

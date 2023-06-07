@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use tokio::sync::oneshot;
 
 use crate::{error::{ActorError, ErrorPolicyCollection}, system::SystemNotification};
 
@@ -32,7 +33,17 @@ pub struct ActorMetadata {
 /// It contains one associated type `Response`, which should be set to the response type of the message.
 pub trait ActorMessage: Clone + Send + Sync + 'static {
     /// The response type of the message
-    type Response;
+    type Response: Send + Sync + 'static;
+}
+
+/// # MessageType
+/// This enum provides two possible message types: one off messages and requests.
+/// This dictates how an actor supervisor will respond to a particular message
+enum MessageType<T: ActorMessage> {
+    /// A One Off message that does not require a response
+    OneOff(T),
+    /// A Request, which will require a responst of type T::Response. This is achieved by using a oneshot::Sender.
+    Response(T, oneshot::Sender<T::Response>)
 }
 
 /// # Actor
