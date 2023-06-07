@@ -50,8 +50,6 @@ pub trait Actor: Send + Sync + 'static {
 /// # NotifyHandler
 /// NotifyHandler contains a single function `notified` that is called whenever an actor recieves a notification from the system.
 /// The `notified` function has a default implementation that simply returns `Ok(())`.
-/// `NotifyHandler<()>` is implemented by default for all implementors of `Actor`, and uses the aformentioned default implementation.
-/// This default implementation can be overriden on a per-actor basis.
 #[async_trait]
 pub trait NotifyHandler<N: SystemNotification> {
     /// Called when the actor recieves a notification
@@ -59,9 +57,6 @@ pub trait NotifyHandler<N: SystemNotification> {
         Ok(())
     }
 }
-
-#[async_trait]
-impl<A> NotifyHandler<()> for A where A: Actor {}
 
 /// # MessageHandler
 /// MessageHandler contains a single function `message`, which is called whenever the actor recieves a message.

@@ -2,7 +2,7 @@
 
 
 use async_trait::async_trait;
-use fluxion::{actor::{Actor, ActorMessage, context::ActorContext, MessageHandler}, error::ActorError};
+use fluxion::{actor::{Actor, ActorMessage, context::ActorContext, MessageHandler, NotifyHandler}, error::{ActorError, ErrorPolicyCollection}, system::System};
 
 struct TestMessage;
 
@@ -24,9 +24,10 @@ impl Actor for TestActor {
 }
 
 #[async_trait]
-impl MessageHandler<TestMessage> for TestActor {
-    async fn message(&mut self, _context: &mut ActorContext, _message: TestMessage) -> Result<<TestMessage as ActorMessage>::Response, ActorError> {
-        println!("Recieved Message");
+impl NotifyHandler<()> for TestActor {
+    async fn notified(&mut self, context: &mut ActorContext, _notification: ()) -> Result<(), ActorError> {
+        let id = context.get_id();
+        println!("Actor {id} recieved a notification.");
         Ok(())
     }
 }
@@ -35,4 +36,13 @@ impl MessageHandler<TestMessage> for TestActor {
 
 #[tokio::main]
 async fn main() {
+
+    let sys = System::<()>::new("sys1".to_string());
+
+
+
+    let _ar = sys.add_actor(TestActor {}, "test1".to_string(), ErrorPolicyCollection::default()).await.unwrap();
+    let _ar = sys.add_actor(TestActor {}, "test2".to_string(), ErrorPolicyCollection::default()).await.unwrap();
+    let _ar = sys.add_actor(TestActor {}, "test3".to_string(), ErrorPolicyCollection::default()).await.unwrap();
+    println!("{}", sys.notify(()));
 }

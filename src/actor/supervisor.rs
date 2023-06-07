@@ -59,7 +59,7 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>> ActorSupervisor<A, N> {
 
         // Create an actor context
         let mut context = ActorContext {
-
+            metadata: self.metadata.clone()
         };
 
         // Initialize the actor, following initialization retry error policy
