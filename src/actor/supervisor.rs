@@ -112,7 +112,7 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>> ActorSupervisor<A, N> {
                             broadcast::error::RecvError::Closed => self.metadata.error_policy.notify_closed,
                             broadcast::error::RecvError::Lagged(_) => self.metadata.error_policy.notify_lag,
                         };
-
+                        
                         // Match on the error policy
                         match policy {
                             ErrorPolicy::Ignore => {
@@ -141,7 +141,7 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>> ActorSupervisor<A, N> {
             tokio::select! {
                 notification = notify_recieve => {
 
-                    // If failed, exit
+                    // If failed, exit the actor
                     if !notification.1 {
                         break;
                     }

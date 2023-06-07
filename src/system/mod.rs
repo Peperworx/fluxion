@@ -37,7 +37,7 @@ impl<N: SystemNotification> System<N> {
     /// Creates a new system with SystemID id
     pub fn new(id: SystemID) -> Self {
         // Create a new notification sender
-        let (notify_sender, _) = broadcast::channel(64);
+        let (notify_sender, _) = broadcast::channel(1024);
 
         Self {
             id,
@@ -112,5 +112,12 @@ impl<N: SystemNotification> System<N> {
     /// Returns a notification Reciever for recieving notifications
     pub fn subscribe_notify(&self) -> broadcast::Receiver<N> {
         self.notify_sender.subscribe()
+    }
+
+    /// Yields the current task until all notifications have been recieved
+    pub async fn drain_notify(&self) {
+        while self.notify_sender.len() > 0 {
+            tokio::task::yield_now().await;
+        }
     }
 }
