@@ -1,26 +1,31 @@
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 
 use crate::{system::{System, SystemNotification}, actor::NotifyHandler, error::{ErrorPolicyCollection, ErrorPolicy}};
 
-use super::{ActorMetadata, Actor, ActorID, handle::ActorHandle, context::ActorContext};
+use super::{ActorMetadata, Actor, ActorID, handle::ActorHandle, context::ActorContext, ActorMessage};
 
 
 
 /// # ActorSupervisor
 /// This struct is responsible for handling a specific actor's entire lifecycle, including initialization, message processing, an deinitialization.
-pub struct ActorSupervisor<A: Actor + NotifyHandler<N>, N: SystemNotification> {
+pub struct ActorSupervisor<A: Actor + NotifyHandler<N>, N: SystemNotification, F: ActorMessage> {
     /// Contains the metadata of the running actor.
     metadata: ActorMetadata,
     /// Stores the actual actor
     actor: A,
     /// Stores the notification reciever
     notify_reciever: broadcast::Receiver<N>,
+    /// Stores the federated message reciever
+    federated_reciever: mpsc::Receiver<F>
 }
 
-impl<N: SystemNotification, A: Actor + NotifyHandler<N>> ActorSupervisor<A, N> {
+impl<N: SystemNotification, A: Actor + NotifyHandler<N>, F: ActorMessage> ActorSupervisor<A, N, F> {
 
     /// Creates a new supervisor from an actor, id, and system
-    pub fn new(actor: A, id: ActorID, system: System<N>, error_policy: ErrorPolicyCollection) -> (ActorSupervisor<A, N>, ActorHandle) {
+    pub fn new(actor: A, id: ActorID, system: System<N, F>, error_policy: ErrorPolicyCollection) -> (ActorSupervisor<A, N, F>, ActorHandle<F>) {
+
+        // Create an mpsc channel to send federated messages through
+        let (fedtx, fedrx) = mpsc::channel(64);
 
         // Subscribe to the notification reciever
         let notify_reciever = system.subscribe_notify();
@@ -36,10 +41,14 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>> ActorSupervisor<A, N> {
             metadata: metadata.clone(),
             actor, 
             notify_reciever,
+            federated_reciever: fedrx,
         };
 
         // Create the handle
-        let handle = ActorHandle::new(metadata);
+        let handle = ActorHandle {
+            metadata,
+            federated_sender: fedtx
+        };
 
 
         (supervisor, handle)
@@ -55,7 +64,7 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>> ActorSupervisor<A, N> {
     /// 
     /// # Panics
     /// This function panics any error is returned from the actor. This will be replaced with better error handling later.
-    pub async fn run(&mut self, _system: System<N>) {
+    pub async fn run(&mut self, _system: System<N, F>) {
 
         // Create an actor context
         let mut context = ActorContext {

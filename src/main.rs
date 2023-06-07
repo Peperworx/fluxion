@@ -1,9 +1,7 @@
 use async_trait::async_trait;
-use fluxion::{actor::{Actor, ActorMessage, context::ActorContext, NotifyHandler}, error::{ActorError, ErrorPolicyCollection}, system::System};
-use tokio::{sync::RwLock, time};
+use fluxion::{actor::{Actor, ActorMessage, context::ActorContext, NotifyHandler, FederatedHandler}, error::{ActorError, ErrorPolicyCollection}, system::System};
 
-static ACTOROK: RwLock<Vec<bool>> = RwLock::const_new(Vec::new());
-
+#[derive(Clone)]
 struct TestMessage;
 
 impl ActorMessage for TestMessage {
@@ -27,39 +25,28 @@ impl Actor for TestActor {
 #[async_trait]
 impl NotifyHandler<()> for TestActor {
     async fn notified(&mut self, _context: &mut ActorContext, _notification: ()) -> Result<(), ActorError> {
-        
-        let mut aok = ACTOROK.write().await;
-        aok.push(true);
+        println!("notified");
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl FederatedHandler<TestMessage> for TestActor {
+    async fn federated_message(&mut self, _context: &mut ActorContext, _message: TestMessage) -> Result<(), ActorError> {
+        println!("Recieved federated message");
         Ok(())
     }
 }
 
 
-
 #[tokio::main]
 async fn main() {
     
-    let sys = System::<()>::new("sys1".to_string());
+    let sys = System::<(), TestMessage>::new("sys1".to_string());
 
-    let l = 1000000;
-    let start = time::Instant::now();
-    for i in 0..l {
-        sys.add_actor(TestActor {}, i.to_string(), ErrorPolicyCollection::default()).await.unwrap();
-    }
-    let end = time::Instant::now() - start;
-    println!("Initializing {l} actors took {end:?}");
-
-    let start = time::Instant::now();
+    let ar = sys.add_actor(TestActor {}, "test actor".to_string(), ErrorPolicyCollection::default()).await.unwrap();
+    
     sys.notify(());
-    sys.drain_notify().await;
     
-    let end = time::Instant::now() - start;
-    println!("Notifying {l} actors took {end:?}");
-
-    let aok = ACTOROK.read().await;
-    println!("{}", aok.len());
-    assert!(aok.len() == l);
-    assert!(aok.iter().all(|v| *v));
-    
-    }
+}
     

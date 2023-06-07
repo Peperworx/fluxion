@@ -30,7 +30,7 @@ pub struct ActorMetadata {
 /// # ActorMessage
 /// This trait should be implemented for any type which will be used as a message.
 /// It contains one associated type `Response`, which should be set to the response type of the message.
-pub trait ActorMessage {
+pub trait ActorMessage: Clone + Send + Sync + 'static {
     /// The response type of the message
     type Response;
 }

@@ -1,8 +1,8 @@
-use std::{any::Any, collections::HashMap, sync::Arc};
+use std::{any::Any, collections::HashMap, sync::Arc, marker::PhantomData};
 
 use tokio::sync::{RwLock, broadcast};
 
-use crate::{actor::{ActorID, handle::ActorHandle, Actor, supervisor::ActorSupervisor, NotifyHandler}, error::{SystemError, ErrorPolicyCollection}};
+use crate::{actor::{ActorID, handle::ActorHandle, Actor, supervisor::ActorSupervisor, NotifyHandler, ActorMessage, FederatedHandler}, error::{SystemError, ErrorPolicyCollection}};
 
 /// # SystemNotification
 /// This marker trait should be implemented for any type which will be used as a system notification.
@@ -23,16 +23,18 @@ pub type SystemID = String;
 /// # System
 /// The System manages all actors, messages, notifications, and events.
 #[derive(Clone)]
-pub struct System<N: SystemNotification> {
+pub struct System<N: SystemNotification, F: ActorMessage> {
     id: SystemID,
     /// This is a Arc to a RwLock of a HashMap containing the actors. This allows the system to be repeatedly cloned while
     /// still being able to access the same map of actors.
     actors: Arc<RwLock<HashMap<ActorID, Box<ActorType>>>>,
     /// This broadcast Sender is used to send a notification to all actors.
-    notify_sender: broadcast::Sender<N>
+    notify_sender: broadcast::Sender<N>,
+    /// This phantom data is used to force a system to behave as if it stores the federated message type
+    _phantom_federated: PhantomData<F>
 }
 
-impl<N: SystemNotification> System<N> {
+impl<N: SystemNotification, F: ActorMessage> System<N, F> {
 
     /// Creates a new system with SystemID id
     pub fn new(id: SystemID) -> Self {
@@ -42,7 +44,8 @@ impl<N: SystemNotification> System<N> {
         Self {
             id,
             actors: Default::default(),
-            notify_sender
+            notify_sender,
+            _phantom_federated: PhantomData::default()
         }
     }
 
@@ -52,7 +55,7 @@ impl<N: SystemNotification> System<N> {
     }
 
     /// Adds an actor to the system
-    pub async fn add_actor<A: Actor + NotifyHandler<N>>(&self, actor: A, id: ActorID, error_policy: ErrorPolicyCollection) -> Result<ActorHandle, SystemError> {
+    pub async fn add_actor<A: Actor + NotifyHandler<N> + FederatedHandler<F>>(&self, actor: A, id: ActorID, error_policy: ErrorPolicyCollection) -> Result<ActorHandle<F>, SystemError> {
 
         // Lock write access to the actor map
         let mut actors = self.actors.write().await;
@@ -81,7 +84,7 @@ impl<N: SystemNotification> System<N> {
     }
 
     /// Retrieves an actor from the system, returning None if the actor does not exist
-    pub async fn get_actor(&self, id: &ActorID) -> Option<ActorHandle> {
+    pub async fn get_actor(&self, id: &ActorID) -> Option<ActorHandle<F>> {
 
         // Lock read access to the actor map
         let actors = self.actors.read().await;
@@ -96,7 +99,6 @@ impl<N: SystemNotification> System<N> {
     }
 
     /// Broadcasts a notification to all actors, and returns the number of actors that recieved the notification.
-    /// 
     /// # Note
     /// Beneath this function, Fluxion uses a tokio broadcast channel. When Recievers exist, the broadcast channel's send function returns an error.
     /// This function abstracts away the error, and returns 0 if there are no listeners. This is because there may be some points in time when no actors exist,
