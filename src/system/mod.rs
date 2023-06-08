@@ -30,6 +30,8 @@ pub struct System<N: SystemNotification, F: ActorMessage> {
     actors: Arc<RwLock<HashMap<ActorID, Box<ActorType>>>>,
     /// This broadcast Sender is used to send a notification to all actors.
     notify_sender: broadcast::Sender<N>,
+    /// This broadcast Sender is used to cleanup all actors immediately.
+    shutdown_sender: broadcast::Sender<()>,
     /// This phantom data is used to force a system to behave as if it stores the federated message type
     _phantom_federated: PhantomData<F>
 }
@@ -41,10 +43,14 @@ impl<N: SystemNotification, F: ActorMessage> System<N, F> {
         // Create a new notification sender
         let (notify_sender, _) = broadcast::channel(1024);
 
+        // Create a new shutdown sender
+        let (shutdown_sender, _) = broadcast::channel(1);
+
         Self {
             id,
             actors: Default::default(),
             notify_sender,
+            shutdown_sender,
             _phantom_federated: PhantomData::default()
         }
     }
@@ -65,15 +71,12 @@ impl<N: SystemNotification, F: ActorMessage> System<N, F> {
             return Err(SystemError::ActorAlreadyExists);
         }
 
-        // Clone the system (self)
-        let system = self.clone();
-
         // Initialize the supervisor
-        let (mut supervisor, handle) = ActorSupervisor::new(actor, id.clone(), system.clone(), error_policy);
+        let (mut supervisor, handle) = ActorSupervisor::new(actor, id.clone(), self.clone(), error_policy);
 
         // Start the supervisor task
         tokio::spawn(async move {
-            supervisor.run(system).await;
+            supervisor.run().await;
         });
 
         // Insert the handle into the map
@@ -112,7 +115,7 @@ impl<N: SystemNotification, F: ActorMessage> System<N, F> {
     }
 
     /// Returns a notification Reciever for recieving notifications
-    pub fn subscribe_notify(&self) -> broadcast::Receiver<N> {
+    pub(crate) fn subscribe_notify(&self) -> broadcast::Receiver<N> {
         self.notify_sender.subscribe()
     }
 
@@ -122,4 +125,30 @@ impl<N: SystemNotification, F: ActorMessage> System<N, F> {
             tokio::task::yield_now().await;
         }
     }
+
+    /// Shutsdown all actors ont he system.
+    /// 
+    /// # Note
+    /// This does not shutdown the system itself, but only actors running on the system. The system is cleaned up at drop.
+    /// Even after calling this function, actors can still be added to the system. This returns the number of actors shutdown.
+    pub fn shutdown(&self) -> usize {
+        if let Ok(v) = self.shutdown_sender.send(()) {
+            v
+        } else {
+            0
+        }
+    }
+
+    /// Subscribes to the shutdown reciever
+    pub(crate) fn subscribe_shutdown(&self) -> broadcast::Receiver<()> {
+        self.shutdown_sender.subscribe()
+    }
+
+    /// Waits until all actors have shutdown
+    pub async fn drain_shutdown(&self) {
+        while !self.shutdown_sender.is_empty() {
+            tokio::task::yield_now().await;
+        }
+    }
 }
+

@@ -8,23 +8,30 @@ use super::{ActorMetadata, Actor, ActorID, handle::ActorHandle, context::ActorCo
 
 /// # ActorSupervisor
 /// This struct is responsible for handling a specific actor's entire lifecycle, including initialization, message processing, an deinitialization.
-pub struct ActorSupervisor<A: Actor + NotifyHandler<N>, N: SystemNotification> {
+pub struct ActorSupervisor<A: Actor + NotifyHandler<N>, N: SystemNotification, F: ActorMessage> {
     /// Contains the metadata of the running actor.
     metadata: ActorMetadata,
     /// Stores the actual actor
     actor: A,
+    /// The system
+    system: System<N, F>,
     /// Stores the notification reciever
     notify_reciever: broadcast::Receiver<N>,
+    /// Stores the shutdown reciever
+    shutdown_reciever: broadcast::Receiver<()>,
 }
 
-impl<N: SystemNotification, A: Actor + NotifyHandler<N>> ActorSupervisor<A, N> {
+impl<N: SystemNotification, A: Actor + NotifyHandler<N>, F: ActorMessage> ActorSupervisor<A, N, F> {
 
     /// Creates a new supervisor from an actor, id, and system
-    pub fn new<F: ActorMessage>(actor: A, id: ActorID, system: System<N, F>, error_policy: ErrorPolicyCollection) -> (ActorSupervisor<A, N>, ActorHandle) {
+    pub fn new(actor: A, id: ActorID, system: System<N, F>, error_policy: ErrorPolicyCollection) -> (ActorSupervisor<A, N, F>, ActorHandle) {
 
 
         // Subscribe to the notification reciever
         let notify_reciever = system.subscribe_notify();
+
+        // Subscribe to the shutdown reciever
+        let shutdown_reciever = system.subscribe_shutdown();
 
         // Create the actor metadata
         let metadata = ActorMetadata {
@@ -35,8 +42,10 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>> ActorSupervisor<A, N> {
         // Create the supervisor
         let supervisor = ActorSupervisor {
             metadata: metadata.clone(),
-            actor, 
+            actor,
+            system,
             notify_reciever,
+            shutdown_reciever
         };
 
         // Create the handle
@@ -60,7 +69,7 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>> ActorSupervisor<A, N> {
     /// 
     /// # Panics
     /// This function panics any error is returned from the actor. This will be replaced with better error handling later.
-    pub async fn run<F: ActorMessage>(&mut self, _system: System<N, F>) {
+    pub async fn run(&mut self) {
 
         // Create an actor context
         let mut context = ActorContext {
@@ -86,6 +95,10 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>> ActorSupervisor<A, N> {
         loop {
 
             tokio::select! {
+                _ = self.shutdown_reciever.recv() => {
+                    // Just shutdown no matter what happened
+                    break;
+                },
                 notification = handle_policy!(
                     self.notify_reciever.recv().await,
                     |e| match e {
@@ -127,7 +140,7 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>> ActorSupervisor<A, N> {
 
         // Deinitialize the actor, following deinitialization retry error policy
         let _ = handle_policy!(
-            self.actor.initialize(&mut context).await,
+            self.actor.deinitialize(&mut context).await,
             |_| self.metadata.error_policy.deinitialize,
             (), ActorError).await;
         

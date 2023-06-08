@@ -13,12 +13,11 @@ struct TestActor;
 #[async_trait]
 impl Actor for TestActor {
     async fn initialize(&mut self, _context: &mut ActorContext) -> Result<(), ActorError> {
-        println!("initialized actor");
         Ok(())
     }
 
     async fn deinitialize(&mut self, _context: &mut ActorContext) -> Result<(), ActorError> {
-        println!("deinitialized actor");
+
         Ok(())
     }
 }
@@ -26,7 +25,6 @@ impl Actor for TestActor {
 #[async_trait]
 impl NotifyHandler<()> for TestActor {
     async fn notified(&mut self, _context: &mut ActorContext, _notification: ()) -> Result<(), ActorError> {
-        println!("notified");
         Ok(())
     }
 }
@@ -34,7 +32,6 @@ impl NotifyHandler<()> for TestActor {
 #[async_trait]
 impl FederatedHandler<TestMessage> for TestActor {
     async fn federated_message(&mut self, _context: &mut ActorContext, _message: TestMessage) -> Result<(), ActorError> {
-        println!("Recieved federated message");
         Ok(())
     }
 }
@@ -45,13 +42,32 @@ async fn main() {
     
     let sys = System::<(), TestMessage>::new("sys1".to_string());
 
-    sys.add_actor(TestActor {}, "test actor".to_string(), ErrorPolicyCollection::default()).await.unwrap();
+    // The number of actors to create
+    let l = 1000000;
+
+    // Create l actors and time it
+    let start = tokio::time::Instant::now();
+    for i in 0..l {
+        sys.add_actor(TestActor {}, i.to_string(), ErrorPolicyCollection::default()).await.unwrap();
+    }
+    let end = tokio::time::Instant::now() - start;
+    println!("Initializing {l} actors took {end:?}");
+    println!("\tMean time per actor: {:?}", end/l);
     
+    // Notify l actors and time it
+    let start = tokio::time::Instant::now();
     sys.notify(());
     sys.drain_notify().await;
-    drop(sys);
-    // Todo: shutdown here
-    // Will use timeout for now
-    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+    let end = tokio::time::Instant::now() - start;
+    println!("Notifying {l} actors took {end:?}");
+    println!("\tMean time per actor: {:?}", end/l);
+
+    // Shutdown l actors and time it
+    let start = tokio::time::Instant::now();
+    sys.shutdown();
+    sys.drain_shutdown().await;
+    let end = tokio::time::Instant::now() - start;
+    println!("Shutting down {l} actors took {end:?}");
+    println!("\tMean time per actor: {:?}", end/l);
 }
     
