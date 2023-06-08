@@ -1,4 +1,3 @@
-use tokio::sync::mpsc;
 
 use super::{ActorMetadata, ActorID, ActorMessage, MessageType};
 

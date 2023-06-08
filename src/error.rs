@@ -1,6 +1,4 @@
-use std::io::Error;
 
-use futures::Future;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -32,57 +30,7 @@ impl Default for ErrorPolicy {
     }
 }
 
-impl ErrorPolicy {
-    /// Handles the error policy for a given async function f. The policy is chosen by calling policy_resolver, passing the error value returned by the function.
-    /// If the return value Ok(return), then the policy succeeded. If the contained result is an Error, it should be ignored or logged. If the returned value
-    /// is Err(error), then the error should be handled.
-    pub async fn handle_policy<T, E, P, F, Fut>(f: F, policy_resolver: P) -> Result<Result<T,E>,E>
-    where
-        F: Fn() -> Fut,
-        Fut: Future<Output = Result<T, E>>,
-        P: Fn(&E) -> ErrorPolicy,
-    {
-        // Count the number of retries done, in case the policy type is Retry.
-        let mut retry_count = 0;
 
-        // Loop until either success or failure
-        loop {
-
-            // Call the passed function and save the return type
-            let r = f().await;
-
-            // If error, unpack the error. If not, return Ok.
-            let Err(returned_error) = r else {
-                return Ok(r)
-            };
-
-            // Resolve the policy
-            let policy = policy_resolver(&returned_error);
-
-            // Match on the policy
-            match policy {
-                ErrorPolicy::Ignore => {
-                    // Ignore the error and return ok
-                    return Ok(Err(returned_error));
-                },
-                ErrorPolicy::Retry(ct) => {
-                    // If retry count has been reached, then fail, returning the error
-                    if retry_count >= ct {
-                        return Err(returned_error)
-                    }
-
-                    // If not, increment and try again
-                    retry_count += 1;
-                    continue;
-                },
-                ErrorPolicy::Shutdown => {
-                    // Fail and return the error
-                    return Err(returned_error);
-                }
-            }
-        }
-    }
-}
 
 
 /// # ErrorPolicyCollection
@@ -117,4 +65,45 @@ impl Default for ErrorPolicyCollection {
             federated_handler: ErrorPolicy::Ignore
         }
     }
+}
+
+/// Macro to handle error policies.
+#[macro_export]
+macro_rules! handle_policy {
+    ($checked:expr, $policy:expr, $ret:ty, $e:ty) => {
+        async {
+            let mut retry_count = 0;
+
+            loop {
+                // Get the result
+                let res: Result<$ret, $e> = $checked;
+
+                // If failed, then get the error and resolve the policy
+                let Err(e) = res else {
+                    return Ok(res);
+                };
+
+                // Resolve the policy
+                let policy: $crate::error::ErrorPolicy = $policy;
+
+                // Handle the policy
+                match policy {
+                    // If ignoring, just pass through
+                    $crate::error::ErrorPolicy::Ignore => {
+                        return Ok(Err(e))
+                    }
+                    $crate::error::ErrorPolicy::Retry(rty) => {
+                        if retry_count >= rty {
+                            return Err(Err(e) as Result<$ret, $e>); // If retries reached, then it is a failure
+                        } else {
+                            retry_count += 1; // If not, then retry one more time
+                        }
+                    },
+                    $crate::error::ErrorPolicy::Shutdown => {
+                        return Err(Err(e));
+                    },
+                };
+            }
+        }
+    };
 }
