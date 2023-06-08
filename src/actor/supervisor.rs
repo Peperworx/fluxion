@@ -1,8 +1,8 @@
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::{system::{System, SystemNotification}, actor::NotifyHandler, error::{ErrorPolicyCollection, ActorError}, handle_policy};
 
-use super::{ActorMetadata, Actor, ActorID, handle::ActorHandle, context::ActorContext, ActorMessage};
+use super::{ActorMetadata, Actor, ActorID, handle::ActorHandle, context::ActorContext, ActorMessage, FederatedHandler};
 
 
 
@@ -19,12 +19,14 @@ pub struct ActorSupervisor<A: Actor + NotifyHandler<N>, N: SystemNotification, F
     notify_reciever: broadcast::Receiver<N>,
     /// Stores the shutdown reciever
     shutdown_reciever: broadcast::Receiver<()>,
+    /// Stores the message reciever
+    federated_reciever: mpsc::Receiver<(F, Option<oneshot::Sender<F::Response>>)>,
 }
 
-impl<N: SystemNotification, A: Actor + NotifyHandler<N>, F: ActorMessage> ActorSupervisor<A, N, F> {
+impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F: ActorMessage> ActorSupervisor<A, N, F> {
 
     /// Creates a new supervisor from an actor, id, and system
-    pub fn new(actor: A, id: ActorID, system: System<N, F>, error_policy: ErrorPolicyCollection) -> (ActorSupervisor<A, N, F>, ActorHandle) {
+    pub fn new(actor: A, id: ActorID, system: System<N, F>, error_policy: ErrorPolicyCollection) -> (ActorSupervisor<A, N, F>, ActorHandle<F>) {
 
 
         // Subscribe to the notification reciever
@@ -32,6 +34,9 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>, F: ActorMessage> ActorS
 
         // Subscribe to the shutdown reciever
         let shutdown_reciever = system.subscribe_shutdown();
+
+        // Create a message channel
+        let (federated_sender, federated_reciever) = mpsc::channel(16);
 
         // Create the actor metadata
         let metadata = ActorMetadata {
@@ -45,13 +50,13 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>, F: ActorMessage> ActorS
             actor,
             system,
             notify_reciever,
-            shutdown_reciever
+            shutdown_reciever,
+            federated_reciever
         };
 
         // Create the handle
-        let handle = ActorHandle {
-            metadata,
-        };
+        let handle = ActorHandle::new(metadata,
+            federated_sender);
 
 
         (supervisor, handle)
@@ -113,11 +118,11 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>, F: ActorMessage> ActorS
                         if let Ok(n) = n {
                             // Handle policy for the notification handler
                             let handled = handle_policy!(
-                                self.actor.notified(&mut context, n).await,
+                                self.actor.notified(&mut context, n.clone()).await,
                                 |_| self.metadata.error_policy.notify_handler,
                                 (), ActorError
                             ).await;
-                            
+
                             // If error, exit
                             if handled.is_err() {
                                 break;
@@ -125,6 +130,60 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>, F: ActorMessage> ActorS
                         }
                     } else {
                         // Stop the actor if not ok
+                        break;
+                    }
+                },
+                federated_message = handle_policy!(
+                    self.federated_reciever.recv().await.ok_or(ActorError::OutOfMessages),
+                    |_| self.metadata.error_policy.federated_closed,
+                    (F, Option<oneshot::Sender<F::Response>>), ActorError
+                ) => {
+
+                    // If Ok, continue to handler
+                    if let Ok(m) = federated_message {
+
+                        // If ok, then handle
+                        if let Ok(m) = m {
+                            // Call the handler
+                            let handled = handle_policy!(
+                                self.actor.federated_message(&mut context, m.0.clone()).await,
+                                |_| self.metadata.error_policy.federated_handler,
+                                F::Response, ActorError
+                            ).await;
+
+                            // If error, break
+                            if handled.is_err() {
+                                break;
+                            }
+
+                            // If both are Ok, and we are supposed to return, then return
+                            if let Ok(Ok(ret)) = handled {
+                                
+                                let Some(sender) = m.1 else {
+                                    continue;
+                                };
+                                
+                                // Send the oneshot
+                                let e = sender.send(ret);
+
+                                // Special error policy handling. Because of the one shot, Retry will be treated the same as Shutdown
+                                if e.is_err() {
+                                    match self.metadata.error_policy.federated_respond {
+                                        crate::error::ErrorPolicy::Ignore => {
+                                            continue;
+                                        },
+                                        crate::error::ErrorPolicy::Retry(_) => {
+                                            break;
+                                        },
+                                        crate::error::ErrorPolicy::Shutdown => {
+                                            break;
+                                        },
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // Stop the actor if error
                         break;
                     }
                 }

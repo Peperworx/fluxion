@@ -2,7 +2,7 @@ use std::{any::Any, collections::HashMap, sync::Arc, marker::PhantomData};
 
 use tokio::sync::{RwLock, broadcast};
 
-use crate::{actor::{ActorID, handle::ActorHandle, Actor, supervisor::ActorSupervisor, NotifyHandler, ActorMessage, FederatedHandler}, error::{SystemError, ErrorPolicyCollection}};
+use crate::{actor::{ActorID, handle::ActorHandle, Actor, supervisor::ActorSupervisor, NotifyHandler, ActorMessage, FederatedHandler, MessageHandler}, error::{SystemError, ErrorPolicyCollection}};
 
 /// # SystemNotification
 /// This marker trait should be implemented for any type which will be used as a system notification.
@@ -61,7 +61,7 @@ impl<N: SystemNotification, F: ActorMessage> System<N, F> {
     }
 
     /// Adds an actor to the system
-    pub async fn add_actor<A: Actor + NotifyHandler<N> + FederatedHandler<F>>(&self, actor: A, id: ActorID, error_policy: ErrorPolicyCollection) -> Result<ActorHandle, SystemError> {
+    pub async fn add_actor<A: Actor + NotifyHandler<N> + FederatedHandler<F>>(&self, actor: A, id: ActorID, error_policy: ErrorPolicyCollection) -> Result<ActorHandle<F>, SystemError> {
 
         // Lock write access to the actor map
         let mut actors = self.actors.write().await;
@@ -87,7 +87,7 @@ impl<N: SystemNotification, F: ActorMessage> System<N, F> {
     }
 
     /// Retrieves an actor from the system, returning None if the actor does not exist
-    pub async fn get_actor(&self, id: &ActorID) -> Option<ActorHandle> {
+    pub async fn get_actor(&self, id: &ActorID) -> Option<ActorHandle<F>> {
 
         // Lock read access to the actor map
         let actors = self.actors.read().await;

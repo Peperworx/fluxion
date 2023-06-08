@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use fluxion::{actor::{Actor, ActorMessage, context::ActorContext, NotifyHandler, FederatedHandler}, error::{ActorError, ErrorPolicyCollection}, system::System};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 struct TestMessage;
 
 impl ActorMessage for TestMessage {
@@ -32,6 +32,7 @@ impl NotifyHandler<()> for TestActor {
 #[async_trait]
 impl FederatedHandler<TestMessage> for TestActor {
     async fn federated_message(&mut self, _context: &mut ActorContext, _message: TestMessage) -> Result<(), ActorError> {
+        println!("recieved federated");
         Ok(())
     }
 }
@@ -39,11 +40,21 @@ impl FederatedHandler<TestMessage> for TestActor {
 
 #[tokio::main]
 async fn main() {
+    let sys = System::<(), TestMessage>::new("sys1".to_string());
+
+    let ar = sys.add_actor(TestActor {}, "test".to_string(), ErrorPolicyCollection::default()).await.unwrap();
+
+    ar.send_federated(TestMessage {}).await.unwrap();
+
+    sys.shutdown();
+    sys.drain_shutdown().await;
+}
+    
+
+async fn benchmark(l: u32) {
     
     let sys = System::<(), TestMessage>::new("sys1".to_string());
 
-    // The number of actors to create
-    let l = 1000000;
 
     // Create l actors and time it
     let start = tokio::time::Instant::now();
@@ -70,4 +81,3 @@ async fn main() {
     println!("Shutting down {l} actors took {end:?}");
     println!("\tMean time per actor: {:?}", end/l);
 }
-    

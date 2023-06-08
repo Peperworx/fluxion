@@ -1,15 +1,22 @@
 
+use std::io::Error;
+
 use thiserror::Error;
+use tokio::sync::mpsc;
 
 #[derive(Clone, Debug, Error)]
 pub enum ActorError {
-
+    #[error("The message reiever has ran out of messages")]
+    OutOfMessages,
+    #[error("A federated message failed to send")]
+    FederatedSendError,
 }
 
 #[derive(Clone, Debug, Error)]
 pub enum SystemError {
     #[error("The actor with that id already exists in the system")]
     ActorAlreadyExists,
+    
 }
 
 /// # ErrorPolicy
@@ -49,8 +56,12 @@ pub struct ErrorPolicyCollection {
     pub notify_handler: ErrorPolicy,
     /// The error policy used when the federated message channel is closed
     pub federated_closed: ErrorPolicy,
-    /// The error policy used when a federated message handler fials
-    pub federated_handler: ErrorPolicy
+    /// The error policy used when a federated message handler fails
+    pub federated_handler: ErrorPolicy,
+    /// The error policy used when a federated message handler is unable to respond
+    pub federated_respond: ErrorPolicy,
+    /// The error policy used when a federated message fails to send
+    pub federated_send: ErrorPolicy,
 }
 
 impl Default for ErrorPolicyCollection {
@@ -62,7 +73,9 @@ impl Default for ErrorPolicyCollection {
             notify_closed: ErrorPolicy::Shutdown,
             notify_handler: ErrorPolicy::Ignore,
             federated_closed: ErrorPolicy::Shutdown,
-            federated_handler: ErrorPolicy::Ignore
+            federated_handler: ErrorPolicy::Ignore,
+            federated_respond: ErrorPolicy::Ignore,
+            federated_send: ErrorPolicy::Shutdown,
         }
     }
 }
@@ -96,13 +109,13 @@ macro_rules! handle_policy {
                     }
                     $crate::error::ErrorPolicy::Retry(rty) => {
                         if _retry_count >= rty {
-                            return Err(Err(e) as Result<$ret, $e>); // If retries reached, then it is a failure
+                            return Err(e); // If retries reached, then it is a failure
                         } else {
                             _retry_count += 1; // If not, then retry one more time
                         }
                     },
                     $crate::error::ErrorPolicy::Shutdown => {
-                        return Err(Err(e));
+                        return Err(e);
                     },
                 }
             }
