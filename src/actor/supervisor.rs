@@ -115,8 +115,7 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>, F: ActorMessage> ActorS
                                 
                                 // Handle policy for the notification handler
                                 let handled = handle_policy!(
-                                    // TODO: Consider finding a way to remove n.clone() here in the future.
-                                    self.actor.notified(&mut context, n.clone()).await,
+                                    self.actor.notified(&mut context, n).await,
                                     |_| self.metadata.error_policy.notify_handler,
                                     (), ActorError
                                 ).await;
