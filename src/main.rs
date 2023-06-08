@@ -13,6 +13,7 @@ struct TestActor;
 #[async_trait]
 impl Actor for TestActor {
     async fn initialize(&mut self, _context: &mut ActorContext) -> Result<(), ActorError> {
+        println!("initialized actor");
         Ok(())
     }
 
@@ -44,9 +45,13 @@ async fn main() {
     
     let sys = System::<(), TestMessage>::new("sys1".to_string());
 
-    let ar = sys.add_actor(TestActor {}, "test actor".to_string(), ErrorPolicyCollection::default()).await.unwrap();
+    sys.add_actor(TestActor {}, "test actor".to_string(), ErrorPolicyCollection::default()).await.unwrap();
     
     sys.notify(());
-    
+    sys.drain_notify().await;
+    drop(sys);
+    // Todo: shutdown here
+    // Will use timeout for now
+    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 }
     

@@ -1,8 +1,8 @@
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::broadcast;
 
-use crate::{system::{System, SystemNotification}, actor::NotifyHandler, error::{ErrorPolicyCollection, ErrorPolicy, ActorError}, handle_policy};
+use crate::{system::{System, SystemNotification}, actor::NotifyHandler, error::{ErrorPolicyCollection, ActorError}, handle_policy};
 
-use super::{ActorMetadata, Actor, ActorID, handle::ActorHandle, context::ActorContext, ActorMessage, MessageType, FederatedHandler};
+use super::{ActorMetadata, Actor, ActorID, handle::ActorHandle, context::ActorContext, ActorMessage};
 
 
 
@@ -70,7 +70,7 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>> ActorSupervisor<A, N> {
         // Initialize the actor, following initialization retry error policy
         let a = handle_policy!(
             self.actor.initialize(&mut context).await,
-            self.metadata.error_policy.initialize,
+            |_| self.metadata.error_policy.initialize,
             (), ActorError).await;
         
         // If error, exit
@@ -83,14 +83,52 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>> ActorSupervisor<A, N> {
 
 
         // Continuously recieve messages
-        'event: loop {
-           break;
+        loop {
+
+            tokio::select! {
+                notification = handle_policy!(
+                    self.notify_reciever.recv().await,
+                    |e| match e {
+                        broadcast::error::RecvError::Closed => self.metadata.error_policy.notify_closed,
+                        broadcast::error::RecvError::Lagged(_) => self.metadata.error_policy.notify_lag,
+                    },
+                    N, broadcast::error::RecvError
+                ) => {
+                    // If Ok, then continue on with operation
+                    if let Ok(n) = notification {
+                        // If n is Ok, handle. If not, just continue
+                        match n {
+                            Ok(n) => {
+                                
+                                // Handle policy for the notification handler
+                                let handled = handle_policy!(
+                                    // TODO: Consider finding a way to remove n.clone() here in the future.
+                                    self.actor.notified(&mut context, n.clone()).await,
+                                    |_| self.metadata.error_policy.notify_handler,
+                                    (), ActorError
+                                ).await;
+
+                                // If error, exit
+                                if handled.is_err() {
+                                    break;
+                                }
+                            },
+                            Err(e) => {
+                                println!("{:?}", e);
+                            }
+                        }
+                    } else {
+                        // Stop the actor if not ok
+                        break;
+                    }
+                }
+            }
         }
 
         // Deinitialize the actor, following deinitialization retry error policy
         let _ = handle_policy!(
             self.actor.initialize(&mut context).await,
-            self.metadata.error_policy.initialize,
+            |_| self.metadata.error_policy.deinitialize,
             (), ActorError).await;
         
         // We dont even care if it was ok or error until logging is implemented.

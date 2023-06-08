@@ -1,12 +1,12 @@
 
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 pub enum ActorError {
 
 }
 
-#[derive(Debug, Error)]
+#[derive(Clone, Debug, Error)]
 pub enum SystemError {
     #[error("The actor with that id already exists in the system")]
     ActorAlreadyExists,
@@ -67,12 +67,15 @@ impl Default for ErrorPolicyCollection {
     }
 }
 
-/// Macro to handle error policies.
+/// Macro to handle error policies. Errors must implement clone.
 #[macro_export]
+
 macro_rules! handle_policy {
     ($checked:expr, $policy:expr, $ret:ty, $e:ty) => {
         async {
-            let mut retry_count = 0;
+            // This macro used a bunch of underscores to fix some really weird warnings, without relying on unstable
+            // to add attributes to individual expressions.
+            let mut _retry_count = 0;
 
             loop {
                 // Get the result
@@ -83,26 +86,25 @@ macro_rules! handle_policy {
                     return Ok(res);
                 };
 
-                // Resolve the policy
-                let policy: $crate::error::ErrorPolicy = $policy;
+                let _e2 = e.clone();
 
-                // Handle the policy
-                match policy {
+                // Resolve and handle the policy
+                match $policy(_e2) {
                     // If ignoring, just pass through
                     $crate::error::ErrorPolicy::Ignore => {
                         return Ok(Err(e))
                     }
                     $crate::error::ErrorPolicy::Retry(rty) => {
-                        if retry_count >= rty {
+                        if _retry_count >= rty {
                             return Err(Err(e) as Result<$ret, $e>); // If retries reached, then it is a failure
                         } else {
-                            retry_count += 1; // If not, then retry one more time
+                            _retry_count += 1; // If not, then retry one more time
                         }
                     },
                     $crate::error::ErrorPolicy::Shutdown => {
                         return Err(Err(e));
                     },
-                };
+                }
             }
         }
     };

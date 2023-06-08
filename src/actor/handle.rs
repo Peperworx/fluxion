@@ -1,5 +1,5 @@
 
-use super::{ActorMetadata, ActorID, ActorMessage, MessageType};
+use super::{ActorMetadata, ActorID};
 
 
 

@@ -19,7 +19,6 @@ pub mod message;
 
 // Pub uses for message types
 pub use message::ActorMessage;
-pub(crate) use message::MessageType;
 
 /// # ActorID
 /// The type by which an actor is identified. Currently set to `String`

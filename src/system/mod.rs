@@ -118,7 +118,7 @@ impl<N: SystemNotification, F: ActorMessage> System<N, F> {
 
     /// Yields the current task until all notifications have been recieved
     pub async fn drain_notify(&self) {
-        while self.notify_sender.len() > 0 {
+        while !self.notify_sender.is_empty() {
             tokio::task::yield_now().await;
         }
     }

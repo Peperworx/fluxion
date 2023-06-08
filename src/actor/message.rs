@@ -12,7 +12,7 @@ pub trait ActorMessage: Clone + Send + Sync + 'static {
 
 /// # MessageType
 /// This enum provides different message types that actors can recieve.
-pub(crate) enum MessageType<M: ActorMessage, F: ActorMessage> {
+pub enum MessageType<M: ActorMessage, F: ActorMessage> {
     /// A Federated Message. If `1` is Some, then a response is expected.
     FederatedMessage(F, Option<oneshot::Sender<Result<F::Response, ActorError>>>),
     /// A regular message. If `1` is Some, then a response is expected.
