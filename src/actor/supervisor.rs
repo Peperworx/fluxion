@@ -110,23 +110,17 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N>, F: ActorMessage> ActorS
                     // If Ok, then continue on with operation
                     if let Ok(n) = notification {
                         // If n is Ok, handle. If not, just continue
-                        match n {
-                            Ok(n) => {
-                                
-                                // Handle policy for the notification handler
-                                let handled = handle_policy!(
-                                    self.actor.notified(&mut context, n).await,
-                                    |_| self.metadata.error_policy.notify_handler,
-                                    (), ActorError
-                                ).await;
-
-                                // If error, exit
-                                if handled.is_err() {
-                                    break;
-                                }
-                            },
-                            Err(e) => {
-                                println!("{:?}", e);
+                        if let Ok(n) = n {
+                            // Handle policy for the notification handler
+                            let handled = handle_policy!(
+                                self.actor.notified(&mut context, n).await,
+                                |_| self.metadata.error_policy.notify_handler,
+                                (), ActorError
+                            ).await;
+                            
+                            // If error, exit
+                            if handled.is_err() {
+                                break;
                             }
                         }
                     } else {
