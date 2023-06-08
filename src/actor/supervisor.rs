@@ -8,24 +8,20 @@ use super::{ActorMetadata, Actor, ActorID, handle::ActorHandle, context::ActorCo
 
 /// # ActorSupervisor
 /// This struct is responsible for handling a specific actor's entire lifecycle, including initialization, message processing, an deinitialization.
-pub struct ActorSupervisor<A: Actor + NotifyHandler<N> + FederatedHandler<F>, N: SystemNotification, F: ActorMessage> {
+pub struct ActorSupervisor<A: Actor + NotifyHandler<N>, N: SystemNotification> {
     /// Contains the metadata of the running actor.
     metadata: ActorMetadata,
     /// Stores the actual actor
     actor: A,
     /// Stores the notification reciever
     notify_reciever: broadcast::Receiver<N>,
-    /// Stores the federated message reciever
-    federated_reciever: mpsc::Receiver<MessageType<F>>
 }
 
-impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F: ActorMessage> ActorSupervisor<A, N, F> {
+impl<N: SystemNotification, A: Actor + NotifyHandler<N>> ActorSupervisor<A, N> {
 
     /// Creates a new supervisor from an actor, id, and system
-    pub fn new(actor: A, id: ActorID, system: System<N, F>, error_policy: ErrorPolicyCollection) -> (ActorSupervisor<A, N, F>, ActorHandle<F>) {
+    pub fn new<F: ActorMessage>(actor: A, id: ActorID, system: System<N, F>, error_policy: ErrorPolicyCollection) -> (ActorSupervisor<A, N>, ActorHandle) {
 
-        // Create an mpsc channel to send federated messages through
-        let (fedtx, fedrx) = mpsc::channel(64);
 
         // Subscribe to the notification reciever
         let notify_reciever = system.subscribe_notify();
@@ -41,13 +37,11 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
             metadata: metadata.clone(),
             actor, 
             notify_reciever,
-            federated_reciever: fedrx,
         };
 
         // Create the handle
         let handle = ActorHandle {
             metadata,
-            federated_sender: fedtx
         };
 
 
@@ -64,7 +58,7 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
     /// 
     /// # Panics
     /// This function panics any error is returned from the actor. This will be replaced with better error handling later.
-    pub async fn run(&mut self, _system: System<N, F>) {
+    pub async fn run<F: ActorMessage>(&mut self, _system: System<N, F>) {
 
         // Create an actor context
         let mut context = ActorContext {
@@ -147,45 +141,6 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
                 }
             };
 
-            // This will return a tuple (Option<F>, bool). If the bool is false, the operation failed and was not recovered.
-            // If this is the case, the actor should exit. If Option is Some, then proceed, if not then continue.
-            let p_federated_recv = async {
-                let mut retry_count = 0;
-
-                loop {
-                    // Get the result
-                    let r = self.federated_reciever.recv().await;
-
-                    // If successful, return
-                    if r.is_some() {
-                        return (r, true);
-                    }
-
-                    // If not, then match on the policy
-                    match self.metadata.error_policy.federated_closed {
-                        ErrorPolicy::Ignore => {
-                            // Ignore the error
-                            return (None, true);
-                        },
-                        ErrorPolicy::Retry(ct) => {
-                            // If retry count has been reached, then fail, shutting down the actor
-                            if retry_count >= ct {
-                                return (None, false);
-                            }
-
-                            // If not, increment and try again
-                            retry_count += 1;
-                            continue;
-                        },
-                        ErrorPolicy::Shutdown => {
-                            // Return none and false to indicate shutdown
-                            return (None, false);
-                        }
-                    }
-                }
-                
-            };
-
             tokio::select! {
                 notification = p_notify_recieve => {
 
@@ -244,65 +199,7 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
                     }
                     
                 },
-                federated_message = p_federated_recv => {
-
-                    // If failed, break
-                    if !federated_message.1 {
-                        break;
-                    }
-
-                    // If some, then send the message and determine whether to send a response
-                    if let Some(m) = federated_message.0 {
-
-                        // Get the message
-                        let (msg, responder) = match m {
-                            MessageType::OneOff(msg) => (msg.clone(), red),
-                            MessageType::Response(msg, res) => (msg.clone(), Some(res)),
-                        };
-
-                        // Handle the error policy
-                        let r = async {
-                            let mut retry_count = 0;
-                            loop {
-                                // Get the result
-                                let r = self.actor.federated_message(&mut context, msg.clone()).await;
-                            
-                            
-                                // If successful, return
-                                if r.is_ok() {
-                                    return (r, true);
-                                }
-                            
-                                // If not, then match on the policy
-                                match self.metadata.error_policy.federated_handler {
-                                    ErrorPolicy::Ignore => {
-                                        // Ignore the error
-                                        return (r, true);
-                                    },
-                                    ErrorPolicy::Retry(ct) => {
-                                        // If retry count has been reached, then fail, shutting down the actor
-                                        if retry_count >= ct {
-                                            return (r, false);
-                                            }
-                                    
-                                        // If not, increment and try again
-                                        retry_count += 1;
-                                        continue;
-                                    },
-                                    ErrorPolicy::Shutdown => {
-                                        // Return none and false to indicate shutdown
-                                        return (r, false);
-                                    }
-                                }
-                            }
-                        }.await;
-
-                        // If failed, exit the actor
-                        if !r.1 {
-                            break;
-                        }
-                    }
-                }
+                
             }
         }
 
