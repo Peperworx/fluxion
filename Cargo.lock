@@ -69,7 +69,6 @@ dependencies = [
  "futures",
  "human_bytes",
  "memory-stats",
- "mimalloc",
  "thiserror",
  "tokio 1.28.2",
  "tokio-metrics",
@@ -192,16 +191,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b00cc1c228a6782d0f076e7b232802e0c5689d41bb5df366f2a6b6621cfdfe1"
 
 [[package]]
-name = "libmimalloc-sys"
-version = "0.1.33"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4ac0e912c8ef1b735e92369695618dc5b1819f5a7bf3f167301a3ba1cea515e"
-dependencies = [
- "cc",
- "libc",
-]
-
-[[package]]
 name = "log"
 version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -224,15 +213,6 @@ checksum = "34f79cf9964c5c9545493acda1263f1912f8d2c56c8a2ffee2606cb960acaacc"
 dependencies = [
  "libc",
  "winapi",
-]
-
-[[package]]
-name = "mimalloc"
-version = "0.1.37"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e2894987a3459f3ffb755608bd82188f8ed00d0ae077f1edea29c068d639d98"
-dependencies = [
- "libmimalloc-sys",
 ]
 
 [[package]]

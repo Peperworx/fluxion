@@ -10,7 +10,6 @@ async-trait = "0.1.68"
 futures = "0.3.28"
 human_bytes = { version = "0.4.2", default_features = false}
 memory-stats = "1.1.0"
-mimalloc = "0.1.37"
 thiserror = "1.0.40"
 tokio = { git = "https://github.com/tokio-rs/tokio.git", features = ["rt", "rt-multi-thread", "sync", "macros"] }
 tokio-metrics = "0.2.2"
