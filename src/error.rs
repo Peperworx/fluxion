@@ -1,8 +1,5 @@
-
-use std::io::Error;
-
 use thiserror::Error;
-use tokio::sync::mpsc;
+
 
 #[derive(Clone, Debug, Error)]
 pub enum ActorError {
@@ -10,7 +7,9 @@ pub enum ActorError {
     OutOfMessages,
     #[error("A federated message failed to send")]
     FederatedSendError,
-}
+    #[error("A federated message was sent, but it failed to recieve a response")]
+    FederatedResponseError,
+}   
 
 #[derive(Clone, Debug, Error)]
 pub enum SystemError {

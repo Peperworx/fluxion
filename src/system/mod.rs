@@ -2,7 +2,7 @@ use std::{any::Any, collections::HashMap, sync::Arc, marker::PhantomData};
 
 use tokio::sync::{RwLock, broadcast};
 
-use crate::{actor::{ActorID, handle::ActorHandle, Actor, supervisor::ActorSupervisor, NotifyHandler, ActorMessage, FederatedHandler, MessageHandler}, error::{SystemError, ErrorPolicyCollection}};
+use crate::{actor::{ActorID, handle::ActorHandle, Actor, supervisor::ActorSupervisor, NotifyHandler, ActorMessage, FederatedHandler}, error::{SystemError, ErrorPolicyCollection}};
 
 /// # SystemNotification
 /// This marker trait should be implemented for any type which will be used as a system notification.

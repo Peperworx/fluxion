@@ -139,52 +139,56 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
                     (F, Option<oneshot::Sender<F::Response>>), ActorError
                 ) => {
 
-                    // If Ok, continue to handler
-                    if let Ok(m) = federated_message {
-
-                        // If ok, then handle
-                        if let Ok(m) = m {
-                            // Call the handler
-                            let handled = handle_policy!(
-                                self.actor.federated_message(&mut context, m.0.clone()).await,
-                                |_| self.metadata.error_policy.federated_handler,
-                                F::Response, ActorError
-                            ).await;
-
-                            // If error, break
-                            if handled.is_err() {
-                                break;
-                            }
-
-                            // If both are Ok, and we are supposed to return, then return
-                            if let Ok(Ok(ret)) = handled {
-                                
-                                let Some(sender) = m.1 else {
-                                    continue;
-                                };
-                                
-                                // Send the oneshot
-                                let e = sender.send(ret);
-
-                                // Special error policy handling. Because of the one shot, Retry will be treated the same as Shutdown
-                                if e.is_err() {
-                                    match self.metadata.error_policy.federated_respond {
-                                        crate::error::ErrorPolicy::Ignore => {
-                                            continue;
-                                        },
-                                        crate::error::ErrorPolicy::Retry(_) => {
-                                            break;
-                                        },
-                                        crate::error::ErrorPolicy::Shutdown => {
-                                            break;
-                                        },
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        // Stop the actor if error
+                    // If it is an error, stop the actor
+                    let Ok(reciever_result) = federated_message else {
                         break;
+                    };
+
+                    // If the result from the reciever is an error, continue because the policy succeeded.
+                    let Ok(message) = reciever_result else {
+                        continue;
+                    };
+
+                    // Call the handler
+                    let handler_policy_result = handle_policy!(
+                        self.actor.federated_message(&mut context, message.0.clone()).await,
+                        |_| self.metadata.error_policy.federated_handler,
+                        F::Response, ActorError
+                    ).await;
+                    
+                    // If it is an error, then break
+                    let Ok(handler_result) = handler_policy_result else {
+                        break;
+                    };
+
+                    // If the handler's result is an error, continue because the policy succeeded.
+                    let Ok(response) = handler_result else {
+                        continue;
+                    };
+
+                    
+                    // If we shouldn't respond, continue to the next loop iteration
+                    let Some(sender) = message.1 else {
+                        continue;
+                    };
+                    
+                    // Otherwise,
+                    // Send the oneshot
+                    let e = sender.send(response);
+
+                    // Special error policy handling. Because of the one shot, Retry will be treated the same as Shutdown
+                    if e.is_err() {
+                        match self.metadata.error_policy.federated_respond {
+                            crate::error::ErrorPolicy::Ignore => {
+                                continue;
+                            },
+                            crate::error::ErrorPolicy::Retry(_) => {
+                                break;
+                            },
+                            crate::error::ErrorPolicy::Shutdown => {
+                                break;
+                            },
+                        }   
                     }
                 }
             }

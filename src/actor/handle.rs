@@ -1,8 +1,7 @@
 
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{error::ActorError, handle_policy};
-
+use crate::error::ActorError;
 use super::{ActorMetadata, ActorID,ActorMessage};
 
 
@@ -32,12 +31,34 @@ impl<F: ActorMessage> ActorHandle<F> {
     }
 
     /// Sends a federated message
-    pub async fn send_federated(&self, message: F) -> Result<(), (ActorError, F)> {
+    pub async fn send_federated(&self, message: F) -> Result<(), ActorError> {
         match self.federated_sender.send((message, None)).await {
             Ok(_) => Ok(()),
-            Err(e) => Err((ActorError::FederatedSendError, e.0.0)),
+            Err(_) => Err(ActorError::FederatedSendError),
         }
     }
 
-    
+    // Sends a federated message and waits for a response
+    pub async fn request_federated(&self, message: F) -> Result<F::Response, ActorError> {
+
+        // Create the oneshot channel for the response
+        let (tx, rx) = oneshot::channel();
+
+        // Send the message
+        let sent =  self.federated_sender.send((message, Some(tx))).await;
+
+        // If it errored, return an error.
+        if sent.is_err() {
+            return Err(ActorError::FederatedSendError);
+        };
+
+        // Await recieve
+        let ret = rx.await;
+
+        // If Ok return, if Err, error
+        match ret {
+            Ok(v) => Ok(v),
+            Err(_) => Err(ActorError::FederatedResponseError),
+        }
+    }
 }
