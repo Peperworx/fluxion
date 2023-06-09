@@ -1,7 +1,14 @@
+
+
 use async_trait::async_trait;
 use fluxion::{actor::{Actor, ActorMessage, context::ActorContext, NotifyHandler, FederatedHandler}, error::{ActorError, ErrorPolicyCollection}, system::System};
 use memory_stats::memory_stats;
 use human_bytes::human_bytes;
+
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 #[derive(Debug, Clone)]
 struct TestMessage;
@@ -42,9 +49,22 @@ impl FederatedHandler<TestMessage> for TestActor {
 #[tokio::main]
 async fn main() {
     let sys = System::<(), TestMessage>::new("sys1".to_string());
-    loop {
-        benchmark(1000000, &sys).await;
+    benchmarknio(100000, &sys).await;
+}
+
+
+async fn benchmarknio(l: u32, sys: &System<(), TestMessage>) {
+    println!("Initializing Actors");
+    for i in 0..l {
+        sys.add_actor(TestActor {}, i.to_string(), ErrorPolicyCollection::default()).await.unwrap();
     }
+    
+    println!("Notifying Actors");
+    sys.notify(());
+    sys.drain_notify().await;
+    
+    println!("Cleanup");
+    sys.shutdown().await;
 }
 
 async fn benchmark(l: u32, sys: &System<(), TestMessage>) {
@@ -52,10 +72,11 @@ async fn benchmark(l: u32, sys: &System<(), TestMessage>) {
     
    
 
-    println!("\t{:?}", human_bytes(memory_stats().unwrap().physical_mem as f64));
+    
     // Create l actors and time it
     let start = std::time::Instant::now();
     for i in 0..l {
+        println!("add");
         sys.add_actor(TestActor {}, i.to_string(), ErrorPolicyCollection::default()).await.unwrap();
     }
     let end = std::time::Instant::now() - start;
@@ -78,5 +99,9 @@ async fn benchmark(l: u32, sys: &System<(), TestMessage>) {
     let end = std::time::Instant::now() - start;
     println!("Shutting down {l} actors took {end:?}");
     println!("\tMean time per actor: {:?}", end/l);
+    println!("\t{:?}", human_bytes(memory_stats().unwrap().physical_mem as f64));
+
+    // Drop the system then record memory
+    drop(sys);
     println!("\t{:?}", human_bytes(memory_stats().unwrap().physical_mem as f64));
 }

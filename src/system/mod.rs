@@ -42,7 +42,7 @@ impl<N: SystemNotification, F: ActorMessage> System<N, F> {
     /// Creates a new system with SystemID id
     pub fn new(id: SystemID) -> Self {
         // Create a new notification sender
-        let (notify_sender, _) = broadcast::channel(1024);
+        let (notify_sender, _) = broadcast::channel(16);
 
         // Create a new shutdown sender
         let (shutdown_sender, _) = broadcast::channel(1);
@@ -78,6 +78,9 @@ impl<N: SystemNotification, F: ActorMessage> System<N, F> {
         // Start the supervisor task
         tokio::spawn(async move {
             supervisor.run().await;
+            supervisor.cleanup().await;
+            
+            drop(supervisor);
         });
 
         // Insert the handle into the map

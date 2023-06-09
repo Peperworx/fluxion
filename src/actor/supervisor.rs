@@ -93,7 +93,6 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
         // If error, exit
         // TODO: Log
         if a.is_err() {
-            self.cleanup().await;
             return;
         }
 
@@ -207,13 +206,11 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
         
 
         // We dont even care if it was ok or error until logging is implemented.
-
-        // Make sure that the task is properly cleaned up
-        self.cleanup().await;
     }
 
-    async fn cleanup(&mut self) {
+    pub async fn cleanup(&mut self) {
         // Close all channels
         self.federated_reciever.close();
+        
     }
 }
