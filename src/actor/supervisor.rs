@@ -93,6 +93,7 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
         // If error, exit
         // TODO: Log
         if a.is_err() {
+            self.cleanup().await;
             return;
         }
 
@@ -100,12 +101,12 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
 
 
         // Continuously recieve messages
-        loop {
+        'event: loop {
 
             tokio::select! {
                 _ = self.shutdown_reciever.recv() => {
                     // Just shutdown no matter what happened
-                    break;
+                    break 'event;
                 },
                 notification = handle_policy!(
                     self.notify_reciever.recv().await,
@@ -128,12 +129,12 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
 
                             // If error, exit
                             if handled.is_err() {
-                                break;
+                                break 'event;
                             }
                         }
                     } else {
                         // Stop the actor if not ok
-                        break;
+                        break 'event;
                     }
                 },
                 federated_message = handle_policy!(
@@ -144,7 +145,7 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
 
                     // If it is an error, stop the actor
                     let Ok(reciever_result) = federated_message else {
-                        break;
+                        break 'event;
                     };
 
                     // If the result from the reciever is an error, continue because the policy succeeded.
@@ -161,7 +162,7 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
                     
                     // If it is an error, then break
                     let Ok(handler_result) = handler_policy_result else {
-                        break;
+                        break 'event;
                     };
 
                     // If the handler's result is an error, continue because the policy succeeded.
@@ -186,10 +187,10 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
                                 continue;
                             },
                             crate::error::ErrorPolicy::Retry(_) => {
-                                break;
+                                break 'event;
                             },
                             crate::error::ErrorPolicy::Shutdown => {
-                                break;
+                                break 'event;
                             },
                         }   
                     }
@@ -203,6 +204,16 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
             |_| self.metadata.error_policy.deinitialize,
             (), ActorError).await;
         
+        
+
         // We dont even care if it was ok or error until logging is implemented.
+
+        // Make sure that the task is properly cleaned up
+        self.cleanup().await;
+    }
+
+    async fn cleanup(&mut self) {
+        // Close all channels
+        self.federated_reciever.close();
     }
 }

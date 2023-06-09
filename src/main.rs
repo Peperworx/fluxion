@@ -38,44 +38,43 @@ impl FederatedHandler<TestMessage> for TestActor {
 }
 
 
-#[tokio::main(flavor = "multi_thread")]
+#[tokio::main]
 async fn main() {
-    
-    for i in 0..5 {
-        benchmark(1000000).await;
-        
+    let sys = System::<(), TestMessage>::new("sys1".to_string());
+    loop {
+        benchmark(1000000, &sys).await;
     }
 }
-    
 
-async fn benchmark(l: u32) {
+async fn benchmark(l: u32, sys: &System<(), TestMessage>) {
     
     
-    let sys = System::<(), TestMessage>::new("sys1".to_string());
+   
 
     println!("\t{:?}", human_bytes(memory_stats().unwrap().physical_mem as f64));
     // Create l actors and time it
-    let start = tokio::time::Instant::now();
+    let start = std::time::Instant::now();
     for i in 0..l {
         sys.add_actor(TestActor {}, i.to_string(), ErrorPolicyCollection::default()).await.unwrap();
     }
-    let end = tokio::time::Instant::now() - start;
+    let end = std::time::Instant::now() - start;
     println!("Initializing {l} actors took {end:?}");
     println!("\tMean time per actor: {:?}", end/l);
     println!("\t{:?}", human_bytes(memory_stats().unwrap().physical_mem as f64));
     
     // Notify l actors and time it
-    let start = tokio::time::Instant::now();
+    let start = std::time::Instant::now();
     sys.notify(());
     sys.drain_notify().await;
-    let end = tokio::time::Instant::now() - start;
+    let end = std::time::Instant::now() - start;
     println!("Notifying {l} actors took {end:?}");
     println!("\tMean time per actor: {:?}", end/l);
     println!("\t{:?}", human_bytes(memory_stats().unwrap().physical_mem as f64));
+    
     // Shutdown l actors and time it
-    let start = tokio::time::Instant::now();
+    let start = std::time::Instant::now();
     sys.shutdown().await;
-    let end = tokio::time::Instant::now() - start;
+    let end = std::time::Instant::now() - start;
     println!("Shutting down {l} actors took {end:?}");
     println!("\tMean time per actor: {:?}", end/l);
     println!("\t{:?}", human_bytes(memory_stats().unwrap().physical_mem as f64));

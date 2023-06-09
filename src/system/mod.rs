@@ -74,7 +74,7 @@ impl<N: SystemNotification, F: ActorMessage> System<N, F> {
 
         // Initialize the supervisor
         let (mut supervisor, handle) = ActorSupervisor::new(actor, id.clone(), self.clone(), error_policy);
-
+        
         // Start the supervisor task
         tokio::spawn(async move {
             supervisor.run().await;
@@ -145,7 +145,7 @@ impl<N: SystemNotification, F: ActorMessage> System<N, F> {
 
         // Clear the list
         actors.clear();
-        *actors = HashMap::new();
+        actors.shrink_to_fit();
 
         // Remove the lock
         drop(actors);
