@@ -8,6 +8,10 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1.68"
 futures = "0.3.28"
+human_bytes = { version = "0.4.2", default_features = false}
+memory-stats = "1.1.0"
+mimalloc = "0.1.37"
 thiserror = "1.0.40"
-tokio = { version = "1.28.1", features = ["full"] }
+tokio = { git = "https://github.com/tokio-rs/tokio.git", features = ["full"] }
+tokio-metrics = "0.2.2"
 

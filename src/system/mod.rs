@@ -4,6 +4,7 @@ use tokio::sync::{RwLock, broadcast};
 
 use crate::{actor::{ActorID, handle::ActorHandle, Actor, supervisor::ActorSupervisor, NotifyHandler, ActorMessage, FederatedHandler}, error::{SystemError, ErrorPolicyCollection}};
 
+
 /// # SystemNotification
 /// This marker trait should be implemented for any type which will be used as a system notification.
 /// This is by default implemented for all types that are `Clone + Send + Sync + 'static`
@@ -126,17 +127,33 @@ impl<N: SystemNotification, F: ActorMessage> System<N, F> {
         }
     }
 
-    /// Shutsdown all actors ont he system.
+    /// Shutsdown all actors on the system, drains the shutdown channel, and then clears all actors
     /// 
     /// # Note
     /// This does not shutdown the system itself, but only actors running on the system. The system is cleaned up at drop.
     /// Even after calling this function, actors can still be added to the system. This returns the number of actors shutdown.
-    pub fn shutdown(&self) -> usize {
-        if let Ok(v) = self.shutdown_sender.send(()) {
+    pub async fn shutdown(&self) -> usize {
+        // Send the shutdown signal
+        let res = if let Ok(v) = self.shutdown_sender.send(()) {
             v
         } else {
             0
-        }
+        };
+
+        // Borrow the actor map as writable
+        let mut actors = self.actors.write().await;
+
+        // Clear the list
+        actors.clear();
+        *actors = HashMap::new();
+
+        // Remove the lock
+        drop(actors);
+
+        // Drain the shutdown list
+        self.drain_shutdown().await;
+
+        res
     }
 
     /// Subscribes to the shutdown reciever
@@ -145,7 +162,7 @@ impl<N: SystemNotification, F: ActorMessage> System<N, F> {
     }
 
     /// Waits until all actors have shutdown
-    pub async fn drain_shutdown(&self) {
+    async fn drain_shutdown(&self) {
         while !self.shutdown_sender.is_empty() {
             tokio::task::yield_now().await;
         }

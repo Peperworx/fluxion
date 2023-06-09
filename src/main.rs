@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use fluxion::{actor::{Actor, ActorMessage, context::ActorContext, NotifyHandler, FederatedHandler}, error::{ActorError, ErrorPolicyCollection}, system::System};
-
+use memory_stats::memory_stats;
+use human_bytes::human_bytes;
 #[derive(Debug, Clone)]
 struct TestMessage;
 
@@ -37,17 +38,22 @@ impl FederatedHandler<TestMessage> for TestActor {
 }
 
 
-#[tokio::main]
+#[tokio::main(flavor = "multi_thread")]
 async fn main() {
-    benchmark(1000000).await;
+    
+    for i in 0..5 {
+        benchmark(1000000).await;
+        
+    }
 }
     
 
 async fn benchmark(l: u32) {
     
+    
     let sys = System::<(), TestMessage>::new("sys1".to_string());
 
-
+    println!("\t{:?}", human_bytes(memory_stats().unwrap().physical_mem as f64));
     // Create l actors and time it
     let start = tokio::time::Instant::now();
     for i in 0..l {
@@ -56,6 +62,7 @@ async fn benchmark(l: u32) {
     let end = tokio::time::Instant::now() - start;
     println!("Initializing {l} actors took {end:?}");
     println!("\tMean time per actor: {:?}", end/l);
+    println!("\t{:?}", human_bytes(memory_stats().unwrap().physical_mem as f64));
     
     // Notify l actors and time it
     let start = tokio::time::Instant::now();
@@ -64,12 +71,12 @@ async fn benchmark(l: u32) {
     let end = tokio::time::Instant::now() - start;
     println!("Notifying {l} actors took {end:?}");
     println!("\tMean time per actor: {:?}", end/l);
-
+    println!("\t{:?}", human_bytes(memory_stats().unwrap().physical_mem as f64));
     // Shutdown l actors and time it
     let start = tokio::time::Instant::now();
-    sys.shutdown();
-    sys.drain_shutdown().await;
+    sys.shutdown().await;
     let end = tokio::time::Instant::now() - start;
     println!("Shutting down {l} actors took {end:?}");
     println!("\tMean time per actor: {:?}", end/l);
+    println!("\t{:?}", human_bytes(memory_stats().unwrap().physical_mem as f64));
 }

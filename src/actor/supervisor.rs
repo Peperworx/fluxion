@@ -35,14 +35,15 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
         // Subscribe to the shutdown reciever
         let shutdown_reciever = system.subscribe_shutdown();
 
-        // Create a message channel
-        let (federated_sender, federated_reciever) = mpsc::channel(16);
-
         // Create the actor metadata
         let metadata = ActorMetadata {
             id,
             error_policy,
         };
+
+        // Create a channel for federated messages
+        let (federated_sender, federated_reciever) = mpsc::channel(16);
+
 
         // Create the supervisor
         let supervisor = ActorSupervisor {
@@ -55,8 +56,10 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
         };
 
         // Create the handle
-        let handle = ActorHandle::new(metadata,
-            federated_sender);
+        let handle = ActorHandle::new(
+            metadata,
+            federated_sender
+        );
 
 
         (supervisor, handle)
