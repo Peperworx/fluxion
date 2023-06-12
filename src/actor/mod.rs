@@ -62,8 +62,6 @@ pub trait NotifyHandler<N: SystemNotification> {
 /// # MessageHandler
 /// MessageHandler contains a single function `message`, which is called whenever the actor recieves a message.
 /// The `message` function should return a `Result` containing either an `Err` or the response type of the message.
-/// MessageHandler<M> may be implemented more than once for a single actor, provided that the type `M` is different for each
-/// implementation. It is up to the sender of the message to determine which message type `M` to send.
 #[async_trait]
 pub trait MessageHandler<M: ActorMessage> {
     /// Called when the actor recieves a message

@@ -9,7 +9,12 @@ pub enum ActorError {
     FederatedSendError,
     #[error("A federated message was sent, but it failed to recieve a response")]
     FederatedResponseError,
+    #[error("A message failed to send")]
+    MessageSendError,
+    #[error("A message was sent, but it failed to recieve a response")]
+    MessageResponseError,
 }   
+
 
 #[derive(Clone, Debug, Error)]
 pub enum SystemError {
@@ -59,8 +64,12 @@ pub struct ErrorPolicyCollection {
     pub federated_handler: ErrorPolicy,
     /// The error policy used when a federated message handler is unable to respond
     pub federated_respond: ErrorPolicy,
-    /// The error policy used when a federated message fails to send
-    pub federated_send: ErrorPolicy,
+    /// The error policy used when a message channel is closed
+    pub message_closed: ErrorPolicy,
+    /// The error policy usued when a message handler fails
+    pub message_handler: ErrorPolicy,
+    /// The error policy used when a message handler is unable to respond
+    pub message_respond: ErrorPolicy,
 }
 
 impl Default for ErrorPolicyCollection {
@@ -74,7 +83,9 @@ impl Default for ErrorPolicyCollection {
             federated_closed: ErrorPolicy::Shutdown,
             federated_handler: ErrorPolicy::Ignore,
             federated_respond: ErrorPolicy::Ignore,
-            federated_send: ErrorPolicy::Shutdown,
+            message_closed: ErrorPolicy::Shutdown,
+            message_handler: ErrorPolicy::Ignore,
+            message_respond: ErrorPolicy::Ignore,
         }
     }
 }

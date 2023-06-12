@@ -2,13 +2,13 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 
 use crate::{system::{System, SystemNotification}, actor::NotifyHandler, error::{ErrorPolicyCollection, ActorError}, handle_policy};
 
-use super::{ActorMetadata, Actor, ActorID, handle::ActorHandle, context::ActorContext, ActorMessage, FederatedHandler};
+use super::{ActorMetadata, Actor, ActorID, handle::ActorHandle, context::ActorContext, ActorMessage, FederatedHandler, MessageHandler};
 
 
 
 /// # ActorSupervisor
 /// This struct is responsible for handling a specific actor's entire lifecycle, including initialization, message processing, an deinitialization.
-pub struct ActorSupervisor<A: Actor + NotifyHandler<N>, N: SystemNotification, F: ActorMessage> {
+pub struct ActorSupervisor<A: Actor + NotifyHandler<N> + FederatedHandler<F> + MessageHandler<M>, N: SystemNotification, F: ActorMessage, M: ActorMessage> {
     /// Contains the metadata of the running actor.
     metadata: ActorMetadata,
     /// Stores the actual actor
@@ -19,14 +19,16 @@ pub struct ActorSupervisor<A: Actor + NotifyHandler<N>, N: SystemNotification, F
     notify_reciever: broadcast::Receiver<N>,
     /// Stores the shutdown reciever
     shutdown_reciever: broadcast::Receiver<()>,
-    /// Stores the message reciever
+    /// Stores the federated message reciever
     federated_reciever: mpsc::Receiver<(F, Option<oneshot::Sender<F::Response>>)>,
+    /// Stores the message reciever
+    message_reciever: mpsc::Receiver<(M, Option<oneshot::Sender<M::Response>>)>
 }
 
-impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F: ActorMessage> ActorSupervisor<A, N, F> {
+impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F> + MessageHandler<M>, F: ActorMessage, M: ActorMessage> ActorSupervisor<A, N, F, M> {
 
     /// Creates a new supervisor from an actor, id, and system
-    pub fn new(actor: A, id: ActorID, system: System<N, F>, error_policy: ErrorPolicyCollection) -> (ActorSupervisor<A, N, F>, ActorHandle<F>) {
+    pub fn new(actor: A, id: ActorID, system: System<N, F>, error_policy: ErrorPolicyCollection) -> (ActorSupervisor<A, N, F, M>, ActorHandle<F, M>) {
 
 
         // Subscribe to the notification reciever
@@ -44,6 +46,8 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
         // Create a channel for federated messages
         let (federated_sender, federated_reciever) = mpsc::channel(16);
 
+        // Create a channel for messages
+        let (message_sender, message_reciever) = mpsc::channel(16);
 
         // Create the supervisor
         let supervisor = ActorSupervisor {
@@ -52,13 +56,15 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
             system,
             notify_reciever,
             shutdown_reciever,
-            federated_reciever
+            federated_reciever,
+            message_reciever
         };
 
         // Create the handle
         let handle = ActorHandle::new(
             metadata,
-            federated_sender
+            federated_sender,
+            message_sender
         );
 
 
@@ -182,6 +188,64 @@ impl<N: SystemNotification, A: Actor + NotifyHandler<N> + FederatedHandler<F>, F
                     // Special error policy handling. Because of the one shot, Retry will be treated the same as Shutdown
                     if e.is_err() {
                         match self.metadata.error_policy.federated_respond {
+                            crate::error::ErrorPolicy::Ignore => {
+                                continue;
+                            },
+                            crate::error::ErrorPolicy::Retry(_) => {
+                                break 'event;
+                            },
+                            crate::error::ErrorPolicy::Shutdown => {
+                                break 'event;
+                            },
+                        }   
+                    }
+                },
+                recieved_message = handle_policy!(
+                    self.message_reciever.recv().await.ok_or(ActorError::OutOfMessages),
+                    |_| self.metadata.error_policy.message_closed,
+                    (M, Option<oneshot::Sender<M::Response>>), ActorError
+                ) => {
+                    
+                    // If it is an error, stop the actor
+                    let Ok(reciever_result) = recieved_message else {
+                        break 'event;
+                    };
+
+                    // If the result from the reciever is an error, continue because the policy succeeded.
+                    let Ok(message) = reciever_result else {
+                        continue;
+                    };
+
+                    // Call the handler
+                    let handler_policy_result = handle_policy!(
+                        self.actor.message(&mut context, message.0.clone()).await,
+                        |_| self.metadata.error_policy.message_handler,
+                        M::Response, ActorError
+                    ).await;
+                    
+                    // If it is an error, then break
+                    let Ok(handler_result) = handler_policy_result else {
+                        break 'event;
+                    };
+
+                    // If the handler's result is an error, continue because the policy succeeded.
+                    let Ok(response) = handler_result else {
+                        continue;
+                    };
+
+                    
+                    // If we shouldn't respond, continue to the next loop iteration
+                    let Some(sender) = message.1 else {
+                        continue;
+                    };
+                    
+                    // Otherwise,
+                    // Send the oneshot
+                    let e = sender.send(response);
+
+                    // Special error policy handling. Because of the one shot, Retry will be treated the same as Shutdown
+                    if e.is_err() {
+                        match self.metadata.error_policy.message_respond {
                             crate::error::ErrorPolicy::Ignore => {
                                 continue;
                             },

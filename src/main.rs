@@ -1,14 +1,32 @@
 
 
+use std::marker::PhantomData;
+
 use async_trait::async_trait;
-use fluxion::{actor::{Actor, ActorMessage, context::ActorContext, NotifyHandler, FederatedHandler}, error::{ActorError, ErrorPolicyCollection}, system::System};
-use memory_stats::memory_stats;
-use human_bytes::human_bytes;
+use fluxion::{actor::{Actor, ActorMessage, context::ActorContext, NotifyHandler, FederatedHandler, MessageHandler}, error::{ActorError, ErrorPolicyCollection}, system::System};
 
 use mimalloc::MiMalloc;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
+
+#[derive(Clone)]
+struct GenericMessage<M: Clone + Send + Sync + 'static, R:  Clone + Send + Sync + 'static> {
+    pub data: M,
+    _phantom_data: PhantomData<R>
+}
+impl<M: Clone + Send + Sync + 'static, R:  Clone + Send + Sync + 'static> GenericMessage<M, R> {
+    pub fn new(data: M) -> Self {
+        Self {
+            data,
+            _phantom_data: PhantomData::default()
+        }
+    }
+}
+
+impl<M:  Clone + Send + Sync + 'static, R: Clone + Send + Sync + 'static> ActorMessage for GenericMessage<M, R> {
+    type Response = R;
+}
 
 #[derive(Debug, Clone)]
 struct TestMessage;
@@ -45,63 +63,23 @@ impl FederatedHandler<TestMessage> for TestActor {
     }
 }
 
+#[async_trait]
+impl MessageHandler<GenericMessage<u32, ()>> for TestActor {
+    async fn message(&mut self, _context: &mut ActorContext, message: GenericMessage<u32, ()>) -> Result<(), ActorError> {
+        println!("Recieved u32 {}", message.data);
+        Ok(())
+    }
+}
+
+
 
 #[tokio::main]
 async fn main() {
     let sys = System::<(), TestMessage>::new("sys1".to_string());
-    benchmarknio(100000, &sys).await;
-}
-
-
-async fn benchmarknio(l: u32, sys: &System<(), TestMessage>) {
-    println!("Initializing Actors");
-    for i in 0..l {
-        sys.add_actor(TestActor {}, i.to_string(), ErrorPolicyCollection::default()).await.unwrap();
-    }
     
-    println!("Notifying Actors");
-    sys.notify(());
-    sys.drain_notify().await;
-    
-    println!("Cleanup");
+    let ar = sys.add_actor::<GenericMessage<u32,()>, TestActor>(TestActor {}, "test".to_string(), ErrorPolicyCollection::default()).await.unwrap();
+    ar.send(GenericMessage::<u32,()>::new(10)).await.unwrap();
+
     sys.shutdown().await;
 }
 
-async fn benchmark(l: u32, sys: &System<(), TestMessage>) {
-    
-    
-   
-
-    
-    // Create l actors and time it
-    let start = std::time::Instant::now();
-    for i in 0..l {
-        println!("add");
-        sys.add_actor(TestActor {}, i.to_string(), ErrorPolicyCollection::default()).await.unwrap();
-    }
-    let end = std::time::Instant::now() - start;
-    println!("Initializing {l} actors took {end:?}");
-    println!("\tMean time per actor: {:?}", end/l);
-    println!("\t{:?}", human_bytes(memory_stats().unwrap().physical_mem as f64));
-    
-    // Notify l actors and time it
-    let start = std::time::Instant::now();
-    sys.notify(());
-    sys.drain_notify().await;
-    let end = std::time::Instant::now() - start;
-    println!("Notifying {l} actors took {end:?}");
-    println!("\tMean time per actor: {:?}", end/l);
-    println!("\t{:?}", human_bytes(memory_stats().unwrap().physical_mem as f64));
-    
-    // Shutdown l actors and time it
-    let start = std::time::Instant::now();
-    sys.shutdown().await;
-    let end = std::time::Instant::now() - start;
-    println!("Shutting down {l} actors took {end:?}");
-    println!("\tMean time per actor: {:?}", end/l);
-    println!("\t{:?}", human_bytes(memory_stats().unwrap().physical_mem as f64));
-
-    // Drop the system then record memory
-    drop(sys);
-    println!("\t{:?}", human_bytes(memory_stats().unwrap().physical_mem as f64));
-}
