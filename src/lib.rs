@@ -31,5 +31,8 @@ pub mod actor;
 /// The implementation of messages and surrounding types
 pub mod message;
 
+/// The implementation of systems and surrounding types
+pub mod system;
+
 /// Contains error types for the crate
 pub mod error;
