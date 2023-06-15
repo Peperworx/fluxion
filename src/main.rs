@@ -1,4 +1,4 @@
-use fluxion::{message::Message, system::System};
+use fluxion::{message::Message, system::System, actor::path::ActorPath};
 
 
 
@@ -25,5 +25,9 @@ async fn main() {
         }
     });
 
-    system.force_foreign_send(TestMessage, None).await.unwrap();
+    system.force_foreign_send_message(TestMessage, None, ActorPath::new("test").unwrap()).await.unwrap();
+
+    system.force_foreign_send_federated(TestMessage, None, ActorPath::new("test").unwrap()).await.unwrap();
+
+    system.force_foreign_send_notification(()).await.unwrap();
 }

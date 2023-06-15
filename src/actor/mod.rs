@@ -7,6 +7,8 @@ use self::context::ActorContext;
 /// Contains the context that is passed to the actor which allows it to interact with the system
 pub mod context;
 
+/// Contains implementation of ActorPath, which provides utilities for working with actor identifiers.
+pub mod path;
 
 /// # Actor
 /// The core [`Actor`] trait must be implemented for every actor.

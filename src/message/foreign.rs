@@ -3,6 +3,8 @@
 
 use tokio::sync::oneshot;
 
+use crate::actor::path::ActorPath;
+
 use super::{Message, DynMessageResponse};
 
 
@@ -17,10 +19,10 @@ use super::{Message, DynMessageResponse};
 #[derive(Debug)]
 pub enum ForeignMessage<F: Message, N: super::Notification> {
     /// Contains a federated message sent to a foreign actor
-    /// as well as its responder oneshot.
-    FederatedMessage(F, Option<oneshot::Sender<F::Response>>),
+    /// as well as its responder oneshot and target
+    FederatedMessage(F, Option<oneshot::Sender<F::Response>>, ActorPath),
     /// Contains a notification sent to a foreign actor
     Notification(N),
-    /// Contains a message sent to a foreign actor
-    Message(Box<DynMessageResponse>, Option<oneshot::Sender<Box<DynMessageResponse>>>)
+    /// Contains a message sent to a foreign actor as well as it's responder and target
+    Message(Box<DynMessageResponse>, Option<oneshot::Sender<Box<DynMessageResponse>>>, ActorPath)
 }

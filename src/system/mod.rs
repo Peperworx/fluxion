@@ -4,7 +4,7 @@ use std::{sync::Arc, mem};
 
 use tokio::sync::{mpsc, Mutex, oneshot};
 
-use crate::{message::{foreign::ForeignMessage, Notification, Message}, error::ActorError};
+use crate::{message::{foreign::ForeignMessage, Notification, Message}, error::ActorError, actor::path::ActorPath};
 
 
 /// # System
@@ -56,7 +56,7 @@ where
     }
 
     /// Forces a normal Message to be sent as a foreign message
-    pub async fn force_foreign_send<M: Message>(&self, message: M, responder: Option<oneshot::Sender<M::Response>>) -> Result<(), ActorError> {
+    pub async fn force_foreign_send_message<M: Message>(&self, message: M, responder: Option<oneshot::Sender<M::Response>>, target_actor: ActorPath) -> Result<(), ActorError> {
         
         // If we should wait for a response, then do so
         let (foreign_responder, responder_recieve) = if responder.is_some() {
@@ -67,7 +67,7 @@ where
         };
 
         // Put the message into a foreign message
-        let foreign = ForeignMessage::<F, N>::Message(Box::new(message), foreign_responder);
+        let foreign = ForeignMessage::<F, N>::Message(Box::new(message), foreign_responder, target_actor);
 
         // If the foreign reciever is None (which means that someone is listening for a foreign message), then send the foreign message
         if self.foreign_reciever.lock().await.is_none() {
@@ -89,5 +89,24 @@ where
         }
 
         Ok(())
+    }
+
+    /// Forces a notification to be sent as a foreign message
+    pub async fn force_foreign_send_notification(&self, notification: N) -> Result<(), ActorError> {
+        // Create the foreign message
+        let foreign = ForeignMessage::Notification(notification);
+
+        // Send the foreign message
+        self.foreign_sender.send(foreign).await.or(Err(ActorError::ForeignSendFail))
+    }
+
+    /// Forces a federated message to be send as a foreign message
+    pub async fn force_foreign_send_federated(&self, federated: F, responder: Option<oneshot::Sender<F::Response>>, target_actor: ActorPath) -> Result<(), ActorError> {
+
+        // Create the foreign message
+        let foreign = ForeignMessage::FederatedMessage(federated, responder, target_actor);
+
+        // Send the foreign message
+        self.foreign_sender.send(foreign).await.or(Err(ActorError::ForeignSendFail))
     }
 }
