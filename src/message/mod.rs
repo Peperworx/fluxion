@@ -10,13 +10,13 @@ pub mod foreign;
 
 /// # Message
 /// The [`Message`] trait should be implemented for any message, including Messages, and Federated Messages.
-/// Both [`Message`] and [`Message::Response`] require messages to be [`Any`] + [`Send`] + [`Sync`] + `'static`.
-/// Why require Any? Messages may be passed around as a `dyn Message` (as is the case with foreign channels).
-/// These messages can be sent to an actor's supervisor, which knowing the type can try to downcast it.
-pub trait Message: Any + Send + Sync + 'static {
+/// Both [`Message`] and [`Message::Response`] require messages to be [`Any`] + [`Clone`] + [`Send`] + [`Sync`] + `'static`.
+/// Why require Any? Sometimes messages may be passed around as a `dyn Any` (as is the case with foreign channels).
+pub trait Message: Any + Clone + Send + Sync + 'static {
     /// The response type of the message
-    type Response: Any + Send + Sync + 'static;
+    type Response: Any + Clone + Send + Sync + 'static;
 }
+
 
 /// # Notification
 /// The [`Notification`] trait must be implemented for any notifications.
@@ -25,3 +25,10 @@ pub trait Message: Any + Send + Sync + 'static {
 pub trait Notification: Send + Sync + 'static {}
 
 impl<T> Notification for T where T: Send + Sync + 'static {}
+
+
+/// # DynMessageResponse
+/// Internal type alias for dyn [`Any`] + [`Send`] + [`Sync`] + 'static
+pub(crate) type DynMessageResponse = dyn Any + Send + Sync + 'static;
+
+
