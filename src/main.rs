@@ -1,4 +1,4 @@
-use fluxion::{message::Message, system::System, actor::{path::ActorPath, Actor}};
+use fluxion::{message::Message, system::System, actor::{path::ActorPath, Actor}, error_policy, error::policy::ErrorPolicyCommand};
 
 
 
@@ -11,20 +11,13 @@ impl Message for TestMessage {
 
 #[tokio::main]
 async fn main() {
-    let system = System::<TestMessage, ()>::new("test");
+    let policy: Vec<ErrorPolicyCommand<u32>> = error_policy!{
+        pass;
+        loop 10;
+        ignoreif 1;
+        failif 2;
+        ignore;
+    };
 
-    /* 
-    // Get the foreign channel
-    let f = system.get_foreign().await.unwrap();
-
-    tokio::spawn(async move {
-        let mut f = f;
-        loop {
-            if let Some(res) = f.recv().await {
-                println!("recieved foreign {res:?}");
-            }
-        }
-    });*/
-
-    println!("{}", system.is_foreign(&ActorPath::new("test2:test").unwrap()));
+    println!("{:?}", policy);
 }

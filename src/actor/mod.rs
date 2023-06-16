@@ -2,7 +2,7 @@
 
 use std::any::Any;
 
-use crate::{error::ActorError, message::foreign::{ForeignMessenger, ForeignReciever}};
+use crate::{error::ActorError, message::foreign::ForeignReciever};
 
 use self::context::ActorContext;
 

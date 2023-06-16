@@ -2,9 +2,9 @@
 
 use std::{sync::Arc, mem, collections::HashMap};
 
-use tokio::sync::{mpsc, Mutex, oneshot, RwLock, broadcast};
+use tokio::sync::{mpsc, Mutex, RwLock, broadcast};
 
-use crate::{message::{foreign::{ForeignMessage, ForeignMessenger}, Notification, Message}, error::ActorError, actor::{path::ActorPath, ActorEntry}};
+use crate::{message::{foreign::{ForeignMessage}, Notification, Message}, error::ActorError, actor::{path::ActorPath, ActorEntry}};
 
 
 /// # System
