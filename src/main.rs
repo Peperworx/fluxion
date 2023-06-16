@@ -1,4 +1,4 @@
-use fluxion::{message::Message, system::System, actor::{path::ActorPath, Actor}, error_policy, error::policy::ErrorPolicyCommand};
+use fluxion::{message::Message, system::System, actor::{path::ActorPath, Actor}, error::policy::ErrorPolicy, error_policy};
 
 
 
@@ -11,8 +11,8 @@ impl Message for TestMessage {
 
 #[tokio::main]
 async fn main() {
-    let policy: Vec<ErrorPolicyCommand<u32>> = error_policy!{
-        pass;
+    let policy: ErrorPolicy<usize> = error_policy!{
+        run;
         loop 10;
         ignoreif 1;
         failif 2;
