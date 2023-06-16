@@ -1,4 +1,4 @@
-use fluxion::{message::Message, system::System, actor::path::ActorPath};
+use fluxion::{message::Message, system::System, actor::{path::ActorPath, Actor}};
 
 
 
@@ -11,8 +11,9 @@ impl Message for TestMessage {
 
 #[tokio::main]
 async fn main() {
-    let system = System::<TestMessage, ()>::new();
+    let system = System::<TestMessage, ()>::new("test");
 
+    /* 
     // Get the foreign channel
     let f = system.get_foreign().await.unwrap();
 
@@ -23,11 +24,7 @@ async fn main() {
                 println!("recieved foreign {res:?}");
             }
         }
-    });
+    });*/
 
-    system.force_foreign_send_message(TestMessage, None, ActorPath::new("test").unwrap()).await.unwrap();
-
-    system.force_foreign_send_federated(TestMessage, None, ActorPath::new("test").unwrap()).await.unwrap();
-
-    system.force_foreign_send_notification(()).await.unwrap();
+    println!("{}", system.is_foreign(ActorPath::new("test2:test").unwrap()));
 }

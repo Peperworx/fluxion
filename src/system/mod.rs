@@ -1,10 +1,10 @@
 //! The implementation of systems and surrounding types
 
-use std::{sync::Arc, mem};
+use std::{sync::Arc, mem, collections::HashMap};
 
-use tokio::sync::{mpsc, Mutex, oneshot};
+use tokio::sync::{mpsc, Mutex, oneshot, RwLock};
 
-use crate::{message::{foreign::ForeignMessage, Notification, Message}, error::ActorError, actor::path::ActorPath};
+use crate::{message::{foreign::{ForeignMessage, ForeignMessenger}, Notification, Message}, error::ActorError, actor::{path::ActorPath, ActorEntry}};
 
 
 /// # System
@@ -20,12 +20,18 @@ where
     F: Message,
     N: Notification, {
 
+    /// The id of the system
+    id: String,
+
     /// The reciever for foreign messages
     /// This uses a Mutex to provide interior mutability.
     foreign_reciever: Arc<Mutex<Option<mpsc::Receiver<ForeignMessage<F, N>>>>>,
     
     /// The sender for foreign messages
     foreign_sender: mpsc::Sender<ForeignMessage<F, N>>,
+
+    /// The hashmap of all actors
+    actors: Arc<RwLock<HashMap<String, Box<dyn ActorEntry<Federated = F, Notification = N>>>>>
 }
 
 impl<F, N> System<F, N>
@@ -33,14 +39,16 @@ where
     F: Message,
     N: Notification {
 
-    /// Creates a new system
-    pub fn new() -> Self {
+    /// Creates a new system with the given id.
+    pub fn new(id: &str) -> Self {
         // Create the foreign channel
         let (foreign_sender, foreign_reciever) = mpsc::channel(16);
 
         Self {
+            id: id.to_string(),
             foreign_reciever: Arc::new(Mutex::new(Some(foreign_reciever))),
-            foreign_sender
+            foreign_sender,
+            actors: Default::default(),
         }
     }
     
@@ -55,58 +63,30 @@ where
         mem::take(std::ops::DerefMut::deref_mut(&mut foreign_reciever))
     }
 
-    /// Forces a normal Message to be sent as a foreign message
-    pub async fn force_foreign_send_message<M: Message>(&self, message: M, responder: Option<oneshot::Sender<M::Response>>, target_actor: ActorPath) -> Result<(), ActorError> {
-        
-        // If we should wait for a response, then do so
-        let (foreign_responder, responder_recieve) = if responder.is_some() {
-            let channel = oneshot::channel();
-            (Some(channel.0), Some(channel.1))
-        } else {
-            (None, None)
-        };
-
-        // Put the message into a foreign message
-        let foreign = ForeignMessage::<F, N>::Message(Box::new(message), foreign_responder, target_actor);
-
-        // If the foreign reciever is None (which means that someone is listening for a foreign message), then send the foreign message
-        if self.foreign_reciever.lock().await.is_none() {
-            self.foreign_sender.send(foreign).await.or(Err(ActorError::ForeignSendFail))?;
-        } else {
-            return Ok(());
-        }
-        
-        // If we should wait for a response, then do so
-        if let (Some(target), Some(source)) = (responder, responder_recieve) {
-            // Wait for the foreign response
-            let res = source.await.or(Err(ActorError::ForeignRespondFail))?;
-
-            // Downcast
-            let res = res.downcast_ref::<M::Response>().ok_or(ActorError::ForeignResponseUnexpected)?;
-
-            // Relay the response
-            target.send(res.clone()).or(Err(ActorError::ForeignResponseRelayFail))?;
-        }
-
-        Ok(())
+    /// Returns true if the given [`ActorPath`] is a foreign actor
+    pub fn is_foreign(&self, actor: &ActorPath) -> bool {
+        // If the first system in the actor exists and it it not this system, then it is a foreign system
+        actor.first().is_some_and(|v| v != self.id)
     }
 
-    /// Forces a notification to be sent as a foreign message
-    pub async fn force_foreign_send_notification(&self, notification: N) -> Result<(), ActorError> {
-        // Create the foreign message
-        let foreign = ForeignMessage::Notification(notification);
+    /// Relays a foreign message to this system
+    /// 
+    /// ## Notification Propagation
+    /// Notifications should be propagated in a special way. Each notification does have a target actor associated
+    /// with it, but the actor ID is blank. The notification message will be sent along the entire chain of systems contained in the
+    /// [`ActorPath`]. When the final system is reached, it will send the Notification message to every foreign system that is has a direct
+    /// connection to, with an empty system path. This will cause all of these systems to trigger the Notification.
+    pub fn relay_foreign(&self, foreign: ForeignMessage<F, N>) -> Result<(), ActorError> {
+        // If there are still more actors to visit, then pop it off and relay
+        if self.is_foreign(foreign.get_target()) {
+            // Pop off the target
+            let foreign = foreign.pop_target();
 
-        // Send the foreign message
-        self.foreign_sender.send(foreign).await.or(Err(ActorError::ForeignSendFail))
-    }
-
-    /// Forces a federated message to be send as a foreign message
-    pub async fn force_foreign_send_federated(&self, federated: F, responder: Option<oneshot::Sender<F::Response>>, target_actor: ActorPath) -> Result<(), ActorError> {
-
-        // Create the foreign message
-        let foreign = ForeignMessage::FederatedMessage(federated, responder, target_actor);
-
-        // Send the foreign message
-        self.foreign_sender.send(foreign).await.or(Err(ActorError::ForeignSendFail))
+            // And relay
+            self.foreign_sender.send(foreign).or(Err(ActorError::ForeignSendFail))
+        } else {
+            // Send to a local actor
+            todo!()
+        }
     }
 }

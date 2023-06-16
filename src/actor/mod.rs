@@ -1,6 +1,8 @@
 //! Contains the implementation of actors and surrounding types.
 
-use crate::error::ActorError;
+use std::any::Any;
+
+use crate::{error::ActorError, message::foreign::{ForeignMessenger, ForeignReciever}};
 
 use self::context::ActorContext;
 
@@ -33,3 +35,11 @@ pub trait Actor: Send + Sync + 'static {
     /// or if initialization fails.
     async fn cleanup(&mut self) -> Result<(), ActorError>;
 }
+
+/// # ActorEntry
+/// This trait is used for actor entries in the hashmap, and is automatically implemented for any
+/// types that meet its bounds
+pub(crate) trait ActorEntry: Any + ForeignReciever + Send + Sync + 'static {}
+
+impl<T> ActorEntry for T
+where T: Any + ForeignReciever + Send + Sync + 'static {}

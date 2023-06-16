@@ -22,16 +22,60 @@ pub enum ForeignMessage<F: Message, N: Notification> {
     /// as well as its responder oneshot and target
     FederatedMessage(F, Option<oneshot::Sender<F::Response>>, ActorPath),
     /// Contains a notification sent to a foreign actor
-    Notification(N),
+    Notification(N, ActorPath),
     /// Contains a message sent to a foreign actor as well as it's responder and target
     Message(Box<DynMessageResponse>, Option<oneshot::Sender<Box<DynMessageResponse>>>, ActorPath)
 }
 
-/// # ForeignMessenger
-/// [`ForeignMessenger`] is a trait that can be implemented on any type that is used to send messages to a foreign actor.
+impl<F: Message, N: Notification> ForeignMessage<F, N> {
+    /// Gets the target of the message
+    pub fn get_target(&self) -> &ActorPath {
+        match self {
+            ForeignMessage::FederatedMessage(_, _, t) => t,
+            ForeignMessage::Notification(_, t) => t,
+            ForeignMessage::Message(_, _, t) => t,
+        }
+    }
+
+    /// Returns true if this is a notification
+    pub fn is_notification(&self) -> bool {
+        match self {
+            ForeignMessage::Notification(_, _) => true,
+            _ => false
+        }
+    }
+
+    /// Pops an actor off of target
+    pub fn pop_target(self) -> Self {
+        match self {
+            ForeignMessage::FederatedMessage(a, b, c) => ForeignMessage::FederatedMessage(a, b, c.popfirst()),
+            ForeignMessage::Notification(a, b) => ForeignMessage::Notification(a, b.popfirst()),
+            ForeignMessage::Message(a, b, c) => ForeignMessage::Message(a, b, c.popfirst()) ,
+        }
+    }
+}
+
+/// # ForeignReciever
+/// [`ForeignReciever`] is a trait that can be implemented on any type that can recieve a foreign message.
 /// This is used to abstract over actors stored in a system so that it is not necessary to know the type of their messages.
 #[async_trait::async_trait]
-pub trait ForeignMessenger {
+pub(crate) trait ForeignReciever {
+    /// The type of the federated message that is sent by both the local and foreign system
+    type Federated: Message;
+
+    /// The type of the notification that is sent by both the local and foreign system
+    type Notification: Notification;
+
+    /// This function recieves a foreign message and handles it
+    async fn handle_foreign(&self, foreign: ForeignMessage<Self::Federated, Self::Notification>);
+}
+
+
+/// # ForeignMessenger
+/// [`ForeignMessenger`] is a trait that can be implemented on any type that is used to send messages to a foreign actor.
+
+#[async_trait::async_trait]
+pub(crate) trait ForeignMessenger {
 
     /// The type of the federated message that is sent by both the local and foreign system
     type Federated: Message;
@@ -45,13 +89,13 @@ pub trait ForeignMessenger {
 
     /// This function must be implemented by every [`ForeignMessenger]`
     /// It must return true if someone is ready to recieve a foreign message
-    fn can_send_foreign(&self) -> bool;
+    async fn can_send_foreign(&self) -> bool;
 
     /// This function is automatically implemented. It takes a local notification,
     /// and sends it using [`ForeignMessenger::send_raw_foreign`]
-    async fn send_notification_foreign(&self, notification: Self::Notification) -> Result<(), ActorError> {
+    async fn send_notification_foreign(&self, notification: Self::Notification, path: ActorPath) -> Result<(), ActorError> {
         // Create the foreign message
-        let foreign = ForeignMessage::Notification(notification);
+        let foreign = ForeignMessage::Notification(notification, path);
 
         // Send the foreign message
         self.send_raw_foreign(foreign).await
@@ -63,7 +107,7 @@ pub trait ForeignMessenger {
         message: M, responder: Option<oneshot::Sender<M::Response>>,
         target_actor: ActorPath) -> Result<(), ActorError> {
 
-            // If we should wait for a response, then do so
+        // If we should wait for a response, then do so
         let (foreign_responder, responder_recieve) = if responder.is_some() {
             let channel = oneshot::channel();
             (Some(channel.0), Some(channel.1))
