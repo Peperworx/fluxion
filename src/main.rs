@@ -26,5 +26,5 @@ async fn main() {
         }
     });*/
 
-    println!("{}", system.is_foreign(ActorPath::new("test2:test").unwrap()));
+    println!("{}", system.is_foreign(&ActorPath::new("test2:test").unwrap()));
 }

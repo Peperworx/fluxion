@@ -2,7 +2,7 @@
 
 use std::{sync::Arc, mem, collections::HashMap};
 
-use tokio::sync::{mpsc, Mutex, oneshot, RwLock};
+use tokio::sync::{mpsc, Mutex, oneshot, RwLock, broadcast};
 
 use crate::{message::{foreign::{ForeignMessage, ForeignMessenger}, Notification, Message}, error::ActorError, actor::{path::ActorPath, ActorEntry}};
 
@@ -31,7 +31,10 @@ where
     foreign_sender: mpsc::Sender<ForeignMessage<F, N>>,
 
     /// The hashmap of all actors
-    actors: Arc<RwLock<HashMap<String, Box<dyn ActorEntry<Federated = F, Notification = N>>>>>
+    actors: Arc<RwLock<HashMap<String, Box<dyn ActorEntry<Federated = F, Notification = N>>>>>,
+
+    /// The notification broadcast
+    notification: broadcast::Sender<N>,
 }
 
 impl<F, N> System<F, N>
@@ -44,11 +47,15 @@ where
         // Create the foreign channel
         let (foreign_sender, foreign_reciever) = mpsc::channel(16);
 
+        // Create the notification sender
+        let (notification, _) = broadcast::channel(16);
+
         Self {
             id: id.to_string(),
             foreign_reciever: Arc::new(Mutex::new(Some(foreign_reciever))),
             foreign_sender,
             actors: Default::default(),
+            notification
         }
     }
     
@@ -76,17 +83,27 @@ where
     /// with it, but the actor ID is blank. The notification message will be sent along the entire chain of systems contained in the
     /// [`ActorPath`]. When the final system is reached, it will send the Notification message to every foreign system that is has a direct
     /// connection to, with an empty system path. This will cause all of these systems to trigger the Notification.
-    pub fn relay_foreign(&self, foreign: ForeignMessage<F, N>) -> Result<(), ActorError> {
-        // If there are still more actors to visit, then pop it off and relay
-        if self.is_foreign(foreign.get_target()) {
-            // Pop off the target
-            let foreign = foreign.pop_target();
+    pub async fn relay_foreign(&self, foreign: ForeignMessage<F, N>) -> Result<(), ActorError> {
+        // Get the target
+        let target = foreign.get_target();
+
+        // If it is a foreign actor or the lenth of the systems is larger than 1
+        if self.is_foreign(target) || target.systems().len() > 1 {
+            // Pop off the target if the top system is us (ex. "thissystem:foreign:actor")
+            let foreign = if self.is_foreign(target) {
+                foreign
+            } else {
+                foreign.pop_target()
+            };
 
             // And relay
-            self.foreign_sender.send(foreign).or(Err(ActorError::ForeignSendFail))
+            self.foreign_sender.send(foreign).await.or(Err(ActorError::ForeignSendFail))
         } else {
             // Send to a local actor
             todo!()
         }
     }
+
+    
+
 }

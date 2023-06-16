@@ -119,7 +119,7 @@ pub(crate) trait ForeignMessenger {
         let foreign = ForeignMessage::<Self::Federated, Self::Notification>::Message(Box::new(message), foreign_responder, target_actor);
 
         // If someone is listening for a foreign message, then send the foreign message
-        if self.can_send_foreign() {
+        if self.can_send_foreign().await {
             self.send_raw_foreign(foreign).await?;
         } else {
             return Ok(());

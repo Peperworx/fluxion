@@ -22,9 +22,9 @@ pub trait Message: Any + Clone + Send + Sync + 'static {
 /// The [`Notification`] trait must be implemented for any notifications.
 /// It requires notifications to be [`Send`] + [`Sync`] + ''static`.
 /// This trait is automatically implemented for all types which implement its subtraits.
-pub trait Notification: Send + Sync + 'static {}
+pub trait Notification: Clone + Send + Sync + 'static {}
 
-impl<T> Notification for T where T: Send + Sync + 'static {}
+impl<T> Notification for T where T: Clone + Send + Sync + 'static {}
 
 
 /// # DynMessageResponse
