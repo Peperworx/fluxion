@@ -14,7 +14,7 @@ use crate::{
 #[async_trait::async_trait]
 pub trait HandleNotification<N>: Actor {
     /// Called when the actor recieves a notification
-    async fn notified(&mut self, context: &mut ActorContext, notification: N) -> Result<(), ActorError>;
+    async fn notified(&mut self, context: &mut ActorContext, notification: &N) -> Result<(), ActorError>;
 }
 
 /// # HandleFederated

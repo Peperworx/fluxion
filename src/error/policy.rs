@@ -4,7 +4,7 @@
 
 /// # ErrorPolicyCommand
 /// An [`ErrorPolicyCommand`] contains one step in an [`ErrorPolicy`]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ErrorPolicyCommand<E> {
     /// Runs the operation
     Run,
@@ -25,146 +25,21 @@ pub enum ErrorPolicyCommand<E> {
 /// An error policy is constructed from a [`Vec`] of [`ErrorPolicyCommand`]s,
 /// however users should use the [`error_policy`] macro.
 #[derive(Debug)]
-pub struct ErrorPolicy<E>(Vec<ErrorPolicyCommand<E>>);
+pub struct ErrorPolicy<E: Clone>(Vec<ErrorPolicyCommand<E>>);
 
-impl<E> ErrorPolicy<E> {
+impl<E: Clone> ErrorPolicy<E> {
     pub fn new(policy: Vec<ErrorPolicyCommand<E>>) -> Self {
         Self(policy)
     }
 
     /// Returns the contained vec of policies
-    pub fn contained(self) -> Vec<ErrorPolicyCommand<E>> {
-        self.0
+    pub fn contained(&self) -> &Vec<ErrorPolicyCommand<E>> {
+        &self.0
     }
 
-    /// Handles an error policy for a given function F. Returns Ok(Result) if the policy succeeded.
-    /// If the contained result is Ok, then the operation as a whole succeeded. If the result
-    /// is an Err, then the operation failed, but the policy succeeded. This can happen if an error is ignored.
-    /// If an Err is returned, then both the policy and operation failed with the contained error.
-    pub async fn handle<F, Fut, T>(&self, f: F) -> Result<Result<T, E>, E>
-    where
-        F: Fn() -> Fut,
-        Fut: futures::Future<Output = Result<T, E>>,
-        E: PartialEq
-    {
-
-        // The number of iterations in the current loop
-        let mut loops = 0;
-
-        // The position in the policy
-        let mut pos = 0;
-
-        // The previous result
-        let mut prev: Option<Result<T, E>> = None;
-
-        loop {
-            // Get the command
-            let Some(com) = self.0.get(pos) else {
-                // If no command, pass along the result, returning an Err if error, and Ok(Ok) if Ok
-                let res = if let Some(res) = prev {
-                    res
-                } else {
-                    // Otherwise, call the function
-                    f().await
-                };
-                
-                return Ok(Ok(res?));
-            };
-
-            // Increment pos
-            pos += 1;
-            
-            // Handle the command
-            match com {
-                ErrorPolicyCommand::Run => {
-                    // Run the operation, updating the previous value
-                    prev = Some(f().await);
-                },
-                ErrorPolicyCommand::Fail => {
-                    // If we should fail, then just return the error if there is one. This is also the default behavior if there
-                    // are no more commands.
-                    let res = if let Some(res) = prev {
-                        res
-                    } else {
-                        // Otherwise, call the function
-                        f().await
-                    };
-                    return Ok(Ok(res?));
-                },
-                ErrorPolicyCommand::Ignore => {
-                    // If we should ignore, then return the result in an Ok
-                    let res = if let Some(res) = prev {
-                        res
-                    } else {
-                        // Otherwise, call the function
-                        f().await
-                    };
-                    return Ok(res);
-                },
-                ErrorPolicyCommand::FailIf(test) => {
-                    // Evaluate the previous value
-                    let res = if let Some(res) = prev {
-                        res
-                    } else {
-                        // Otherwise, call the function
-                        f().await
-                    };
-
-                    // If it is a success, then return
-                    if res.is_ok() {
-                        return Ok(res);
-                    }
-
-                    // If an error was returned and matches test, then pass it along
-                    if res.as_ref().is_err_and(|e| e == test)  {
-                        return Ok(Ok(res?));
-                    }
-
-                    // Update the previous value
-                    prev = Some(res);
-                },
-                ErrorPolicyCommand::IgnoreIf(test) => {
-                    // Evaluate the previous value
-                    let res = if let Some(res) = prev {
-                        res
-                    } else {
-                        // Otherwise, call the function
-                        f().await
-                    };
-
-                    // If it is a success, then return
-                    if res.is_ok() {
-                        return Ok(res);
-                    }
-
-                    // If an error was returned and matches test, then ignore the error
-                    // and return.
-                    if res.as_ref().is_err_and(|e| e == test)  {
-                        return Ok(res);
-                    }
-                    
-                    // Update the previous value
-                    prev = Some(res);
-                },
-                ErrorPolicyCommand::Loop(n) => {
-                    // Increment loops
-                    loops += 1;
-
-                    // If loops is smaller than or equal to n, then reset pos to 0.
-                    if &loops < n {
-                        pos = 0;
-                    } else {
-                        // Otherwise, skip this value and set loops to zero
-                        loops = 0;
-                    }
-                },
-                
-            };
-        }
-    }
 }
 
-impl<E> Default for ErrorPolicy<E> {
+impl<E: Clone> Default for ErrorPolicy<E> {
     fn default() -> Self {
         crate::error_policy! {
             run;
@@ -172,6 +47,148 @@ impl<E> Default for ErrorPolicy<E> {
             fail;
         }
     }
+}
+
+/// # handle_error_policy
+/// Handles an error policy for a given expression. Returns Ok(Result) if the policy succeeded.
+/// If the contained result is Ok, then the operation as a whole succeeded. If the result
+/// is an Err, then the operation failed, but the policy succeeded. This can happen if an error is ignored.
+/// If an Err is returned, then both the policy and operation failed with the contained error.
+/// 
+/// ## Usage
+/// ```
+/// handle_policy!(
+///     checked_expr, policy,
+///     return_type, return_error
+/// )
+/// ```
+#[macro_export]
+macro_rules! handle_policy {
+    ($checked:expr, $policy:expr, $ret:ty, $e:ty) => {
+        async {
+            // The number of iterations in the current loop
+            let mut loops = 0;
+
+            // The position in the policy
+            let mut pos = 0;
+
+            // The previous result
+            let mut prev: Option<Result<$ret, $e>> = None;
+
+            loop {
+                // Get the policy
+                let policy = $policy(&prev);
+
+                // Get the internal commands
+                let com = policy.contained();
+
+                // Extract the policy from the option
+                let Some(com) = com.get(pos) else {
+                    // If no command, pass along the result, returning an Err if error, and Ok(Ok) if Ok
+                    let res = if let Some(res) = prev {
+                        res
+                    } else {
+                        // Otherwise, call the function
+                        $checked
+                    };
+
+                    // Weird thing to make the macro guess the return type correctly
+                    let ret: Result<_, $e> = Ok(Ok(res?));
+                    return ret;
+                };
+
+                // Increment pos
+                pos += 1;
+
+                // Handle the command
+                match com {
+                    $crate::error::policy::ErrorPolicyCommand::Run => {
+                        // Run the operation, updating the previous value
+                        prev = Some($checked);
+                    },
+                    $crate::error::policy::ErrorPolicyCommand::Fail => {
+                        // If we should fail, then just return the error if there is one. This is also the default behavior if there
+                        // are no more commands.
+                        let res = if let Some(res) = prev {
+                            res
+                        } else {
+                            // Otherwise, call the function
+                            $checked
+                        };
+                        return Ok(Ok(res?));
+                    },
+                    $crate::error::policy::ErrorPolicyCommand::Ignore => {
+                        // If we should ignore, then return the result in an Ok
+                        let res = if let Some(res) = prev {
+                            res
+                        } else {
+                            // Otherwise, call the function
+                            $checked
+                        };
+                        return Ok(res);
+                    },
+                    $crate::error::policy::ErrorPolicyCommand::FailIf(test) => {
+                        // Evaluate the previous value
+                        let res = if let Some(res) = prev {
+                            res
+                        } else {
+                            // Otherwise, call the function
+                            $checked
+                        };
+
+                        // If it is a success, then return
+                        if res.is_ok() {
+                            return Ok(res);
+                        }
+
+                        // If an error was returned and matches test, then pass it along
+                        if res.as_ref().is_err_and(|e| e == test)  {
+                            return Ok(Ok(res?));
+                        }
+
+                        // Update the previous value
+                        prev = Some(res);
+                    },
+                    $crate::error::policy::ErrorPolicyCommand::IgnoreIf(test) => {
+                        // Evaluate the previous value
+                        let res = if let Some(res) = prev {
+                            res
+                        } else {
+                            // Otherwise, call the function
+                            $checked
+                        };
+
+                        // If it is a success, then return
+                        if res.is_ok() {
+                            return Ok(res);
+                        }
+
+                        // If an error was returned and matches test, then ignore the error
+                        // and return.
+                        if res.as_ref().is_err_and(|e| e == test)  {
+                            return Ok(res);
+                        }
+
+                        // Update the previous value
+                        prev = Some(res);
+                    },
+                    $crate::error::policy::ErrorPolicyCommand::Loop(n) => {
+                        // Increment loops
+                        loops += 1;
+
+                        // If loops is smaller than or equal to n, then reset pos to 0.
+                        if &loops < n {
+                            pos = 0;
+                        } else {
+                            // Otherwise, skip this value and set loops to zero
+                            loops = 0;
+                        }
+                    },
+
+                };
+            }
+        }
+    };
 }
 
 
@@ -255,7 +272,8 @@ macro_rules! error_policy {
 
     ($command:ident $($arg:expr) *; $($commands:ident $($args:expr) *;)+) => {{
         let mut out = vec![$crate::_error_policy_resolve_single!{ $command $($arg),*; }];
-        out.extend($crate::error_policy!{ $($commands $($args) *;)+ }.contained());
+        let cons: Vec<$crate::error::policy::ErrorPolicyCommand<_>> = $crate::error_policy!{ $($commands $($args) *;)+ }.contained().clone();
+        out.extend(cons);
         ErrorPolicy::new(out)
     }};
 }
