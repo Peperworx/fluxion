@@ -67,7 +67,7 @@ pub(crate) trait ForeignReciever {
     type Notification: Notification;
 
     /// This function recieves a foreign message and handles it
-    async fn handle_foreign(&self, foreign: ForeignMessage<Self::Federated, Self::Notification>);
+    async fn handle_foreign(&self, foreign: ForeignMessage<Self::Federated, Self::Notification>) -> Result<(), ActorError>;
 }
 
 

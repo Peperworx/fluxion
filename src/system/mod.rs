@@ -77,12 +77,6 @@ where
     }
 
     /// Relays a foreign message to this system
-    /// 
-    /// ## Notification Propagation
-    /// Notifications should be propagated in a special way. Each notification does have a target actor associated
-    /// with it, but the actor ID is blank. The notification message will be sent along the entire chain of systems contained in the
-    /// [`ActorPath`]. When the final system is reached, it will send the Notification message to every foreign system that is has a direct
-    /// connection to, with an empty system path. This will cause all of these systems to trigger the Notification.
     pub async fn relay_foreign(&self, foreign: ForeignMessage<F, N>) -> Result<(), ActorError> {
         // Get the target
         let target = foreign.get_target();
@@ -100,10 +94,61 @@ where
             self.foreign_sender.send(foreign).await.or(Err(ActorError::ForeignSendFail))
         } else {
             // Send to a local actor
-            todo!()
+            self.send_foreign_to_local(foreign).await
+        }
+    }
+
+    /// Sends a foreign message to a local actor
+    async fn send_foreign_to_local(&self, foreign: ForeignMessage<F, N>) -> Result<(), ActorError> {
+        match foreign {
+            ForeignMessage::FederatedMessage(message, responder, target) => {
+                // Get actors as read
+                let actors = self.actors.read().await;
+                
+                // Get the local actor
+                let actor = actors.get(target.actor());
+
+                // If it does not exist, then error
+                let Some(actor) = actor else {
+                    return Err(ActorError::ForeignTargetNotFound);
+                };
+
+                // Send the message
+                actor.handle_foreign(ForeignMessage::FederatedMessage(message, responder, target)).await
+            },
+            ForeignMessage::Notification(notification, _) => {
+                // Send the notification on this system
+                self.notify(notification).await;
+
+                Ok(())
+            },
+            ForeignMessage::Message(message, responder, target) => {
+                // Get actors as read
+                let actors = self.actors.read().await;
+                
+                // Get the local actor
+                let actor = actors.get(target.actor());
+
+                // If it does not exist, then error
+                let Some(actor) = actor else {
+                    return Err(ActorError::ForeignTargetNotFound);
+                };
+
+                // Send the message
+                actor.handle_foreign(ForeignMessage::Message(message, responder, target)).await
+            },
         }
     }
 
     
+    /// Returns a notification reciever associated with the system's notification broadcaster.
+    pub(crate) fn subscribe_notify(&self) -> broadcast::Receiver<N> {
+        self.notification.subscribe()
+    }
 
+    /// Notifies all actors on this system.
+    /// Returns the number of actors notified
+    pub async fn notify(&self, notification: N) -> usize {
+        self.notification.send(notification).unwrap_or(0)
+    }
 }

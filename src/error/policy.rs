@@ -1,6 +1,7 @@
 
 
 
+
 /// # ErrorPolicyCommand
 /// An [`ErrorPolicyCommand`] contains one step in an [`ErrorPolicy`]
 #[derive(Debug)]
@@ -36,30 +37,13 @@ impl<E> ErrorPolicy<E> {
         self.0
     }
 
-    /// Used in [`ErrorPolicy::handle`] to either use a previously returned result or to call
-    /// the function again.
-    async fn evaluate_previous<F, Fut, T>(f: F, prev: Option<Result<T, E>>) -> Result<T, E>
-    where
-        F: Fn() -> Fut,
-        Fut: futures::Future<Output = Result<T, E>>,
-        E: PartialEq
-    {
-        // If previous contains a value, return it
-        if let Some(res) = prev {
-            res
-        } else {
-            // Otherwise, call the function
-            f().await
-        }
-    }
-
     /// Handles an error policy for a given function F. Returns Ok(Result) if the policy succeeded.
     /// If the contained result is Ok, then the operation as a whole succeeded. If the result
     /// is an Err, then the operation failed, but the policy succeeded. This can happen if an error is ignored.
     /// If an Err is returned, then both the policy and operation failed with the contained error.
     pub async fn handle<F, Fut, T>(&self, f: F) -> Result<Result<T, E>, E>
     where
-        F: Fn() -> Fut + Copy,
+        F: Fn() -> Fut,
         Fut: futures::Future<Output = Result<T, E>>,
         E: PartialEq
     {
@@ -77,7 +61,14 @@ impl<E> ErrorPolicy<E> {
             // Get the command
             let Some(com) = self.0.get(pos) else {
                 // If no command, pass along the result, returning an Err if error, and Ok(Ok) if Ok
-                return Ok(Ok(Self::evaluate_previous(f, prev).await?));
+                let res = if let Some(res) = prev {
+                    res
+                } else {
+                    // Otherwise, call the function
+                    f().await
+                };
+                
+                return Ok(Ok(res?));
             };
 
             // Increment pos
@@ -92,15 +83,32 @@ impl<E> ErrorPolicy<E> {
                 ErrorPolicyCommand::Fail => {
                     // If we should fail, then just return the error if there is one. This is also the default behavior if there
                     // are no more commands.
-                    return Ok(Ok(Self::evaluate_previous(f, prev).await?));
+                    let res = if let Some(res) = prev {
+                        res
+                    } else {
+                        // Otherwise, call the function
+                        f().await
+                    };
+                    return Ok(Ok(res?));
                 },
                 ErrorPolicyCommand::Ignore => {
                     // If we should ignore, then return the result in an Ok
-                    return Ok(Self::evaluate_previous(f, prev).await);
+                    let res = if let Some(res) = prev {
+                        res
+                    } else {
+                        // Otherwise, call the function
+                        f().await
+                    };
+                    return Ok(res);
                 },
                 ErrorPolicyCommand::FailIf(test) => {
                     // Evaluate the previous value
-                    let res = Self::evaluate_previous(f, prev).await;
+                    let res = if let Some(res) = prev {
+                        res
+                    } else {
+                        // Otherwise, call the function
+                        f().await
+                    };
 
                     // If it is a success, then return
                     if res.is_ok() {
@@ -117,7 +125,12 @@ impl<E> ErrorPolicy<E> {
                 },
                 ErrorPolicyCommand::IgnoreIf(test) => {
                     // Evaluate the previous value
-                    let res = Self::evaluate_previous(f, prev).await;
+                    let res = if let Some(res) = prev {
+                        res
+                    } else {
+                        // Otherwise, call the function
+                        f().await
+                    };
 
                     // If it is a success, then return
                     if res.is_ok() {
@@ -147,6 +160,16 @@ impl<E> ErrorPolicy<E> {
                 },
                 
             };
+        }
+    }
+}
+
+impl<E> Default for ErrorPolicy<E> {
+    fn default() -> Self {
+        crate::error_policy! {
+            run;
+            loop 5;
+            fail;
         }
     }
 }
@@ -232,7 +255,7 @@ macro_rules! error_policy {
 
     ($command:ident $($arg:expr) *; $($commands:ident $($args:expr) *;)+) => {{
         let mut out = vec![$crate::_error_policy_resolve_single!{ $command $($arg),*; }];
-        out.extend(error_policy!{ $($commands $($args) *;)+ }.contained());
+        out.extend($crate::error_policy!{ $($commands $($args) *;)+ }.contained());
         ErrorPolicy::new(out)
     }};
 }

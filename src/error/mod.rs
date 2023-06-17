@@ -12,7 +12,7 @@ pub mod policy;
 /// # ActorError
 /// An error type returned by an actor, as the result of failed communication with an actor,
 /// or as the result of an internal error in Actor initialization.
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum ActorError {
     #[error("A foreign message failed to send.")]
     ForeignSendFail,
@@ -22,4 +22,8 @@ pub enum ActorError {
     ForeignResponseUnexpected,
     #[error("A foreign response failed to relay to the local sender")]
     ForeignResponseRelayFail,
+    #[error("The target of a foreign message on this system was not found")]
+    ForeignTargetNotFound,
 }
+
+

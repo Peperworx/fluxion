@@ -15,6 +15,9 @@ pub mod path;
 /// Contains [`ActorHandle`], a struct that is used for interacting with Actors, and other supporting types.
 pub mod handle;
 
+/// Contains [`ActorSupervisor`], a struct which contains a task that handles an actor's lifecycle.
+pub mod supervisor;
+
 /// # Actor
 /// The core [`Actor`] trait must be implemented for every actor.
 /// This trait requires that any implementor be [`Send`] + [`Sync`] + `'static`.
