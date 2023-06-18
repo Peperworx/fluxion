@@ -37,11 +37,9 @@ pub(crate) type DynMessageResponse = dyn Any + Send + Sync + 'static;
 /// # MessageType
 /// An enum that contains each different type of message sent to an actor.
 /// Used to reduce the nuber of mpsc channels required.
-pub enum MessageType<F: Message, N, M: Message> {
+pub enum MessageType<F: Message, M: Message> {
     /// A federated message
     Federated(F, Option<oneshot::Sender<F::Response>>),
-    /// A notification
-    Notification(N),
     /// A message
     Message(M, Option<oneshot::Sender<M::Response>>)
 }

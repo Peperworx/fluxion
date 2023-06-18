@@ -24,6 +24,8 @@ pub enum ActorError {
     ForeignResponseRelayFail,
     #[error("The target of a foreign message on this system was not found")]
     ForeignTargetNotFound,
+    #[error("A message failed to be sent to a local actor")]
+    MessageSendError,
 }
 
 

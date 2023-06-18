@@ -16,7 +16,7 @@ where
     M: Message, {
     
     /// The message sender for the actor
-    pub(crate) message_sender: mpsc::Sender<MessageType<F, N, M>>,
+    pub(crate) message_sender: mpsc::Sender<MessageType<F, M>>,
 
     /// The foreign message sender for the actor
     pub(crate) foreign_sender: mpsc::Sender<ForeignMessage<F, N>>,
@@ -25,6 +25,22 @@ where
     pub(crate) id: String,
 }
 
+impl<F, N, M> ActorHandle<F, N, M>
+where
+    F: Message,
+    N: Notification,
+    M: Message, {
+    
+    /// Gets the actor's id
+    pub fn get_id(&self) -> &str {
+        &self.id
+    }
+
+    /// Sends a raw message to the actor
+    pub async fn send_raw_message(&self, message: MessageType<F, M>) -> Result<(), ActorError> {
+        self.message_sender.send(message).await.or(Err(ActorError::MessageSendError))
+    }
+}
 
 
 #[async_trait::async_trait]
@@ -37,7 +53,6 @@ where
     type Federated = F;
     type Notification = N;
 
-    
     async fn handle_foreign(&self, foreign: ForeignMessage<F, N>) -> Result<(), ActorError> {
         self.foreign_sender.send(foreign).await.or(Err(ActorError::ForeignSendFail))
     }

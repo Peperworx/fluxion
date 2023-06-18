@@ -22,7 +22,7 @@ pub struct ActorSupervisor<A, F: Message, N: Notification, M: Message> {
     notify: broadcast::Receiver<N>,
 
     /// The message reciever
-    message: mpsc::Receiver<MessageType<F, N, M>>,
+    message: mpsc::Receiver<MessageType<F, M>>,
 
     /// The foreign reciever
     foreign: mpsc::Receiver<ForeignMessage<F, N>>,
