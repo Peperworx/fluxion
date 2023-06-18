@@ -27,6 +27,9 @@ pub struct ActorSupervisor<A, F: Message, N: Notification, M: Message> {
     /// The foreign reciever
     foreign: mpsc::Receiver<ForeignMessage<F, N>>,
 
+    /// The shutdown reciever
+    shutdown: broadcast::Receiver<()>,
+
     /// The system the actor is running on
     system: System<F, N>,
 }
@@ -39,7 +42,7 @@ where
     M: Message {
     /// Creates a new supervisor with the given actor and actor id.
     /// Returns the new supervisor alongside the handle that references this.
-    pub fn new(actor: A, id: &str, system: System<F,N>, error_policy: SupervisorErrorPolicy) -> (ActorSupervisor<A, F, N, M>, ActorHandle<F, N, M>) {
+    pub fn new(actor: A, id: String, system: System<F,N>, error_policy: SupervisorErrorPolicy) -> (ActorSupervisor<A, F, N, M>, ActorHandle<F, N, M>) {
 
         // Create a new message channel
         let (message_sender, message) = mpsc::channel(16);
@@ -50,12 +53,13 @@ where
         // Subscribe to the notification broadcaster
         let notify = system.subscribe_notify();
 
-        // Convert the id to string
-        let id = id.to_string();
+        // Subscribe to the shutdown reciever
+        let shutdown = system.subscribe_shutdown();
         
         // Create the supervisor
         let supervisor = Self {
             actor, notify, message, foreign, system,
+            shutdown,
             error_policy,
             id: id.clone(),
         };
@@ -100,36 +104,32 @@ where
         loop {
             // Select on recieving messages
             tokio::select! {
-
+                _ = self.shutdown.recv() => {
+                    // Just shutdown no matter what happened
+                    break;
+                },
                 notification = handle_policy!(
                     self.notify.recv().await,
                     |_| &self.error_policy.notification_channel_closed,
                     N, broadcast::error::RecvError) => {
+                     // If the policy failed, then exit the loop
+                    if let Ok(n) = notification {
+                        // If the policy succeeded, but we failed to recieve, then continue. Otherwise handle it.
+                        if let Ok(n) = n {
+                            // Call the handler, handling error policy
+                            let res = handle_policy!(
+                                self.actor.notified(&mut context, n.clone()).await,
+                                |_| &self.error_policy.notification_handler,
+                                (), ActorError).await;
 
-                    // If the policy failed, then exit the loop
-                    let Ok(notification) = notification else {
+                            // If the policy failed, then exit the loop
+                            if res.is_err() {
+                                break;
+                            }
+                        }
+                    } else {
+                        // Stop the actor if not ok
                         break;
-                    };
-
-                    // If the policy succeeded, but we failed to recieve, then continue.
-                    let Ok(notification) = notification else {
-                        continue;
-                    };
-
-                    // Call the handler, handling error policy
-                    let res = handle_policy!(
-                        self.actor.notified(&mut context, &notification).await,
-                        |_| &self.error_policy.notification_handler,
-                        (), ActorError).await;
-
-                    // If the policy failed, then exit the loop
-                    let Ok(res) = res else {
-                        break;
-                    };
-                    
-                    // If the policy succeeded, but the handler failed, then continue.
-                    if res.is_err() {
-                        continue;
                     }
                 },
             }

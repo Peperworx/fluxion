@@ -10,8 +10,7 @@ async-trait = "0.1.68"
 futures = "0.3.28"
 thiserror = "1.0.40"
 tokio = { git = "https://github.com/tokio-rs/tokio.git", features = ["rt", "rt-multi-thread", "sync", "macros"] }
-mimalloc = { version = "*", default-features = false }
 
 
 [profile.release]
-debug = 1
+debug = true

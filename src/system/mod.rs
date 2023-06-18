@@ -31,6 +31,9 @@ where
     /// The sender for foreign messages
     foreign_sender: mpsc::Sender<ForeignMessage<F, N>>,
 
+    /// A shutdown sender which tells all actors to stop
+    shutdown: broadcast::Sender<()>,
+
     /// The hashmap of all actors
     actors: Arc<RwLock<HashMap<String, Box<dyn ActorEntry<Federated = F, Notification = N>>>>>,
 
@@ -51,10 +54,14 @@ where
         // Create the notification sender
         let (notification, _) = broadcast::channel(16);
 
+        // Create the shutdown sender
+        let (shutdown, _) = broadcast::channel(1);
+
         Self {
             id: id.to_string(),
             foreign_reciever: Arc::new(Mutex::new(Some(foreign_reciever))),
             foreign_sender,
+            shutdown,
             actors: Default::default(),
             notification
         }
@@ -153,10 +160,10 @@ where
         }
 
         // Initialize the supervisor
-        let (mut supervisor, handle) = ActorSupervisor::new(actor, id, self.clone(), error_policy);
+        let (mut supervisor, handle) = ActorSupervisor::new(actor, id.to_string(), self.clone(), error_policy);
         
         // Start the supervisor task
-        tokio::spawn(async move {
+        tokio::spawn(async {
             // TODO: Log this.
             let _ = supervisor.run().await;
             let _ = supervisor.cleanup().await;
@@ -190,6 +197,47 @@ where
     /// Yields the current task until all notifications have been recieved
     pub async fn drain_notify(&self) {
         while !self.notification.is_empty() {
+            tokio::task::yield_now().await;
+        }
+    }
+
+    /// Shutsdown all actors on the system, drains the shutdown channel, and then clears all actors
+    /// 
+    /// # Note
+    /// This does not shutdown the system itself, but only actors running on the system. The system is cleaned up at drop.
+    /// Even after calling this function, actors can still be added to the system. This returns the number of actors shutdown.
+    pub async fn shutdown(&self) -> usize {
+        // Send the shutdown signal
+        let res = if let Ok(v) = self.shutdown.send(()) {
+            v
+        } else {
+            0
+        };
+
+        // Borrow the actor map as writable
+        let mut actors = self.actors.write().await;
+
+        // Clear the list
+        actors.clear();
+        actors.shrink_to_fit();
+
+        // Remove the lock
+        drop(actors);
+
+        // Drain the shutdown list
+        self.drain_shutdown().await;
+
+        res
+    }
+
+    /// Subscribes to the shutdown reciever
+    pub(crate) fn subscribe_shutdown(&self) -> broadcast::Receiver<()> {
+        self.shutdown.subscribe()
+    }
+
+    /// Waits until all actors have shutdown
+    async fn drain_shutdown(&self) {
+        while !self.shutdown.is_empty() {
             tokio::task::yield_now().await;
         }
     }

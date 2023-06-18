@@ -1,8 +1,6 @@
 use fluxion::{message::{Message, handler::HandleNotification}, system::System, actor::{ Actor, supervisor::SupervisorErrorPolicy, context::ActorContext}, error:: ActorError};
 
 
-
-
 #[derive(Clone, Debug)]
 struct TestMessage;
 
@@ -43,19 +41,18 @@ impl Actor for TestActor {
 
 #[async_trait::async_trait]
 impl HandleNotification<()> for TestActor {
-    async fn notified(&mut self, _context: &mut ActorContext, _notification: &()) -> Result<(), ActorError> {
+    async fn notified(&mut self, _context: &mut ActorContext, _notification: ()) -> Result<(), ActorError> {
         Ok(())
     }
 }
 
 #[tokio::main]
 async fn main() {
-    let system = System::<TestMessage, ()>::new("host");
+    let system = System::<TestFederated, ()>::new("host");
 
     let start = std::time::Instant::now();
-    let policy = SupervisorErrorPolicy::default();
     for i in 0..100000 {
-        system.add_actor::<TestActor, TestFederated>(TestActor {}, &format!("{i}"),  policy.clone()).await.unwrap();
+        system.add_actor::<TestActor, TestMessage>(TestActor, &format!("{i}"),  SupervisorErrorPolicy::default()).await.unwrap();
     }
     let end = std::time::Instant::now() - start;
     println!("Created actors in {end:?}");
@@ -65,4 +62,9 @@ async fn main() {
     system.drain_notify().await;
     let end = std::time::Instant::now() - start;
     println!("Notified actors in {end:?}");
+    
+    let start = std::time::Instant::now();
+    system.shutdown().await;
+    let end = std::time::Instant::now() - start;
+    println!("Shutdown actors in {end:?}");
 }
