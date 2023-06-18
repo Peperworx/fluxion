@@ -33,11 +33,10 @@ pub struct ActorSupervisor<A, F: Message, N: Notification, M: Message> {
 
 impl<A, F, N, M> ActorSupervisor<A, F, N, M>
 where
-    A: Actor + HandleNotification<N>,
+    A: Actor,
     F: Message,
     N: Notification,
     M: Message {
-
     /// Creates a new supervisor with the given actor and actor id.
     /// Returns the new supervisor alongside the handle that references this.
     pub fn new(actor: A, id: &str, system: System<F,N>, error_policy: SupervisorErrorPolicy) -> (ActorSupervisor<A, F, N, M>, ActorHandle<F, N, M>) {
@@ -68,6 +67,16 @@ where
         // Return both
         (supervisor, handle)
     }
+}
+
+impl<A, F, N, M> ActorSupervisor<A, F, N, M>
+where
+    A: Actor + HandleNotification<N>,
+    F: Message,
+    N: Notification,
+    M: Message {
+
+    
 
 
     /// Runs the actor, only returning an error after all error policy options have been exhausted.
@@ -108,7 +117,17 @@ where
                     let res = handle_policy!(
                         self.actor.notified(&mut context, &notification).await,
                         |_| &self.error_policy.notification_handler,
-                        (), ActorError).await?;
+                        (), ActorError).await;
+
+                    // If the policy failed, then exit the loop
+                    let Ok(res) = res else {
+                        break;
+                    };
+                    
+                    // If the policy succeeded, but the handler failed, then continue.
+                    if res.is_err() {
+                        continue;
+                    }
                 },
             }
         }

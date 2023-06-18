@@ -8,6 +8,7 @@ use crate::{message::{MessageType, Message, foreign::{ForeignMessage, ForeignRec
 
 /// # ActorHandle
 /// [`ActorHandle`] provides a method through which to interact with actors.
+#[derive(Clone)]
 pub struct ActorHandle<F, N, M>
 where
     F: Message,

@@ -4,7 +4,7 @@ use std::{sync::Arc, mem, collections::HashMap};
 
 use tokio::sync::{mpsc, Mutex, RwLock, broadcast};
 
-use crate::{message::{foreign::{ForeignMessage}, Notification, Message}, error::ActorError, actor::{path::ActorPath, ActorEntry}};
+use crate::{message::{foreign::{ForeignMessage}, Notification, Message, handler::HandleNotification}, error::{ActorError, SystemError}, actor::{path::ActorPath, ActorEntry, Actor, supervisor::{ActorSupervisor, SupervisorErrorPolicy}, handle::ActorHandle}};
 
 
 /// # System
@@ -15,6 +15,7 @@ use crate::{message::{foreign::{ForeignMessage}, Notification, Message}, error::
 /// The foreign channel is an mpsc channel, the Reciever for which can be retrieved once by a single outside source using [`System::get_foreign`].
 /// When a Message or Foreign Message is sent to an external actor, or a Notification is sent at all, the foreign
 /// channel will be notified.
+#[derive(Clone)]
 pub struct System<F, N>
 where
     F: Message,
@@ -140,6 +141,36 @@ where
         }
     }
 
+    /// Adds an actor to the system
+    pub async fn add_actor<A: Actor + HandleNotification<N>, M: Message>(&self, actor: A, id: &str, error_policy: SupervisorErrorPolicy) -> Result<ActorHandle<F, N, M>, SystemError> {
+
+        // Lock write access to the actor map
+        let mut actors = self.actors.write().await;
+
+        // If the key is already in actors, return an error
+        if actors.contains_key(id) {
+            return Err(SystemError::ActorExists);
+        }
+
+        // Initialize the supervisor
+        let (mut supervisor, handle) = ActorSupervisor::new(actor, id, self.clone(), error_policy);
+        
+        // Start the supervisor task
+        tokio::spawn(async move {
+            // TODO: Log this.
+            let _ = supervisor.run().await;
+            let _ = supervisor.cleanup().await;
+            
+            drop(supervisor);
+        });
+
+        // Insert the handle into the map
+        actors.insert(id.to_string(), Box::new(handle.clone()));
+
+        // Return the handle
+        Ok(handle)
+    }
+
     
     /// Returns a notification reciever associated with the system's notification broadcaster.
     pub(crate) fn subscribe_notify(&self) -> broadcast::Receiver<N> {
@@ -150,5 +181,12 @@ where
     /// Returns the number of actors notified
     pub async fn notify(&self, notification: N) -> usize {
         self.notification.send(notification).unwrap_or(0)
+    }
+
+    /// Yields the current task until all notifications have been recieved
+    pub async fn drain_notify(&self) {
+        while !self.notification.is_empty() {
+            tokio::task::yield_now().await;
+        }
     }
 }

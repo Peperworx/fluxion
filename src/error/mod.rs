@@ -27,3 +27,10 @@ pub enum ActorError {
 }
 
 
+/// # SystemError
+/// An error type returned when an operation on a system fails.
+#[derive(Error, Debug, PartialEq, Clone)]
+pub enum SystemError {
+    #[error("An actor with that id already exists")]
+    ActorExists,
+}
