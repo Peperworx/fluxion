@@ -51,7 +51,7 @@ async fn main() {
     let system = System::<TestFederated, ()>::new("host");
 
     let start = std::time::Instant::now();
-    for i in 0..100000 {
+    for i in 0..1000000 {
         system.add_actor::<TestActor, TestMessage>(TestActor, &format!("{i}"),  SupervisorErrorPolicy::default()).await.unwrap();
     }
     let end = std::time::Instant::now() - start;
