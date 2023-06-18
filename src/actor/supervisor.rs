@@ -41,27 +41,30 @@ where
     /// Returns the new supervisor alongside the handle that references this.
     pub fn new(actor: A, id: &str, system: System<F,N>, error_policy: SupervisorErrorPolicy) -> (ActorSupervisor<A, F, N, M>, ActorHandle<F, N, M>) {
 
-        // Subscribe to the notification broadcaster
-        let notify = system.subscribe_notify();
-
         // Create a new message channel
         let (message_sender, message) = mpsc::channel(16);
 
         // Create a new foreign message channel
         let (foreign_sender, foreign) = mpsc::channel(16);
 
+        // Subscribe to the notification broadcaster
+        let notify = system.subscribe_notify();
+
+        // Convert the id to string
+        let id = id.to_string();
+        
         // Create the supervisor
         let supervisor = Self {
             actor, notify, message, foreign, system,
             error_policy,
-            id: id.to_string(),
+            id: id.clone(),
         };
 
         // Create the handle
         let handle = ActorHandle {
             message_sender,
             foreign_sender,
-            id: id.to_string(),
+            id,
         };
 
         // Return both
@@ -165,6 +168,7 @@ where
 
 /// # SupervisorErrorPolicy
 /// The error policies used by an actor supervisor.
+#[derive(Clone, Debug)]
 pub struct SupervisorErrorPolicy {
     /// Called when actor initialization fails
     pub initialize: ErrorPolicy<ActorError>,

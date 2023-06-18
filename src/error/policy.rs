@@ -24,7 +24,7 @@ pub enum ErrorPolicyCommand<E> {
 /// [`ErrorPolicy`] dictates how a recieved error is to be handled.
 /// An error policy is constructed from a [`Vec`] of [`ErrorPolicyCommand`]s,
 /// however users should use the [`error_policy`] macro.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ErrorPolicy<E: Clone>(Vec<ErrorPolicyCommand<E>>);
 
 impl<E: Clone> ErrorPolicy<E> {
@@ -66,14 +66,22 @@ impl<E: Clone> Default for ErrorPolicy<E> {
 macro_rules! handle_policy {
     ($checked:expr, $policy:expr, $ret:ty, $e:ty) => {
         async {
+            // The previous result.
+            let mut prev: Option<Result<$ret, $e>> = None;
+
+            // Run the operation once. 
+            let res_first = $checked;
+
+            // If ok, then return.
+            if res_first.is_ok() {
+                return Ok(res_first);
+            }
+
             // The number of iterations in the current loop
             let mut loops = 0;
 
             // The position in the policy
             let mut pos = 0;
-
-            // The previous result
-            let mut prev: Option<Result<$ret, $e>> = None;
 
             loop {
                 // Get the policy

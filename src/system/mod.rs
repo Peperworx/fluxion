@@ -180,7 +180,11 @@ where
     /// Notifies all actors on this system.
     /// Returns the number of actors notified
     pub async fn notify(&self, notification: N) -> usize {
-        self.notification.send(notification).unwrap_or(0)
+        if let Ok(v) = self.notification.send(notification) {
+            v
+        } else {
+            0
+        }
     }
 
     /// Yields the current task until all notifications have been recieved
