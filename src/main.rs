@@ -1,4 +1,4 @@
-use fluxion::{message::{Message, handler::HandleNotification}, system::System, actor::{ Actor, supervisor::SupervisorErrorPolicy, context::ActorContext}, error:: ActorError};
+use fluxion::{message::{Message, handler::{HandleNotification, HandleMessage, HandleFederated}}, system::System, actor::{ Actor, supervisor::SupervisorErrorPolicy, context::ActorContext}, error:: ActorError};
 
 
 #[derive(Clone, Debug)]
@@ -46,12 +46,26 @@ impl HandleNotification<()> for TestActor {
     }
 }
 
+#[async_trait::async_trait]
+impl HandleMessage<TestMessage> for TestActor {
+    async fn message(&mut self, _context: &mut ActorContext, _message: TestMessage) -> Result<(), ActorError> {
+        Ok(())
+    }
+}
+
+#[async_trait::async_trait]
+impl HandleFederated<TestFederated> for TestActor {
+    async fn federated_message(&mut self, _context: &mut ActorContext, _message: TestFederated) -> Result<(), ActorError> {
+        Ok(())
+    }
+}
+
 #[tokio::main]
 async fn main() {
     let system = System::<TestFederated, ()>::new("host");
 
     let start = std::time::Instant::now();
-    for i in 0..1000 {
+    for i in 0..1000000 {
         system.add_actor::<TestActor, TestMessage>(TestActor, &format!("{i}"),  SupervisorErrorPolicy::default()).await.unwrap();
     }
     let end = std::time::Instant::now() - start;

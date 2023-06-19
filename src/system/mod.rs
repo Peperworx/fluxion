@@ -4,7 +4,7 @@ use std::{sync::Arc, mem, collections::HashMap};
 
 use tokio::sync::{mpsc, Mutex, RwLock, broadcast};
 
-use crate::{message::{foreign::{ForeignMessage}, Notification, Message, handler::HandleNotification}, error::{ActorError, SystemError}, actor::{path::ActorPath, ActorEntry, Actor, supervisor::{ActorSupervisor, SupervisorErrorPolicy}, handle::ActorHandle}};
+use crate::{message::{foreign::{ForeignMessage}, Notification, Message, handler::{HandleNotification, HandleMessage, HandleFederated}}, error::{ActorError, SystemError}, actor::{path::ActorPath, ActorEntry, Actor, supervisor::{ActorSupervisor, SupervisorErrorPolicy}, handle::ActorHandle}};
 
 
 /// # System
@@ -124,12 +124,6 @@ where
                 // Send the message
                 actor.handle_foreign(ForeignMessage::FederatedMessage(message, responder, target)).await
             },
-            ForeignMessage::Notification(notification, _) => {
-                // Send the notification on this system
-                self.notify(notification).await;
-
-                Ok(())
-            },
             ForeignMessage::Message(message, responder, target) => {
                 // Get actors as read
                 let actors = self.actors.read().await;
@@ -149,7 +143,7 @@ where
     }
 
     /// Adds an actor to the system
-    pub async fn add_actor<A: Actor + HandleNotification<N>, M: Message>(&self, actor: A, id: &str, error_policy: SupervisorErrorPolicy) -> Result<ActorHandle<F, N, M>, SystemError> {
+    pub async fn add_actor<A: Actor + HandleNotification<N> + HandleFederated<F> + HandleMessage<M>, M: Message>(&self, actor: A, id: &str, error_policy: SupervisorErrorPolicy) -> Result<ActorHandle<F, M>, SystemError> {
 
         // Convert id to a string
         let id = id.to_string();

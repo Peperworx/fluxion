@@ -1,6 +1,8 @@
+use std::io::Error;
+
 use tokio::sync::{broadcast, mpsc};
 
-use crate::{system::System, message::{Message, Notification, foreign::ForeignMessage, MessageType, handler::HandleNotification, DualMessage}, error::{policy::ErrorPolicy, ActorError}, handle_policy, error_policy};
+use crate::{system::System, message::{Message, Notification, foreign::ForeignMessage, LocalMessage, handler::{HandleNotification, HandleFederated, HandleMessage}, DualMessage, MessageType, AsMessageType}, error::{policy::ErrorPolicy, ActorError}, handle_policy, error_policy};
 
 use super::{handle::ActorHandle, Actor, context::ActorContext};
 
@@ -22,7 +24,7 @@ pub struct ActorSupervisor<A, F: Message, N: Notification, M: Message> {
     notify: broadcast::Receiver<N>,
 
     /// The message reciever
-    message: mpsc::Receiver<DualMessage<F, M, N>>,
+    message: mpsc::Receiver<DualMessage<F, M>>,
 
     /// The shutdown reciever
     shutdown: broadcast::Receiver<()>,
@@ -39,7 +41,7 @@ where
     M: Message {
     /// Creates a new supervisor with the given actor and actor id.
     /// Returns the new supervisor alongside the handle that references this.
-    pub fn new(actor: A, id: String, system: &System<F,N>, error_policy: SupervisorErrorPolicy) -> (ActorSupervisor<A, F, N, M>, ActorHandle<F, N, M>) {
+    pub fn new(actor: A, id: String, system: &System<F,N>, error_policy: SupervisorErrorPolicy) -> (ActorSupervisor<A, F, N, M>, ActorHandle<F, M>) {
 
         // Create a new message channel
         let (message_sender, message) = mpsc::channel(64);
@@ -71,7 +73,7 @@ where
 
 impl<A, F, N, M> ActorSupervisor<A, F, N, M>
 where
-    A: Actor + HandleNotification<N>,
+    A: Actor + HandleNotification<N> + HandleFederated<F> + HandleMessage<M>,
     F: Message,
     N: Notification,
     M: Message {
@@ -134,7 +136,7 @@ where
                 message = handle_policy!(
                     self.message.recv().await.ok_or(ActorError::MessageChannelClosed),
                     |_| &self.error_policy.message_channel_closed,
-                    DualMessage<F, M, N>, ActorError) => {
+                    DualMessage<F, M>, ActorError) => {
                     
 
                     // If the policy failed, then exit the loop
@@ -147,16 +149,83 @@ where
                         continue;
                     };
 
-                    // Get the MessageType, downcasting if foreign
-                    let message_type = match message {
-                        DualMessage::MessageType(m) => m,
-                        DualMessage::ForeignMessage(foreign) => match foreign {
-                            ForeignMessage::FederatedMessage(_, _, _) => todo!(),
-                            ForeignMessage::Message(_, _, _) => todo!(),
-                        },
+                    // Get the message, downcasting if foreign. This always does at least one clone, but it appears to be unavoidable.
+                    let message_type = handle_policy!(
+                        message.as_message_type(),
+                        |_| &self.error_policy.unexpected_foreign,
+                        MessageType<F, M>, ActorError).await;
+                    
+                    // If the policy failed, exit
+                    let Ok(message_type) = message_type else {
+                        break;
+                    };
+                    
+                    // If the policy succeeded, but we failed to recieve, then continue.
+                    let Ok(message_type) = message_type else {
+                        continue;
                     };
 
+                    // Given the message type, call the proper handler
+                    match message_type {
+                        MessageType::Federated(m) => {
+                            let res = handle_policy!(
+                                self.actor.federated_message(&mut context, m.clone()).await,
+                                |_| &self.error_policy.federated_handler,
+                                F::Response, ActorError).await;
+                            
+                            // If the policy failed, exit
+                            let Ok(res) = res else {
+                                break;
+                            };
 
+                            // If the policy succeeded, but we failed to recieve, then continue.
+                            let Ok(res) = res else {
+                                continue;
+                            };
+
+                            // Match on the responder
+                            let responder = match message {
+                                DualMessage::LocalMessage(LocalMessage::Federated(_, Some(responder))) => Some(responder),
+                                DualMessage::ForeignMessage(ForeignMessage::FederatedMessage(_, Some(responder), _)) => Some(responder),
+                                _ => None
+                            };
+
+                            // If we need to respond, do so
+                            if let Some(responder) = responder {
+                                // This is a oneshot, so ignore if error
+                                let _ = responder.send(res);
+                            }
+                        },
+                        MessageType::Message(m) => {
+                            let res = handle_policy!(
+                                self.actor.message(&mut context, m.clone()).await,
+                                |_| &self.error_policy.message_handler,
+                                M::Response, ActorError).await;
+
+                            // If the policy failed, exit
+                            let Ok(res) = res else {
+                                break;
+                            };
+
+                            // If the policy succeeded, but we failed to recieve, then continue.
+                            let Ok(res) = res else {
+                                continue;
+                            };
+
+                            // Match on the responder, and respond if found
+                            match message {
+                                DualMessage::LocalMessage(LocalMessage::Message(_, Some(responder))) => {
+                                    // Just send the response, ignoring the error
+                                    let _ = responder.send(res);
+                                },
+                                DualMessage::ForeignMessage(ForeignMessage::Message(_, Some(responder), _)) => {
+                                    // Box and send the response
+                                    let _ = responder.send(Box::new(res));
+                                },
+                                _ => {}
+                            };
+                        },
+                    };
                 }
             }
         }
@@ -209,6 +278,14 @@ pub struct SupervisorErrorPolicy {
     pub notification_handler: ErrorPolicy<ActorError>,
     /// Called when an actor's message channel closes
     pub message_channel_closed: ErrorPolicy<ActorError>,
+    /// Called when a foreign message failed to downcast
+    pub unexpected_foreign: ErrorPolicy<ActorError>,
+    /// Called when an actor's federated message handler fails
+    pub federated_handler: ErrorPolicy<ActorError>,
+    /// Called when an actor's message handler fails
+    pub message_handler: ErrorPolicy<ActorError>,
+    /// Called when a federated message fails to send its response
+    pub federated_respond: ErrorPolicy<ActorError>,
 }
 
 impl Default for SupervisorErrorPolicy {
@@ -234,6 +311,18 @@ impl Default for SupervisorErrorPolicy {
             },
             message_channel_closed: error_policy! {
                 fail;
+            },
+            unexpected_foreign: error_policy! {
+                ignore;
+            },
+            federated_handler: error_policy! {
+                ignore;
+            },
+            message_handler: error_policy! {
+                ignore;
+            },
+            federated_respond: error_policy! {
+                ignore;
             },
         }
     }

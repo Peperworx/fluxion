@@ -4,6 +4,8 @@ use std::any::Any;
 
 use tokio::sync::oneshot;
 
+use crate::error::ActorError;
+
 use self::foreign::ForeignMessage;
 
 /// Contains message handling traits that can be implemented by actors
@@ -36,21 +38,55 @@ impl<T> Notification for T where T: Clone + Send + Sync + 'static {}
 pub(crate) type DynMessageResponse = dyn Any + Send + Sync + 'static;
 
 
-/// # MessageType
+/// # LocalMessage
 /// An enum that contains each different type of message sent to an actor.
 /// Used to reduce the nuber of mpsc channels required.
-pub enum MessageType<F: Message, M: Message> {
+pub enum LocalMessage<F: Message, M: Message> {
     /// A federated message
     Federated(F, Option<oneshot::Sender<F::Response>>),
     /// A message
     Message(M, Option<oneshot::Sender<M::Response>>)
 }
 
+impl<F: Message, M: Message> AsMessageType<F, M> for LocalMessage<F, M> {
+    fn as_message_type(&self) -> Result<MessageType<F, M>, ActorError> {
+        Ok(match self {
+            LocalMessage::Federated(m, _) => MessageType::Federated(m.clone()),
+            LocalMessage::Message(m, _) => MessageType::Message(m.clone()),
+        })
+    }
+}
+
+
+/// # MessageType
+/// An enum that contains the contents of a message minus its responder
+pub enum MessageType<F: Message, M: Message> {
+    /// A Federated message
+    Federated(F),
+    /// A message
+    Message(M)
+}
+
+/// # AsMessageType
+/// Converts a struct into a MessageType
+pub(crate) trait AsMessageType<F: Message, M: Message> {
+    fn as_message_type(&self) -> Result<MessageType<F, M>, ActorError>;
+}
+
 /// # DualMessage
-/// An internal enum that stores both a MessageType and a ForeignMessage, used in an actor's message channel.
+/// An internal enum that stores both a LocalMessage and a ForeignMessage, used in an actor's message channel.
 pub(crate) enum DualMessage<F: Message, M: Message> {
-    /// A MessageType
-    MessageType(MessageType<F, M>),
+    /// A LocalMessage
+    LocalMessage(LocalMessage<F, M>),
     /// A Foreign Message
     ForeignMessage(ForeignMessage<F>)
+}
+
+impl<F: Message, M: Message> AsMessageType<F, M> for DualMessage<F, M> {
+    fn as_message_type(&self) -> Result<MessageType<F, M>, ActorError> {
+        match self {
+            DualMessage::LocalMessage(m) => m.as_message_type(),
+            DualMessage::ForeignMessage(m) => m.as_message_type(),
+        }
+    }
 }

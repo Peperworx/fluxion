@@ -5,6 +5,8 @@ use crate::{
     actor::{Actor, context::ActorContext}
 };
 
+use super::Message;
+
 
 
 
@@ -21,16 +23,16 @@ pub trait HandleNotification<N>: Actor {
 /// This trait implements a single function, [`Self::federated_message`], which is called
 /// whenever the actor recieves a federated message.
 #[async_trait::async_trait]
-pub trait HandleFederated<F>: Actor {
+pub trait HandleFederated<F: Message>: Actor {
     /// Called when the actor recieves a federated message
-    async fn federated_message(&mut self, context: &mut ActorContext, federated_message: F) -> Result<(), ActorError>;
+    async fn federated_message(&mut self, context: &mut ActorContext, federated_message: F) -> Result<F::Response, ActorError>;
 }
 
 /// # HandleMessage
 /// This trait implements a single function, [`Self::message`], which is called whenever
 /// the actor recieves a message. 
 #[async_trait::async_trait]
-pub trait HandleMessage<M>: Actor {
+pub trait HandleMessage<M: Message>: Actor {
     /// Called when the actor recieves a message
-    async fn message(&mut self, context: &mut ActorContext, message: M) -> Result<(), ActorError>;
+    async fn message(&mut self, context: &mut ActorContext, message: M) -> Result<M::Response, ActorError>;
 }

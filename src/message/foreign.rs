@@ -5,7 +5,7 @@ use tokio::sync::oneshot;
 
 use crate::{actor::path::ActorPath, error::ActorError};
 
-use super::{Message, DynMessageResponse, Notification};
+use super::{Message, DynMessageResponse, Notification, AsMessageType, MessageType};
 
 
 
@@ -40,6 +40,20 @@ impl<F: Message> ForeignMessage<F> {
             ForeignMessage::FederatedMessage(a, b, c) => ForeignMessage::FederatedMessage(a, b, c.popfirst()),
             ForeignMessage::Message(a, b, c) => ForeignMessage::Message(a, b, c.popfirst()) ,
         }
+    }
+}
+
+impl<F: Message, M: Message> AsMessageType<F, M> for ForeignMessage<F> {
+    fn as_message_type(&self) -> Result<MessageType<F, M>, ActorError> {
+        Ok(match self {
+            ForeignMessage::FederatedMessage(m, _, _) => MessageType::Federated(m.clone()),
+            ForeignMessage::Message(m, _, _) => {
+                // Downcast
+                let m = m.downcast_ref::<M>().ok_or(ActorError::ForeignResponseUnexpected)?;
+
+                MessageType::Message(m.clone())
+            },
+        })
     }
 }
 
@@ -89,7 +103,7 @@ pub(crate) trait ForeignMessenger {
         };
 
         // Put the message into a foreign message
-        let foreign = ForeignMessage::<Self::Federated, Self::Notification>::Message(Box::new(message), foreign_responder, target_actor);
+        let foreign = ForeignMessage::<Self::Federated>::Message(Box::new(message), foreign_responder, target_actor);
 
         // If someone is listening for a foreign message, then send the foreign message
         if self.can_send_foreign().await {
