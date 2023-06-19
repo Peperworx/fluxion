@@ -16,7 +16,7 @@ where
     M: Message, {
     
     /// The message sender for the actor
-    pub(crate) message_sender: mpsc::Sender<DualMessage<F, M, N>>,
+    pub(crate) message_sender: mpsc::Sender<DualMessage<F, M>>,
 
     /// The id of the actor
     pub(crate) id: String,
