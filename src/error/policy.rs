@@ -66,15 +66,16 @@ impl<E: Clone> Default for ErrorPolicy<E> {
 macro_rules! handle_policy {
     ($checked:expr, $policy:expr, $ret:ty, $e:ty) => {
         async {
+            
             // The previous result.
-            let mut prev: Option<Result<$ret, $e>> = None;
-
             // Run the operation once. 
-            let res_first = $checked;
+            let mut prev: Result<$ret, $e> = $checked;
 
             // If ok, then return.
-            if res_first.is_ok() {
-                return Ok(res_first);
+            if prev.is_ok() {
+                // Weird reassign to allow the return type to be infered
+                let res: Result<_, $e> = Ok(prev);
+                return res;
             }
 
             // The number of iterations in the current loop
@@ -84,25 +85,20 @@ macro_rules! handle_policy {
             let mut pos = 0;
 
             loop {
+                // If at any point the operation was a success, then return
+                let Err(res_err) = &prev else {
+                    return Ok(prev);
+                };
+
                 // Get the policy
-                let policy = $policy(&prev);
+                let policy = $policy(res_err);
 
                 // Get the internal commands
                 let com = policy.contained();
 
                 // Extract the policy from the option
                 let Some(com) = com.get(pos) else {
-                    // If no command, pass along the result, returning an Err if error, and Ok(Ok) if Ok
-                    let res = if let Some(res) = prev {
-                        res
-                    } else {
-                        // Otherwise, call the function
-                        $checked
-                    };
-
-                    // Weird thing to make the macro guess the return type correctly
-                    let ret: Result<_, $e> = Ok(Ok(res?));
-                    return ret;
+                    return Ok(Ok(prev?));
                 };
 
                 // Increment pos
@@ -112,73 +108,35 @@ macro_rules! handle_policy {
                 match com {
                     $crate::error::policy::ErrorPolicyCommand::Run => {
                         // Run the operation, updating the previous value
-                        prev = Some($checked);
+                        prev = $checked;
                     },
                     $crate::error::policy::ErrorPolicyCommand::Fail => {
                         // If we should fail, then just return the error if there is one. This is also the default behavior if there
                         // are no more commands.
-                        let res = if let Some(res) = prev {
-                            res
-                        } else {
-                            // Otherwise, call the function
-                            $checked
-                        };
-                        return Ok(Ok(res?));
+                        return Ok(Ok(prev?));
                     },
                     $crate::error::policy::ErrorPolicyCommand::Ignore => {
                         // If we should ignore, then return the result in an Ok
-                        let res = if let Some(res) = prev {
-                            res
-                        } else {
-                            // Otherwise, call the function
-                            $checked
-                        };
-                        return Ok(res);
+                        return Ok(prev);
                     },
                     $crate::error::policy::ErrorPolicyCommand::FailIf(test) => {
-                        // Evaluate the previous value
-                        let res = if let Some(res) = prev {
-                            res
-                        } else {
-                            // Otherwise, call the function
-                            $checked
-                        };
-
-                        // If it is a success, then return
-                        if res.is_ok() {
-                            return Ok(res);
+                        // If the operation was a success, then return
+                        if prev.is_ok() {
+                            return Ok(prev);
                         }
 
                         // If an error was returned and matches test, then pass it along
-                        if res.as_ref().is_err_and(|e| e == test)  {
-                            return Ok(Ok(res?));
+                        if prev.as_ref().is_err_and(|e| e == test)  {
+                            return Ok(Ok(prev?));
                         }
-
-                        // Update the previous value
-                        prev = Some(res);
                     },
                     $crate::error::policy::ErrorPolicyCommand::IgnoreIf(test) => {
-                        // Evaluate the previous value
-                        let res = if let Some(res) = prev {
-                            res
-                        } else {
-                            // Otherwise, call the function
-                            $checked
-                        };
-
-                        // If it is a success, then return
-                        if res.is_ok() {
-                            return Ok(res);
-                        }
-
+                        
                         // If an error was returned and matches test, then ignore the error
                         // and return.
-                        if res.as_ref().is_err_and(|e| e == test)  {
-                            return Ok(res);
+                        if prev.as_ref().is_err_and(|e| e == test)  {
+                            return Ok(prev);
                         }
-
-                        // Update the previous value
-                        prev = Some(res);
                     },
                     $crate::error::policy::ErrorPolicyCommand::Loop(n) => {
                         // Increment loops

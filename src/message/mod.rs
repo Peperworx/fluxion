@@ -4,6 +4,8 @@ use std::any::Any;
 
 use tokio::sync::oneshot;
 
+use self::foreign::ForeignMessage;
+
 /// Contains message handling traits that can be implemented by actors
 pub mod handler;
 
@@ -42,4 +44,13 @@ pub enum MessageType<F: Message, M: Message> {
     Federated(F, Option<oneshot::Sender<F::Response>>),
     /// A message
     Message(M, Option<oneshot::Sender<M::Response>>)
+}
+
+/// # DualMessage
+/// An internal enum that stores both a MessageType and a ForeignMessage, used in an actor's message channel.
+pub(crate) enum DualMessage<F: Message, M: Message> {
+    /// A MessageType
+    MessageType(MessageType<F, M>),
+    /// A Foreign Message
+    ForeignMessage(ForeignMessage<F>)
 }

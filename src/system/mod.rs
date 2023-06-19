@@ -26,16 +26,16 @@ where
 
     /// The reciever for foreign messages
     /// This uses a Mutex to provide interior mutability.
-    foreign_reciever: Arc<Mutex<Option<mpsc::Receiver<ForeignMessage<F, N>>>>>,
+    foreign_reciever: Arc<Mutex<Option<mpsc::Receiver<ForeignMessage<F>>>>>,
     
     /// The sender for foreign messages
-    foreign_sender: mpsc::Sender<ForeignMessage<F, N>>,
+    foreign_sender: mpsc::Sender<ForeignMessage<F>>,
 
     /// A shutdown sender which tells all actors to stop
     shutdown: broadcast::Sender<()>,
 
     /// The hashmap of all actors
-    actors: Arc<RwLock<HashMap<String, Box<dyn ActorEntry<Federated = F, Notification = N>>>>>,
+    actors: Arc<RwLock<HashMap<String, Box<dyn ActorEntry<Federated = F>>>>>,
 
     /// The notification broadcast
     notification: broadcast::Sender<N>,
@@ -49,13 +49,13 @@ where
     /// Creates a new system with the given id.
     pub fn new(id: &str) -> Self {
         // Create the foreign channel
-        let (foreign_sender, foreign_reciever) = mpsc::channel(16);
+        let (foreign_sender, foreign_reciever) = mpsc::channel(64);
 
         // Create the notification sender
-        let (notification, _) = broadcast::channel(16);
+        let (notification, _) = broadcast::channel(64);
 
         // Create the shutdown sender
-        let (shutdown, _) = broadcast::channel(1);
+        let (shutdown, _) = broadcast::channel(8);
 
         Self {
             id: id.to_string(),
@@ -69,7 +69,7 @@ where
     
     /// Returns the foreign channel reciever wrapped in an [`Option<T>`].
     /// [`None`] will be returned if the foreign reciever has already been retrieved.
-    pub async fn get_foreign(&self) -> Option<mpsc::Receiver<ForeignMessage<F, N>>> {
+    pub async fn get_foreign(&self) -> Option<mpsc::Receiver<ForeignMessage<F>>> {
         
         // Lock the foreign reciever
         let mut foreign_reciever = self.foreign_reciever.lock().await;
@@ -85,7 +85,7 @@ where
     }
 
     /// Relays a foreign message to this system
-    pub async fn relay_foreign(&self, foreign: ForeignMessage<F, N>) -> Result<(), ActorError> {
+    pub async fn relay_foreign(&self, foreign: ForeignMessage<F>) -> Result<(), ActorError> {
         // Get the target
         let target = foreign.get_target();
 
@@ -107,7 +107,7 @@ where
     }
 
     /// Sends a foreign message to a local actor
-    async fn send_foreign_to_local(&self, foreign: ForeignMessage<F, N>) -> Result<(), ActorError> {
+    async fn send_foreign_to_local(&self, foreign: ForeignMessage<F>) -> Result<(), ActorError> {
         match foreign {
             ForeignMessage::FederatedMessage(message, responder, target) => {
                 // Get actors as read
@@ -151,19 +151,23 @@ where
     /// Adds an actor to the system
     pub async fn add_actor<A: Actor + HandleNotification<N>, M: Message>(&self, actor: A, id: &str, error_policy: SupervisorErrorPolicy) -> Result<ActorHandle<F, N, M>, SystemError> {
 
+        // Convert id to a string
+        let id = id.to_string();
+
         // Lock write access to the actor map
         let mut actors = self.actors.write().await;
 
         // If the key is already in actors, return an error
-        if actors.contains_key(id) {
+        if actors.contains_key(&id) {
             return Err(SystemError::ActorExists);
         }
+        
 
         // Initialize the supervisor
-        let (mut supervisor, handle) = ActorSupervisor::new(actor, id.to_string(), self.clone(), error_policy);
+        let (mut supervisor, handle) = ActorSupervisor::new(actor, id.clone(), self, error_policy);
         
         // Start the supervisor task
-        tokio::spawn(async {
+        tokio::spawn(async move {
             // TODO: Log this.
             let _ = supervisor.run().await;
             let _ = supervisor.cleanup().await;
@@ -172,8 +176,8 @@ where
         });
 
         // Insert the handle into the map
-        actors.insert(id.to_string(), Box::new(handle.clone()));
-
+        actors.insert(id, Box::new(handle.clone()));
+        
         // Return the handle
         Ok(handle)
     }

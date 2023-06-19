@@ -26,6 +26,8 @@ pub enum ActorError {
     ForeignTargetNotFound,
     #[error("A message failed to be sent to a local actor")]
     MessageSendError,
+    #[error("An actor's message channel was closed")]
+    MessageChannelClosed
 }
 
 

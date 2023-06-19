@@ -17,31 +17,20 @@ use super::{Message, DynMessageResponse, Notification};
 /// which both contain their respective messages. Because Federated Messages and Notifications are uniform for an entire system,
 /// they can be included as generics.
 #[derive(Debug)]
-pub enum ForeignMessage<F: Message, N: Notification> {
+pub enum ForeignMessage<F: Message> {
     /// Contains a federated message sent to a foreign actor
     /// as well as its responder oneshot and target
     FederatedMessage(F, Option<oneshot::Sender<F::Response>>, ActorPath),
-    /// Contains a notification sent to a foreign actor
-    Notification(N, ActorPath),
     /// Contains a message sent to a foreign actor as well as it's responder and target
     Message(Box<DynMessageResponse>, Option<oneshot::Sender<Box<DynMessageResponse>>>, ActorPath)
 }
 
-impl<F: Message, N: Notification> ForeignMessage<F, N> {
+impl<F: Message> ForeignMessage<F> {
     /// Gets the target of the message
     pub fn get_target(&self) -> &ActorPath {
         match self {
             ForeignMessage::FederatedMessage(_, _, t) => t,
-            ForeignMessage::Notification(_, t) => t,
             ForeignMessage::Message(_, _, t) => t,
-        }
-    }
-
-    /// Returns true if this is a notification
-    pub fn is_notification(&self) -> bool {
-        match self {
-            ForeignMessage::Notification(_, _) => true,
-            _ => false
         }
     }
 
@@ -49,7 +38,6 @@ impl<F: Message, N: Notification> ForeignMessage<F, N> {
     pub fn pop_target(self) -> Self {
         match self {
             ForeignMessage::FederatedMessage(a, b, c) => ForeignMessage::FederatedMessage(a, b, c.popfirst()),
-            ForeignMessage::Notification(a, b) => ForeignMessage::Notification(a, b.popfirst()),
             ForeignMessage::Message(a, b, c) => ForeignMessage::Message(a, b, c.popfirst()) ,
         }
     }
@@ -63,11 +51,8 @@ pub(crate) trait ForeignReciever {
     /// The type of the federated message that is sent by both the local and foreign system
     type Federated: Message;
 
-    /// The type of the notification that is sent by both the local and foreign system
-    type Notification: Notification;
-
     /// This function recieves a foreign message and handles it
-    async fn handle_foreign(&self, foreign: ForeignMessage<Self::Federated, Self::Notification>) -> Result<(), ActorError>;
+    async fn handle_foreign(&self, foreign: ForeignMessage<Self::Federated>) -> Result<(), ActorError>;
 }
 
 
@@ -80,26 +65,14 @@ pub(crate) trait ForeignMessenger {
     /// The type of the federated message that is sent by both the local and foreign system
     type Federated: Message;
 
-    /// The type of the notification that is sent by both the local and foreign system
-    type Notification: Notification;
-
     /// This function must be implemented by every [`ForeignMessenger`]. It sends the passed foreign
     /// message to the foreign actor.
-    async fn send_raw_foreign(&self, message: ForeignMessage<Self::Federated, Self::Notification>) -> Result<(), ActorError>;
+    async fn send_raw_foreign(&self, message: ForeignMessage<Self::Federated>) -> Result<(), ActorError>;
 
     /// This function must be implemented by every [`ForeignMessenger]`
     /// It must return true if someone is ready to recieve a foreign message
     async fn can_send_foreign(&self) -> bool;
 
-    /// This function is automatically implemented. It takes a local notification,
-    /// and sends it using [`ForeignMessenger::send_raw_foreign`]
-    async fn send_notification_foreign(&self, notification: Self::Notification, path: ActorPath) -> Result<(), ActorError> {
-        // Create the foreign message
-        let foreign = ForeignMessage::Notification(notification, path);
-
-        // Send the foreign message
-        self.send_raw_foreign(foreign).await
-    }
     
     /// This function is automatically implemented. It takes a local message, and
     /// sends it using [`ForeignMessenger::send_raw_foreign`]

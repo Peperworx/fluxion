@@ -2,7 +2,7 @@
 
 use tokio::sync::mpsc;
 
-use crate::{message::{MessageType, Message, foreign::{ForeignMessage, ForeignReciever}, Notification}, error::ActorError};
+use crate::{message::{MessageType, Message, foreign::{ForeignMessage, ForeignReciever}, Notification, DualMessage}, error::ActorError};
 
 
 
@@ -16,10 +16,7 @@ where
     M: Message, {
     
     /// The message sender for the actor
-    pub(crate) message_sender: mpsc::Sender<MessageType<F, M>>,
-
-    /// The foreign message sender for the actor
-    pub(crate) foreign_sender: mpsc::Sender<ForeignMessage<F, N>>,
+    pub(crate) message_sender: mpsc::Sender<DualMessage<F, M, N>>,
 
     /// The id of the actor
     pub(crate) id: String,
@@ -38,7 +35,7 @@ where
 
     /// Sends a raw message to the actor
     pub async fn send_raw_message(&self, message: MessageType<F, M>) -> Result<(), ActorError> {
-        self.message_sender.send(message).await.or(Err(ActorError::MessageSendError))
+        self.message_sender.send(DualMessage::MessageType(message)).await.or(Err(ActorError::MessageSendError))
     }
 }
 
@@ -51,10 +48,9 @@ where
     M: Message {
 
     type Federated = F;
-    type Notification = N;
 
-    async fn handle_foreign(&self, foreign: ForeignMessage<F, N>) -> Result<(), ActorError> {
-        self.foreign_sender.send(foreign).await.or(Err(ActorError::ForeignSendFail))
+    async fn handle_foreign(&self, foreign: ForeignMessage<F>) -> Result<(), ActorError> {
+        self.message_sender.send(DualMessage::ForeignMessage(foreign)).await.or(Err(ActorError::ForeignSendFail))
     }
 }
 
