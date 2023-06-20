@@ -5,7 +5,7 @@ use tokio::sync::oneshot;
 
 use crate::{actor::path::ActorPath, error::ActorError};
 
-use super::{Message, DynMessageResponse, Notification, AsMessageType, MessageType};
+use super::{Message, DynMessageResponse, AsMessageType, MessageType};
 
 
 
@@ -115,7 +115,7 @@ pub(crate) trait ForeignMessenger {
         // If we should wait for a response, then do so
         if let (Some(target), Some(source)) = (responder, responder_recieve) {
             // Wait for the foreign response
-            let res = source.await.or(Err(ActorError::ForeignRespondFail))?;
+            let res = source.await.or(Err(ActorError::ForeignRespondFailed))?;
 
             // Downcast
             let res = res.downcast_ref::<M::Response>().ok_or(ActorError::ForeignResponseUnexpected)?;

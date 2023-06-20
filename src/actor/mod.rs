@@ -2,9 +2,9 @@
 
 use std::any::Any;
 
-use crate::{error::ActorError, message::foreign::ForeignReciever};
+use crate::{error::ActorError, message::{foreign::ForeignReciever, Message, Notification}};
 
-use self::context::ActorContext;
+use self::{context::ActorContext, handle::ActorHandle};
 
 /// Contains the context that is passed to the actor which allows it to interact with the system
 pub mod context;
@@ -27,12 +27,12 @@ pub mod supervisor;
 pub trait Actor: Send + Sync + 'static {
 
     /// Called upon actor initialization, when the supervisor begins to run.
-    async fn initialize(&mut self, context: &mut ActorContext) -> Result<(), ActorError>;
+    async fn initialize<F: Message, N: Notification>(&mut self, context: &mut ActorContext<F, N>) -> Result<(), ActorError>;
 
     /// Called upon actor deinitialization, when the supervisor stops.
     /// Note that this will not be called if the initialize function fails.
     /// For handling cases of initialization failure, use [`Actor::cleanup`]
-    async fn deinitialize(&mut self, context: &mut ActorContext) -> Result<(), ActorError>;
+    async fn deinitialize<F: Message, N: Notification>(&mut self, context: &mut ActorContext<F, N>) -> Result<(), ActorError>;
 
     /// Called when the actor supervisor is killed, either as the result of a graceful shutdown
     /// or if initialization fails.
@@ -42,7 +42,6 @@ pub trait Actor: Send + Sync + 'static {
 /// # ActorEntry
 /// This trait is used for actor entries in the hashmap, and is automatically implemented for any
 /// types that meet its bounds
-pub(crate) trait ActorEntry: Any + ForeignReciever + Send + Sync + 'static {}
-
-impl<T> ActorEntry for T
-where T: Any + ForeignReciever + Send + Sync + 'static {}
+pub(crate) trait ActorEntry: Any + ForeignReciever {
+    fn as_any(&self) -> &dyn Any;
+}

@@ -1,8 +1,12 @@
 //! Contains [`ActorHandle`], a struct that is used for interacting with Actors, and other supporting types.
 
-use tokio::sync::mpsc;
+use std::any::Any;
 
-use crate::{message::{LocalMessage, Message, foreign::{ForeignMessage, ForeignReciever}, Notification, DualMessage}, error::ActorError};
+use tokio::sync::{mpsc, oneshot};
+
+use crate::{message::{LocalMessage, Message, foreign::{ForeignMessage, ForeignReciever}, DualMessage}, error::ActorError};
+
+use super::ActorEntry;
 
 
 
@@ -32,8 +36,48 @@ where
     }
 
     /// Sends a raw message to the actor
-    pub async fn send_raw_message(&self, message: LocalMessage<F, M>) -> Result<(), ActorError> {
+    async fn send_raw_message(&self, message: LocalMessage<F, M>) -> Result<(), ActorError> {
         self.message_sender.send(DualMessage::LocalMessage(message)).await.or(Err(ActorError::MessageSendError))
+    }
+
+    /// Sends a message to the actor
+    pub async fn send(&self, message: M) -> Result<(), ActorError> {
+        self.send_raw_message(LocalMessage::<F, M>::Message(message, None)).await
+    }
+
+    /// Sends a message to the actor and awaits a response
+    pub async fn request(&self, message: M) -> Result<M::Response, ActorError> {
+        // Create the responder
+        let (responder, reciever) = oneshot::channel();
+
+        // Send the message
+        self.send_raw_message(LocalMessage::<F, M>::Message(message, Some(responder))).await?;
+
+        // Await a response
+        let res = reciever.await;
+
+        // Return the result with the error converted
+        res.or(Err(ActorError::MessageResponseFailed))
+    }
+
+    /// Sends a federated message to the actor
+    pub async fn send_federated(&self, message: F) -> Result<(), ActorError> {
+        self.send_raw_message(LocalMessage::<F, M>::Federated(message, None)).await
+    }
+
+    /// Sends a federated message to the actor and awaits a response
+    pub async fn request_federated(&self, message: F) -> Result<F::Response, ActorError> {
+        // Create the responder
+        let (responder, reciever) = oneshot::channel();
+
+        // Send the message
+        self.send_raw_message(LocalMessage::<F, M>::Federated(message, Some(responder))).await?;
+
+        // Await a response
+        let res = reciever.await;
+
+        // Return the result with the error converted
+        res.or(Err(ActorError::FederatedResponseFailed))
     }
 }
 
@@ -51,3 +95,13 @@ where
     }
 }
 
+
+impl<F, M> ActorEntry for ActorHandle<F, M>
+where
+    F: Message,
+    M: Message {
+    
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}

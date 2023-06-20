@@ -1,10 +1,10 @@
 //! The implementation of systems and surrounding types
 
-use std::{sync::Arc, mem, collections::HashMap};
+use std::{sync::Arc, mem, collections::HashMap, any::Any, ops::Deref};
 
 use tokio::sync::{mpsc, Mutex, RwLock, broadcast};
 
-use crate::{message::{foreign::{ForeignMessage}, Notification, Message, handler::{HandleNotification, HandleMessage, HandleFederated}}, error::{ActorError, SystemError}, actor::{path::ActorPath, ActorEntry, Actor, supervisor::{ActorSupervisor, SupervisorErrorPolicy}, handle::ActorHandle}};
+use crate::{message::{foreign::{ForeignMessage, ForeignReciever}, Notification, Message, handler::{HandleNotification, HandleMessage, HandleFederated}}, error::{ActorError, SystemError}, actor::{path::ActorPath, Actor, supervisor::{ActorSupervisor, SupervisorErrorPolicy}, handle::ActorHandle, ActorEntry}};
 
 
 /// # System
@@ -35,7 +35,7 @@ where
     shutdown: broadcast::Sender<()>,
 
     /// The hashmap of all actors
-    actors: Arc<RwLock<HashMap<String, Box<dyn ActorEntry<Federated = F>>>>>,
+    actors: Arc<RwLock<HashMap<String, Box<dyn ActorEntry<Federated = F> + Send + Sync + 'static>>>>,
 
     /// The notification broadcast
     notification: broadcast::Sender<N>,
@@ -160,10 +160,13 @@ where
         // Initialize the supervisor
         let (mut supervisor, handle) = ActorSupervisor::new(actor, id.clone(), self, error_policy);
         
+        // Clone the system
+        let system = self.clone();
+
         // Start the supervisor task
-        tokio::spawn(async move {
+        tokio::spawn(async {
             // TODO: Log this.
-            let _ = supervisor.run().await;
+            let _ = supervisor.run(system).await;
             let _ = supervisor.cleanup().await;
             
             drop(supervisor);
@@ -171,9 +174,24 @@ where
 
         // Insert the handle into the map
         actors.insert(id, Box::new(handle.clone()));
-        
+
         // Return the handle
         Ok(handle)
+    }
+
+    /// Retrieves an actor from the system, returning None if the actor does not exist
+    pub async fn get_actor<M: Message>(&self, id: &str) -> Option<ActorHandle<F, M>> {
+
+        // Lock read access to the actor map
+        let actors = self.actors.read().await;
+
+        // Try to get the actor
+        let actor = actors.get(id);
+        
+        // If the actor exists, downcast it to ActorHandle<M>. If the actor does not exist, return None
+        actor.and_then(|boxed| {
+            boxed.as_any().downcast_ref().cloned()
+        })
     }
 
     

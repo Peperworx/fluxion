@@ -1,5 +1,3 @@
-use std::io::Error;
-
 use tokio::sync::{broadcast, mpsc};
 
 use crate::{system::System, message::{Message, Notification, foreign::ForeignMessage, LocalMessage, handler::{HandleNotification, HandleFederated, HandleMessage}, DualMessage, MessageType, AsMessageType}, error::{policy::ErrorPolicy, ActorError}, handle_policy, error_policy};
@@ -82,10 +80,13 @@ where
 
 
     /// Runs the actor, only returning an error after all error policy options have been exhausted.
-    pub async fn run(&mut self) -> Result<(), ActorError> {
+    pub async fn run(&mut self, system: System<F, N>) -> Result<(), ActorError> {
 
         // Create a new actor context for this actor to use
-        let mut context = ActorContext;
+        let mut context = ActorContext {
+            id: self.id.clone(),
+            system: system,
+        };
 
         // Initialize the actor, following error policy.
         let _ = handle_policy!(

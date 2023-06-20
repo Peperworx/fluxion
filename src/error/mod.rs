@@ -17,7 +17,7 @@ pub enum ActorError {
     #[error("A foreign message failed to send.")]
     ForeignSendFail,
     #[error("A foreign message failed to send a response")] 
-    ForeignRespondFail,
+    ForeignRespondFailed,
     #[error("A foreign message responded with an unxepected type.")]
     ForeignResponseUnexpected,
     #[error("A foreign response failed to relay to the local sender")]
@@ -27,7 +27,11 @@ pub enum ActorError {
     #[error("A message failed to be sent to a local actor")]
     MessageSendError,
     #[error("An actor's message channel was closed")]
-    MessageChannelClosed
+    MessageChannelClosed,
+    #[error("A message failed to recieve a response")]
+    MessageResponseFailed,
+    #[error("A federated message failed to recieve a response")] 
+    FederatedResponseFailed,
 }
 
 
