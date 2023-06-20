@@ -1,17 +1,17 @@
 //! Contains a structure to represent an actor's path
 
 /// # ActorPath
-/// Provides a wrapper for working with actor paths
+/// [`ActorPath`] provides a wrapper for working with actor paths
 #[derive(Clone, Debug, PartialEq, PartialOrd, Hash, Eq)]
 pub struct ActorPath {
-    /// The ID of the contained actor
+    /// The ID of the actor represented by the path
     actor: String,
     /// The systems in the path
     systems: Vec<String>,
 }
 
 impl ActorPath {
-    /// Creates a new empty path from a schema string
+    /// Creates a new path from a schema &str, delimited by ':', where the last item is the actor's id and the others are the path of systems through which the actor can be accessed.
     /// Returns None if the schema is empty
     pub fn new(schema: &str) -> Option<Self> {
         // If the string is empty, return None
@@ -31,9 +31,9 @@ impl ActorPath {
         Some(ActorPath { actor, systems })
     }
 
-    /// Gets the individual components of the path
-    pub fn systems(&self) -> Vec<String> {
-        self.systems.clone()
+    /// Gets the individual systems in the path
+    pub fn systems(&self) -> &[String] {
+        &self.systems
     }
 
     /// Gets the actor name

@@ -18,14 +18,14 @@ pub mod path;
 /// Contains [`ActorHandle`], a struct that is used for interacting with Actors, and other supporting types.
 pub mod handle;
 
-/// Contains [`ActorSupervisor`], a struct which contains a task that handles an actor's lifecycle.
+/// Contains [`ActorSupervisor`], a struct containing a task that handles an actor's lifecycle.
 pub mod supervisor;
 
 /// # Actor
 /// The core [`Actor`] trait must be implemented for every actor.
-/// This trait requires that any implementor be [`Send`] + [`Sync`] + `'static`.
-/// This trait uses the `async_trait` crate to allow async functions to be contained,
-/// but this will be replaced as soon as async functions in traits is stabilized.
+/// This trait requires that any implementor be [`Send`] + [`Sync`] + `'static`,
+/// and uses the `async_trait` crate to allow async functions to be contained,
+/// but this will be replaced as soon as async functions in traits are stabilized.
 #[async_trait::async_trait]
 pub trait Actor: Send + Sync + 'static {
     /// Called upon actor initialization, when the supervisor begins to run.
