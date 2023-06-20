@@ -2,7 +2,7 @@ use tokio::sync::{broadcast, mpsc};
 
 use crate::{system::System, message::{Message, Notification, foreign::ForeignMessage, LocalMessage, handler::{HandleNotification, HandleFederated, HandleMessage}, DualMessage, MessageType, AsMessageType}, error::{policy::ErrorPolicy, ActorError}, handle_policy, error_policy};
 
-use super::{handle::ActorHandle, Actor, context::ActorContext};
+use super::{handle::{ActorHandle, LocalHandle}, Actor, context::ActorContext, path::ActorPath};
 
 
 
@@ -12,8 +12,8 @@ pub struct ActorSupervisor<A, F: Message, N: Notification, M: Message> {
     /// The actor managed by this supervisor
     actor: A,
 
-    /// The id of this actor
-    id: String,
+    /// This actor's path
+    path: ActorPath,
 
     /// The actor's error policy
     error_policy: SupervisorErrorPolicy,
@@ -39,7 +39,7 @@ where
     M: Message {
     /// Creates a new supervisor with the given actor and actor id.
     /// Returns the new supervisor alongside the handle that references this.
-    pub fn new(actor: A, id: String, system: &System<F,N>, error_policy: SupervisorErrorPolicy) -> (ActorSupervisor<A, F, N, M>, ActorHandle<F, M>) {
+    pub fn new(actor: A, path: ActorPath, system: &System<F,N>, error_policy: SupervisorErrorPolicy) -> (ActorSupervisor<A, F, N, M>, LocalHandle<F, M>) {
 
         // Create a new message channel
         let (message_sender, message) = mpsc::channel(64);
@@ -55,13 +55,13 @@ where
             actor, notify, message,
             shutdown,
             error_policy,
-            id: id.clone(),
+            path: path.clone(),
         };
 
         // Create the handle
-        let handle = ActorHandle {
+        let handle = LocalHandle {
             message_sender,
-            id,
+            path,
         };
 
         // Return both
@@ -84,7 +84,7 @@ where
 
         // Create a new actor context for this actor to use
         let mut context = ActorContext {
-            id: self.id.clone(),
+            path: self.path.clone(),
             system: system,
         };
 

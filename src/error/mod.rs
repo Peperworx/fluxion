@@ -18,6 +18,8 @@ pub enum ActorError {
     ForeignSendFail,
     #[error("A foreign message failed to send a response")] 
     ForeignRespondFailed,
+    #[error("A foreign message failed to recieve a response")] 
+    ForeignResponseFailed,
     #[error("A foreign message responded with an unxepected type.")]
     ForeignResponseUnexpected,
     #[error("A foreign response failed to relay to the local sender")]
@@ -32,6 +34,7 @@ pub enum ActorError {
     MessageResponseFailed,
     #[error("A federated message failed to recieve a response")] 
     FederatedResponseFailed,
+    
 }
 
 
@@ -41,4 +44,6 @@ pub enum ActorError {
 pub enum SystemError {
     #[error("An actor with that id already exists")]
     ActorExists,
+    #[error("An actor path was invalid")]
+    InvalidPath,
 }

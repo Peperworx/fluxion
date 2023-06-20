@@ -4,7 +4,7 @@ use std::{sync::Arc, mem, collections::HashMap, any::Any, ops::Deref};
 
 use tokio::sync::{mpsc, Mutex, RwLock, broadcast};
 
-use crate::{message::{foreign::{ForeignMessage, ForeignReciever}, Notification, Message, handler::{HandleNotification, HandleMessage, HandleFederated}}, error::{ActorError, SystemError}, actor::{path::ActorPath, Actor, supervisor::{ActorSupervisor, SupervisorErrorPolicy}, handle::ActorHandle, ActorEntry}};
+use crate::{message::{foreign::{ForeignMessage, ForeignReciever}, Notification, Message, handler::{HandleNotification, HandleMessage, HandleFederated}}, error::{ActorError, SystemError}, actor::{path::ActorPath, Actor, supervisor::{ActorSupervisor, SupervisorErrorPolicy}, handle::{ActorHandle, LocalHandle, ForeignHandle}, ActorEntry}};
 
 
 /// # System
@@ -84,6 +84,11 @@ where
         actor.first().is_some_and(|v| v != self.id)
     }
 
+    /// Returns true if someone is waiting for a foreign message
+    pub async fn can_send_foreign(&self) -> bool {
+        self.foreign_reciever.lock().await.is_none()
+    }
+
     /// Relays a foreign message to this system
     pub async fn relay_foreign(&self, foreign: ForeignMessage<F>) -> Result<(), ActorError> {
         // Get the target
@@ -143,22 +148,22 @@ where
     }
 
     /// Adds an actor to the system
-    pub async fn add_actor<A: Actor + HandleNotification<N> + HandleFederated<F> + HandleMessage<M>, M: Message>(&self, actor: A, id: &str, error_policy: SupervisorErrorPolicy) -> Result<ActorHandle<F, M>, SystemError> {
+    pub async fn add_actor<A: Actor + HandleNotification<N> + HandleFederated<F> + HandleMessage<M>, M: Message>(&self, actor: A, id: &str, error_policy: SupervisorErrorPolicy) -> Result<LocalHandle<F, M>, SystemError> {
 
-        // Convert id to a string
-        let id = id.to_string();
+        // Convert id to a path
+        let path = ActorPath::new(&(self.id.clone() + ":" + id)).ok_or(SystemError::InvalidPath)?;
 
         // Lock write access to the actor map
         let mut actors = self.actors.write().await;
 
         // If the key is already in actors, return an error
-        if actors.contains_key(&id) {
+        if actors.contains_key(id) {
             return Err(SystemError::ActorExists);
         }
         
 
         // Initialize the supervisor
-        let (mut supervisor, handle) = ActorSupervisor::new(actor, id.clone(), self, error_policy);
+        let (mut supervisor, handle) = ActorSupervisor::new(actor, path, self, error_policy);
         
         // Clone the system
         let system = self.clone();
@@ -173,30 +178,44 @@ where
         });
 
         // Insert the handle into the map
-        actors.insert(id, Box::new(handle.clone()));
+        actors.insert(id.to_string(), Box::new(handle.clone()));
 
         // Return the handle
         Ok(handle)
     }
 
     /// Retrieves an actor from the system, returning None if the actor does not exist
-    pub async fn get_actor<M: Message>(&self, id: &str) -> Option<ActorHandle<F, M>> {
+    pub async fn get_actor<M: Message>(&self, id: &str) -> Option<Box<dyn ActorHandle<F, M>>> {
+
+        // Get the actor path
+        let path = ActorPath::new(id)?;
+
+        // If the first system exists and it is not this system, then create a foreign actor handle
+        if path.first().unwrap_or(&self.id) != &self.id {
+            // Create and return a foreign handle
+            return Some(Box::new(ForeignHandle {
+                foreign: self.foreign_sender.clone(),
+                system: self.clone(),
+                path: path
+            }));
+        }
 
         // Lock read access to the actor map
         let actors = self.actors.read().await;
 
         // Try to get the actor
-        let actor = actors.get(id);
+        let actor = actors.get(path.actor())?;
         
-        // If the actor exists, downcast it to ActorHandle<M>. If the actor does not exist, return None
-        actor.and_then(|boxed| {
-            boxed.as_any().downcast_ref().cloned()
-        })
+        // Downcast and clone into a box.
+        match actor.as_any().downcast_ref::<LocalHandle<F, M>>() {
+            Some(v) => Some(Box::new(v.clone())),
+            None => None,
+        }
     }
 
     
     /// Returns a notification reciever associated with the system's notification broadcaster.
-    pub(crate) fn subscribe_notify(&self) -> broadcast::Receiver<N> {
+    pub fn subscribe_notify(&self) -> broadcast::Receiver<N> {
         self.notification.subscribe()
     }
 

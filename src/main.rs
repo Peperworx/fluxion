@@ -52,8 +52,8 @@ impl HandleNotification<()> for TestActor {
 
 #[async_trait::async_trait]
 impl HandleMessage<TestMessage> for TestActor {
-    async fn message<F: Message, N: Notification>(&mut self, _context: &mut ActorContext<F, N>, _message: TestMessage) -> Result<(), ActorError> {
-        println!("message");
+    async fn message<F: Message, N: Notification>(&mut self, context: &mut ActorContext<F, N>, _message: TestMessage) -> Result<(), ActorError> {
+        println!("message on {:?}", context.get_path());
         Ok(())
     }
 }
@@ -61,8 +61,8 @@ impl HandleMessage<TestMessage> for TestActor {
 #[async_trait::async_trait]
 impl HandleFederated<TestFederated> for TestActor {
     async fn federated_message<N: Notification>(&mut self, context: &mut ActorContext<TestFederated, N>, _message: TestFederated) -> Result<(), ActorError> {
-        println!("federated message");
-        let ar = context.get_actor::<TestMessage>("test").await.unwrap();
+        println!("federated message on {:?}", context.get_path());
+        let ar = context.get_actor::<TestMessage>("other:test").await.unwrap();
         ar.send(TestMessage).await.unwrap();
         Ok(())
     }
@@ -70,16 +70,33 @@ impl HandleFederated<TestFederated> for TestActor {
 
 #[tokio::main]
 async fn main() {
-    let system = System::<TestFederated, ()>::new("host");
+    let host = System::<TestFederated, ()>::new("host");
+    let other = System::<TestFederated, ()>::new("other");
 
-    system.add_actor::<TestActor, TestMessage>(TestActor, "test",  SupervisorErrorPolicy::default()).await.unwrap();
-    let ah = system.get_actor("test").await.unwrap();
-    
-    ah.request(TestMessage).await.unwrap();
-    ah.request_federated(TestFederated).await.unwrap();
-    system.notify(()).await;
-    system.drain_notify().await;
-    system.relay_foreign(fluxion::message::foreign::ForeignMessage::Message(Box::new(TestMessage), None, ActorPath::new("test").unwrap())).await.unwrap();
+    let mut foreign_host = host.get_foreign().await.unwrap();
+    let other2 = other.clone();
 
-    system.shutdown().await;
+    tokio::task::spawn(async move {
+        while let Some(message) = foreign_host.recv().await {
+            other2.relay_foreign(message).await.unwrap();
+        }
+    });
+
+    let mut foreign_other = other.get_foreign().await.unwrap();
+    let host2 = host.clone();
+
+    tokio::task::spawn(async move {
+        while let Some(message) = foreign_other.recv().await {
+            host2.relay_foreign(message).await.unwrap();
+        }
+    });
+
+    host.add_actor(TestActor, "test", SupervisorErrorPolicy::default()).await.unwrap();
+    other.add_actor(TestActor, "test", SupervisorErrorPolicy::default()).await.unwrap();
+
+    let ar = other.get_actor::<TestMessage>("host:test").await.unwrap();
+    ar.request_federated(TestFederated).await.unwrap();
+
+    other.shutdown().await;
+    host.shutdown().await;
 }

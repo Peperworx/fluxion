@@ -63,3 +63,10 @@ impl ActorPath {
         }
     }
 }
+
+
+impl ToString for ActorPath {
+    fn to_string(&self) -> String {
+        self.systems.join(":") + ":" + &self.actor
+    }
+}

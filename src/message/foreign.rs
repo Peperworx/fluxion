@@ -92,7 +92,7 @@ pub(crate) trait ForeignMessenger {
     /// sends it using [`ForeignMessenger::send_raw_foreign`]
     async fn send_message_foreign<M: Message>(&self,
         message: M, responder: Option<oneshot::Sender<M::Response>>,
-        target_actor: ActorPath) -> Result<(), ActorError> {
+        target_actor: &ActorPath) -> Result<(), ActorError> {
 
         // If we should wait for a response, then do so
         let (foreign_responder, responder_recieve) = if responder.is_some() {
@@ -103,7 +103,7 @@ pub(crate) trait ForeignMessenger {
         };
 
         // Put the message into a foreign message
-        let foreign = ForeignMessage::<Self::Federated>::Message(Box::new(message), foreign_responder, target_actor);
+        let foreign = ForeignMessage::<Self::Federated>::Message(Box::new(message), foreign_responder, target_actor.clone());
 
         // If someone is listening for a foreign message, then send the foreign message
         if self.can_send_foreign().await {
@@ -131,9 +131,9 @@ pub(crate) trait ForeignMessenger {
     /// sends it using [`ForeignMessenger::send_raw_foreign`]
     async fn send_federated_foreign(&self, federated: Self::Federated,
         responder: Option<oneshot::Sender<<Self::Federated as Message>::Response>>,
-        target_actor: ActorPath) -> Result<(), ActorError> {
+        target_actor: &ActorPath) -> Result<(), ActorError> {
         // Create the foreign message
-        let foreign = ForeignMessage::FederatedMessage(federated, responder, target_actor);
+        let foreign = ForeignMessage::FederatedMessage(federated, responder, target_actor.clone());
         
         // Send the foreign message
         self.send_raw_foreign(foreign).await
