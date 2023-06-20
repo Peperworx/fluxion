@@ -6,7 +6,7 @@ use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 
 use crate::{
     actor::{
-        handle::{ActorHandle, ForeignHandle, LocalHandle},
+        handle::{ActorHandle, foreign::ForeignHandle, local::LocalHandle},
         path::ActorPath,
         supervisor::{ActorSupervisor, SupervisorErrorPolicy},
         Actor, ActorEntry,

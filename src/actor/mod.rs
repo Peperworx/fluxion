@@ -4,7 +4,7 @@ use std::any::Any;
 
 use crate::{
     error::ActorError,
-    message::{foreign::ForeignReciever, Message, Notification},
+    message::{foreign::ForeignReceiver, Message, Notification},
 };
 
 use self::context::ActorContext;
@@ -50,6 +50,6 @@ pub trait Actor: Send + Sync + 'static {
 /// # ActorEntry
 /// This trait is used for actor entries in the hashmap, and is automatically implemented for any
 /// types that meet its bounds
-pub(crate) trait ActorEntry: Any + ForeignReciever {
+pub(crate) trait ActorEntry: Any + ForeignReceiver {
     fn as_any(&self) -> &dyn Any;
 }

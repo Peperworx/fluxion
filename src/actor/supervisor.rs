@@ -11,7 +11,7 @@ use crate::{
     system::System,
 };
 
-use super::{context::ActorContext, handle::LocalHandle, path::ActorPath, Actor};
+use super::{context::ActorContext, handle::local::LocalHandle, path::ActorPath, Actor};
 
 /// # ActorSupervisor
 /// Manages an actor's lifecycle
