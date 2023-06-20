@@ -13,7 +13,7 @@ pub enum ErrorPolicyCommand<E> {
     /// Ignores the failure if a specific error was encountered
     IgnoreIf(E),
     /// Restarts execution of the policy the contained number of times before continuing.
-    Loop(usize),
+    Loop(usize, usize),
 }
 
 /// # ErrorPolicy
@@ -68,32 +68,29 @@ macro_rules! handle_policy {
             let mut prev: Result<$ret, $e> = $checked;
 
             // If ok, then return.
-            if prev.is_ok() {
+            let Err(res_err) = &prev else {
                 // Weird reassign to allow the return type to be infered
                 let res: Result<_, $e> = Ok(prev);
                 return res;
-            }
-
-            // The number of iterations in the current loop
-            let mut loops = 0;
+            };
 
             // The position in the policy
             let mut pos = 0;
 
+            // Get the policy
+            let policy = $policy(res_err);
+
+            // Get the internal commands
+            let mut coms = policy.contained().clone();
+
             loop {
-                // If at any point the operation was a success, then return
-                let Err(res_err) = &prev else {
+                // If the operation was a success, then return
+                if prev.is_ok() {
                     return Ok(prev);
-                };
-
-                // Get the policy
-                let policy = $policy(res_err);
-
-                // Get the internal commands
-                let com = policy.contained();
+                }
 
                 // Extract the policy from the option
-                let Some(com) = com.get(pos) else {
+                let Some(com) = coms.get_mut(pos) else {
                     return Ok(Ok(prev?));
                 };
 
@@ -103,8 +100,9 @@ macro_rules! handle_policy {
                 // Handle the command
                 match com {
                     $crate::error::policy::ErrorPolicyCommand::Run => {
-                        // Run the operation, updating the previous value
+                        // Run the operation
                         prev = $checked;
+                        
                     },
                     $crate::error::policy::ErrorPolicyCommand::Fail => {
                         // If we should fail, then just return the error if there is one. This is also the default behavior if there
@@ -116,35 +114,28 @@ macro_rules! handle_policy {
                         return Ok(prev);
                     },
                     $crate::error::policy::ErrorPolicyCommand::FailIf(test) => {
-                        // If the operation was a success, then return
-                        if prev.is_ok() {
-                            return Ok(prev);
-                        }
-
                         // If an error was returned and matches test, then pass it along
                         if prev.as_ref().is_err_and(|e| e == test)  {
                             return Ok(Ok(prev?));
                         }
                     },
                     $crate::error::policy::ErrorPolicyCommand::IgnoreIf(test) => {
-
                         // If an error was returned and matches test, then ignore the error
                         // and return.
                         if prev.as_ref().is_err_and(|e| e == test)  {
                             return Ok(prev);
                         }
                     },
-                    $crate::error::policy::ErrorPolicyCommand::Loop(n) => {
-                        // Increment loops
-                        loops += 1;
-
-                        // If loops is smaller than or equal to n, then reset pos to 0.
-                        if &loops < n {
+                    $crate::error::policy::ErrorPolicyCommand::Loop(n, curr) => {
+                        // Decrement curr and if it is larger than, 0 return to the beginning
+                        *curr -= 1;
+                        if *curr > 0 {
                             pos = 0;
                         } else {
-                            // Otherwise, skip this value and set loops to zero
-                            loops = 0;
+                            // Otherwise, reset curr to n
+                            *curr = *n;
                         }
+
                     },
 
                 };
@@ -178,7 +169,7 @@ macro_rules! _error_policy_resolve_single {
     };
 
     (loop $e:expr;) => {
-        $crate::error::policy::ErrorPolicyCommand::Loop($e)
+        $crate::error::policy::ErrorPolicyCommand::Loop($e, $e)
     };
 }
 
