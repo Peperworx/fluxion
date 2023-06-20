@@ -8,6 +8,9 @@ use crate::{
 use super::{handle::ActorHandle, path::ActorPath};
 
 /// # ActorContext
+/// [`ActorContext`] provides methods to allow an actor to interact with its [`System`] and other actors.
+/// This is done instead of providing a [`System`] reference directly to disallow actors from calling notifications and calling into themselves, which
+/// can cause infinite loops.
 pub struct ActorContext<F: Message, N: Notification> {
     /// The actor's path
     pub(crate) path: ActorPath,
@@ -16,12 +19,18 @@ pub struct ActorContext<F: Message, N: Notification> {
 }
 
 impl<F: Message, N: Notification> ActorContext<F, N> {
-    /// Retrieves an actor from the system, returning None if the actor does not exist
+    /// Retrieves an actor from the system.
+    /// Returns [`None`] if the actor does not exist or if an actor tries to retrieve its own handle.
     pub async fn get_actor<M: Message>(&self, id: &str) -> Option<Box<dyn ActorHandle<F, M>>> {
-        self.system.get_actor(id).await
+        // If the the id matches the actor's own path, then return None
+        if ActorPath::new(id).as_ref() == Some(&self.path) {
+            None
+        } else {
+            self.system.get_actor(id).await
+        }
     }
 
-    /// Gets the actor's path
+    /// Gets this actor's path.
     pub fn get_path(&self) -> &ActorPath {
         &self.path
     }
