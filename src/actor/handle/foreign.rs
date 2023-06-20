@@ -1,3 +1,6 @@
+//! Contains [`ForeignHandler`], an implementor of [`super::ActorHandle`] used for communicating with foreign actors.
+
+
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{

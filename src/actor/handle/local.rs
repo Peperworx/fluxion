@@ -1,4 +1,4 @@
-/// Contains [`LocalHandler`], an implementor of [`super::ActorHandle`] used for communicating with local actors.
+//! Contains [`LocalHandler`], an implementor of [`super::ActorHandle`] used for communicating with local actors.
 
 use std::any::Any;
 
