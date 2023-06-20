@@ -247,12 +247,8 @@ where
 
     /// Notifies all actors on this system.
     /// Returns the number of actors notified
-    pub async fn notify(&self, notification: N) -> usize {
-        if let Ok(v) = self.notification.send(notification) {
-            v
-        } else {
-            0
-        }
+    pub fn notify(&self, notification: N) -> usize {
+        self.notification.send(notification).unwrap_or(0)
     }
 
     /// Yields the current task until all notifications have been recieved
@@ -269,11 +265,7 @@ where
     /// Even after calling this function, actors can still be added to the system. This returns the number of actors shutdown.
     pub async fn shutdown(&self) -> usize {
         // Send the shutdown signal
-        let res = if let Ok(v) = self.shutdown.send(()) {
-            v
-        } else {
-            0
-        };
+        let res = self.shutdown.send(()).unwrap_or(0);
 
         // Borrow the actor map as writable
         let mut actors = self.actors.write().await;
