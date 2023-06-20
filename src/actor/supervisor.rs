@@ -14,7 +14,8 @@ use crate::{
 use super::{context::ActorContext, handle::local::LocalHandle, path::ActorPath, Actor};
 
 /// # ActorSupervisor
-/// Manages an actor's lifecycle
+/// [`ActorSupervisor`] handles an actor's lifecycle and the reciept of messages.
+/// This is acheived by holding several recieve channels and running a task that [`tokio::select`]s on them.
 pub struct ActorSupervisor<A, F: Message, N: Notification, M: Message> {
     /// The actor managed by this supervisor
     actor: A,
@@ -33,8 +34,6 @@ pub struct ActorSupervisor<A, F: Message, N: Notification, M: Message> {
 
     /// The shutdown reciever
     shutdown: broadcast::Receiver<()>,
-    // The system the actor is running on
-    //system: System<F, N>,
 }
 
 impl<A, F, N, M> ActorSupervisor<A, F, N, M>
@@ -45,7 +44,7 @@ where
     M: Message,
 {
     /// Creates a new supervisor with the given actor and actor id.
-    /// Returns the new supervisor alongside the handle that references this.
+    /// Returns the new supervisor alongside the handle that holds the message sender.
     pub fn new(
         actor: A,
         path: ActorPath,
