@@ -1,5 +1,5 @@
 /// # ErrorPolicyCommand
-/// An [`ErrorPolicyCommand`] contains one step in an [`ErrorPolicy`]
+/// An [`ErrorPolicyCommand`] represents one step in an [`ErrorPolicy`]
 #[derive(Debug, Clone)]
 pub enum ErrorPolicyCommand<E> {
     /// Runs the operation
@@ -24,6 +24,7 @@ pub enum ErrorPolicyCommand<E> {
 pub struct ErrorPolicy<E: Clone>(Vec<ErrorPolicyCommand<E>>);
 
 impl<E: Clone> ErrorPolicy<E> {
+    /// Creates a new [`ErrorPolicy`] from a [`Vec<ErrorPolicyCommand<E>>`]
     pub fn new(policy: Vec<ErrorPolicyCommand<E>>) -> Self {
         Self(policy)
     }
