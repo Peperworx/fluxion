@@ -1,15 +1,31 @@
 //! The implementation of systems and surrounding types
 
-use std::{sync::Arc, mem, collections::HashMap, any::Any, ops::Deref};
+use std::{collections::HashMap, mem, sync::Arc};
 
-use tokio::sync::{mpsc, Mutex, RwLock, broadcast};
+use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
 
-use crate::{message::{foreign::{ForeignMessage, ForeignReciever}, Notification, Message, handler::{HandleNotification, HandleMessage, HandleFederated}}, error::{ActorError, SystemError}, actor::{path::ActorPath, Actor, supervisor::{ActorSupervisor, SupervisorErrorPolicy}, handle::{ActorHandle, LocalHandle, ForeignHandle}, ActorEntry}};
+use crate::{
+    actor::{
+        handle::{ActorHandle, ForeignHandle, LocalHandle},
+        path::ActorPath,
+        supervisor::{ActorSupervisor, SupervisorErrorPolicy},
+        Actor, ActorEntry,
+    },
+    error::{ActorError, SystemError},
+    message::{
+        foreign::ForeignMessage,
+        handler::{HandleFederated, HandleMessage, HandleNotification},
+        Message, Notification,
+    },
+};
 
+/// # ActorType
+/// The type of an actor in the hashmap
+type ActorType<F> = Box<dyn ActorEntry<Federated = F> + Send + Sync + 'static>;
 
 /// # System
 /// The core part of Fluxion, the [`System`] runs actors and handles communications between other systems.
-/// 
+///
 /// ## Inter-System Communication
 /// Fluxion systems enable communication by having what is called a foreign channel.
 /// The foreign channel is an mpsc channel, the Reciever for which can be retrieved once by a single outside source using [`System::get_foreign`].
@@ -19,15 +35,15 @@ use crate::{message::{foreign::{ForeignMessage, ForeignReciever}, Notification, 
 pub struct System<F, N>
 where
     F: Message,
-    N: Notification, {
-
+    N: Notification,
+{
     /// The id of the system
     id: String,
 
     /// The reciever for foreign messages
     /// This uses a Mutex to provide interior mutability.
     foreign_reciever: Arc<Mutex<Option<mpsc::Receiver<ForeignMessage<F>>>>>,
-    
+
     /// The sender for foreign messages
     foreign_sender: mpsc::Sender<ForeignMessage<F>>,
 
@@ -35,7 +51,7 @@ where
     shutdown: broadcast::Sender<()>,
 
     /// The hashmap of all actors
-    actors: Arc<RwLock<HashMap<String, Box<dyn ActorEntry<Federated = F> + Send + Sync + 'static>>>>,
+    actors: Arc<RwLock<HashMap<String, ActorType<F>>>>,
 
     /// The notification broadcast
     notification: broadcast::Sender<N>,
@@ -44,8 +60,8 @@ where
 impl<F, N> System<F, N>
 where
     F: Message,
-    N: Notification {
-
+    N: Notification,
+{
     /// Creates a new system with the given id.
     pub fn new(id: &str) -> Self {
         // Create the foreign channel
@@ -63,14 +79,13 @@ where
             foreign_sender,
             shutdown,
             actors: Default::default(),
-            notification
+            notification,
         }
     }
-    
+
     /// Returns the foreign channel reciever wrapped in an [`Option<T>`].
     /// [`None`] will be returned if the foreign reciever has already been retrieved.
     pub async fn get_foreign(&self) -> Option<mpsc::Receiver<ForeignMessage<F>>> {
-        
         // Lock the foreign reciever
         let mut foreign_reciever = self.foreign_reciever.lock().await;
 
@@ -104,7 +119,10 @@ where
             };
 
             // And relay
-            self.foreign_sender.send(foreign).await.or(Err(ActorError::ForeignSendFail))
+            self.foreign_sender
+                .send(foreign)
+                .await
+                .or(Err(ActorError::ForeignSendFail))
         } else {
             // Send to a local actor
             self.send_foreign_to_local(foreign).await
@@ -117,7 +135,7 @@ where
             ForeignMessage::FederatedMessage(message, responder, target) => {
                 // Get actors as read
                 let actors = self.actors.read().await;
-                
+
                 // Get the local actor
                 let actor = actors.get(target.actor());
 
@@ -127,12 +145,14 @@ where
                 };
 
                 // Send the message
-                actor.handle_foreign(ForeignMessage::FederatedMessage(message, responder, target)).await
-            },
+                actor
+                    .handle_foreign(ForeignMessage::FederatedMessage(message, responder, target))
+                    .await
+            }
             ForeignMessage::Message(message, responder, target) => {
                 // Get actors as read
                 let actors = self.actors.read().await;
-                
+
                 // Get the local actor
                 let actor = actors.get(target.actor());
 
@@ -142,14 +162,23 @@ where
                 };
 
                 // Send the message
-                actor.handle_foreign(ForeignMessage::Message(message, responder, target)).await
-            },
+                actor
+                    .handle_foreign(ForeignMessage::Message(message, responder, target))
+                    .await
+            }
         }
     }
 
     /// Adds an actor to the system
-    pub async fn add_actor<A: Actor + HandleNotification<N> + HandleFederated<F> + HandleMessage<M>, M: Message>(&self, actor: A, id: &str, error_policy: SupervisorErrorPolicy) -> Result<LocalHandle<F, M>, SystemError> {
-
+    pub async fn add_actor<
+        A: Actor + HandleNotification<N> + HandleFederated<F> + HandleMessage<M>,
+        M: Message,
+    >(
+        &self,
+        actor: A,
+        id: &str,
+        error_policy: SupervisorErrorPolicy,
+    ) -> Result<LocalHandle<F, M>, SystemError> {
         // Convert id to a path
         let path = ActorPath::new(&(self.id.clone() + ":" + id)).ok_or(SystemError::InvalidPath)?;
 
@@ -160,11 +189,10 @@ where
         if actors.contains_key(id) {
             return Err(SystemError::ActorExists);
         }
-        
 
         // Initialize the supervisor
         let (mut supervisor, handle) = ActorSupervisor::new(actor, path, self, error_policy);
-        
+
         // Clone the system
         let system = self.clone();
 
@@ -173,7 +201,7 @@ where
             // TODO: Log this.
             let _ = supervisor.run(system).await;
             let _ = supervisor.cleanup().await;
-            
+
             drop(supervisor);
         });
 
@@ -186,17 +214,16 @@ where
 
     /// Retrieves an actor from the system, returning None if the actor does not exist
     pub async fn get_actor<M: Message>(&self, id: &str) -> Option<Box<dyn ActorHandle<F, M>>> {
-
         // Get the actor path
         let path = ActorPath::new(id)?;
 
         // If the first system exists and it is not this system, then create a foreign actor handle
-        if path.first().unwrap_or(&self.id) != &self.id {
+        if path.first().unwrap_or(&self.id) != self.id {
             // Create and return a foreign handle
             return Some(Box::new(ForeignHandle {
                 foreign: self.foreign_sender.clone(),
                 system: self.clone(),
-                path: path
+                path,
             }));
         }
 
@@ -205,7 +232,7 @@ where
 
         // Try to get the actor
         let actor = actors.get(path.actor())?;
-        
+
         // Downcast and clone into a box.
         match actor.as_any().downcast_ref::<LocalHandle<F, M>>() {
             Some(v) => Some(Box::new(v.clone())),
@@ -213,7 +240,6 @@ where
         }
     }
 
-    
     /// Returns a notification reciever associated with the system's notification broadcaster.
     pub fn subscribe_notify(&self) -> broadcast::Receiver<N> {
         self.notification.subscribe()
@@ -237,7 +263,7 @@ where
     }
 
     /// Shutsdown all actors on the system, drains the shutdown channel, and then clears all actors
-    /// 
+    ///
     /// # Note
     /// This does not shutdown the system itself, but only actors running on the system. The system is cleaned up at drop.
     /// Even after calling this function, actors can still be added to the system. This returns the number of actors shutdown.

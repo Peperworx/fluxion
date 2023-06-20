@@ -4,9 +4,16 @@ use std::any::Any;
 
 use tokio::sync::{mpsc, oneshot};
 
-use crate::{message::{LocalMessage, Message, foreign::{ForeignMessage, ForeignReciever, ForeignMessenger}, DualMessage, Notification}, error::ActorError, system::System};
+use crate::{
+    error::ActorError,
+    message::{
+        foreign::{ForeignMessage, ForeignMessenger, ForeignReciever},
+        DualMessage, LocalMessage, Message, Notification,
+    },
+    system::System,
+};
 
-use super::{ActorEntry, path::ActorPath};
+use super::{path::ActorPath, ActorEntry};
 
 /// # ActorHandle
 /// [`ActorHandle`] is a trait which provides methods through which to interface with actorsd
@@ -14,11 +21,10 @@ use super::{ActorEntry, path::ActorPath};
 pub trait ActorHandle<F, M>: Send + Sync + 'static
 where
     F: Message,
-    M: Message, {
-    
+    M: Message,
+{
     /// Gets the actor's path
     fn get_path(&self) -> &ActorPath;
-
 
     /// Sends a message to the actor
     async fn send(&self, message: M) -> Result<(), ActorError>;
@@ -39,8 +45,8 @@ where
 pub struct LocalHandle<F, M>
 where
     F: Message,
-    M: Message, {
-    
+    M: Message,
+{
     /// The message sender for the actor
     pub(crate) message_sender: mpsc::Sender<DualMessage<F, M>>,
 
@@ -51,10 +57,14 @@ where
 impl<F, M> LocalHandle<F, M>
 where
     F: Message,
-    M: Message,  {
+    M: Message,
+{
     /// Sends a raw message to the actor
     async fn send_raw_message(&self, message: LocalMessage<F, M>) -> Result<(), ActorError> {
-        self.message_sender.send(DualMessage::LocalMessage(message)).await.or(Err(ActorError::MessageSendError))
+        self.message_sender
+            .send(DualMessage::LocalMessage(message))
+            .await
+            .or(Err(ActorError::MessageSendError))
     }
 }
 
@@ -62,18 +72,17 @@ where
 impl<F, M> ActorHandle<F, M> for LocalHandle<F, M>
 where
     F: Message,
-    M: Message, {
-    
+    M: Message,
+{
     /// Gets the actor's id
     fn get_path(&self) -> &ActorPath {
         &self.path
     }
 
-    
-
     /// Sends a message to the actor
     async fn send(&self, message: M) -> Result<(), ActorError> {
-        self.send_raw_message(LocalMessage::<F, M>::Message(message, None)).await
+        self.send_raw_message(LocalMessage::<F, M>::Message(message, None))
+            .await
     }
 
     /// Sends a message to the actor and awaits a response
@@ -82,7 +91,8 @@ where
         let (responder, reciever) = oneshot::channel();
 
         // Send the message
-        self.send_raw_message(LocalMessage::<F, M>::Message(message, Some(responder))).await?;
+        self.send_raw_message(LocalMessage::<F, M>::Message(message, Some(responder)))
+            .await?;
 
         // Await a response
         let res = reciever.await;
@@ -93,7 +103,8 @@ where
 
     /// Sends a federated message to the actor
     async fn send_federated(&self, message: F) -> Result<(), ActorError> {
-        self.send_raw_message(LocalMessage::<F, M>::Federated(message, None)).await
+        self.send_raw_message(LocalMessage::<F, M>::Federated(message, None))
+            .await
     }
 
     /// Sends a federated message to the actor and awaits a response
@@ -102,7 +113,8 @@ where
         let (responder, reciever) = oneshot::channel();
 
         // Send the message
-        self.send_raw_message(LocalMessage::<F, M>::Federated(message, Some(responder))).await?;
+        self.send_raw_message(LocalMessage::<F, M>::Federated(message, Some(responder)))
+            .await?;
 
         // Await a response
         let res = reciever.await;
@@ -112,32 +124,31 @@ where
     }
 }
 
-
 #[async_trait::async_trait]
 impl<F, M> ForeignReciever for LocalHandle<F, M>
 where
     F: Message,
-    M: Message {
-
+    M: Message,
+{
     type Federated = F;
 
     async fn handle_foreign(&self, foreign: ForeignMessage<F>) -> Result<(), ActorError> {
-        self.message_sender.send(DualMessage::ForeignMessage(foreign)).await.or(Err(ActorError::ForeignSendFail))
+        self.message_sender
+            .send(DualMessage::ForeignMessage(foreign))
+            .await
+            .or(Err(ActorError::ForeignSendFail))
     }
 }
-
 
 impl<F, M> ActorEntry for LocalHandle<F, M>
 where
     F: Message,
-    M: Message {
-    
+    M: Message,
+{
     fn as_any(&self) -> &dyn Any {
         self
     }
 }
-
-
 
 /// # ForeignHandle
 /// [`ForeignHandle`] serves as an [`ActorHandle`] for foreign actors.
@@ -157,8 +168,14 @@ impl<F: Message, N: Notification> ForeignMessenger for ForeignHandle<F, N> {
 
     /// This function must be implemented by every [`ForeignMessenger`]. It sends the passed foreign
     /// message to the foreign actor.
-    async fn send_raw_foreign(&self, message: ForeignMessage<Self::Federated>) -> Result<(), ActorError> {
-        self.foreign.send(message).await.or(Err(ActorError::ForeignSendFail))
+    async fn send_raw_foreign(
+        &self,
+        message: ForeignMessage<Self::Federated>,
+    ) -> Result<(), ActorError> {
+        self.foreign
+            .send(message)
+            .await
+            .or(Err(ActorError::ForeignSendFail))
     }
 
     /// This function must be implemented by every [`ForeignMessenger]`
@@ -170,13 +187,10 @@ impl<F: Message, N: Notification> ForeignMessenger for ForeignHandle<F, N> {
 
 #[async_trait::async_trait]
 impl<F: Message, M: Message, N: Notification> ActorHandle<F, M> for ForeignHandle<F, N> {
-    
     /// Gets the actor's id
     fn get_path(&self) -> &ActorPath {
         &self.path
     }
-
-    
 
     /// Sends a message to the actor
     async fn send(&self, message: M) -> Result<(), ActorError> {
@@ -189,7 +203,8 @@ impl<F: Message, M: Message, N: Notification> ActorHandle<F, M> for ForeignHandl
         let (responder, reciever) = oneshot::channel();
 
         // Send the message
-        self.send_message_foreign(message, Some(responder), &self.path).await?;
+        self.send_message_foreign(message, Some(responder), &self.path)
+            .await?;
 
         // Await a response
         let res = reciever.await;
@@ -209,7 +224,8 @@ impl<F: Message, M: Message, N: Notification> ActorHandle<F, M> for ForeignHandl
         let (responder, reciever) = oneshot::channel();
 
         // Send the message
-        self.send_federated_foreign(message, Some(responder), &self.path).await?;
+        self.send_federated_foreign(message, Some(responder), &self.path)
+            .await?;
 
         // Await a response
         let res = reciever.await;

@@ -1,10 +1,17 @@
 use tokio::sync::{broadcast, mpsc};
 
-use crate::{system::System, message::{Message, Notification, foreign::ForeignMessage, LocalMessage, handler::{HandleNotification, HandleFederated, HandleMessage}, DualMessage, MessageType, AsMessageType}, error::{policy::ErrorPolicy, ActorError}, handle_policy, error_policy};
+use crate::{
+    error::{policy::ErrorPolicy, ActorError},
+    error_policy, handle_policy,
+    message::{
+        foreign::ForeignMessage,
+        handler::{HandleFederated, HandleMessage, HandleNotification},
+        AsMessageType, DualMessage, LocalMessage, Message, MessageType, Notification,
+    },
+    system::System,
+};
 
-use super::{handle::{ActorHandle, LocalHandle}, Actor, context::ActorContext, path::ActorPath};
-
-
+use super::{context::ActorContext, handle::LocalHandle, path::ActorPath, Actor};
 
 /// # ActorSupervisor
 /// Manages an actor's lifecycle
@@ -26,7 +33,6 @@ pub struct ActorSupervisor<A, F: Message, N: Notification, M: Message> {
 
     /// The shutdown reciever
     shutdown: broadcast::Receiver<()>,
-
     // The system the actor is running on
     //system: System<F, N>,
 }
@@ -36,11 +42,16 @@ where
     A: Actor,
     F: Message,
     N: Notification,
-    M: Message {
+    M: Message,
+{
     /// Creates a new supervisor with the given actor and actor id.
     /// Returns the new supervisor alongside the handle that references this.
-    pub fn new(actor: A, path: ActorPath, system: &System<F,N>, error_policy: SupervisorErrorPolicy) -> (ActorSupervisor<A, F, N, M>, LocalHandle<F, M>) {
-
+    pub fn new(
+        actor: A,
+        path: ActorPath,
+        system: &System<F, N>,
+        error_policy: SupervisorErrorPolicy,
+    ) -> (ActorSupervisor<A, F, N, M>, LocalHandle<F, M>) {
         // Create a new message channel
         let (message_sender, message) = mpsc::channel(64);
 
@@ -49,10 +60,12 @@ where
 
         // Subscribe to the shutdown reciever
         let shutdown = system.subscribe_shutdown();
-        
+
         // Create the supervisor
         let supervisor = Self {
-            actor, notify, message,
+            actor,
+            notify,
+            message,
             shutdown,
             error_policy,
             path: path.clone(),
@@ -74,26 +87,25 @@ where
     A: Actor + HandleNotification<N> + HandleFederated<F> + HandleMessage<M>,
     F: Message,
     N: Notification,
-    M: Message {
-
-    
-
-
+    M: Message,
+{
     /// Runs the actor, only returning an error after all error policy options have been exhausted.
     pub async fn run(&mut self, system: System<F, N>) -> Result<(), ActorError> {
-
         // Create a new actor context for this actor to use
         let mut context = ActorContext {
             path: self.path.clone(),
-            system: system,
+            system,
         };
 
         // Initialize the actor, following error policy.
         let _ = handle_policy!(
             self.actor.initialize(&mut context).await,
             |_| &self.error_policy.initialize,
-            (), ActorError).await?;
-        
+            (),
+            ActorError
+        )
+        .await?;
+
         // TODO: Log any ignored errors here
 
         // Begin main loop
@@ -106,12 +118,12 @@ where
                 },
                 notification = handle_policy!(
                     self.notify.recv().await,
-                    |e| match e {
-                        &broadcast::error::RecvError::Closed => &self.error_policy.notification_channel_closed,
-                        &broadcast::error::RecvError::Lagged(_) => &self.error_policy.notification_channel_lagged,
+                    |e: &broadcast::error::RecvError | match e {
+                        broadcast::error::RecvError::Closed => &self.error_policy.notification_channel_closed,
+                        broadcast::error::RecvError::Lagged(_) => &self.error_policy.notification_channel_lagged,
                     },
                     N, broadcast::error::RecvError) => {
-                    
+
 
                     // If the policy failed, then exit the loop
                     let Ok(notification) = notification else {
@@ -138,7 +150,7 @@ where
                     self.message.recv().await.ok_or(ActorError::MessageChannelClosed),
                     |_| &self.error_policy.message_channel_closed,
                     DualMessage<F, M>, ActorError) => {
-                    
+
 
                     // If the policy failed, then exit the loop
                     let Ok(message) = message else {
@@ -155,12 +167,12 @@ where
                         message.as_message_type(),
                         |_| &self.error_policy.unexpected_foreign,
                         MessageType<F, M>, ActorError).await;
-                    
+
                     // If the policy failed, exit
                     let Ok(message_type) = message_type else {
                         break;
                     };
-                    
+
                     // If the policy succeeded, but we failed to recieve, then continue.
                     let Ok(message_type) = message_type else {
                         continue;
@@ -173,7 +185,7 @@ where
                                 self.actor.federated_message(&mut context, m.clone()).await,
                                 |_| &self.error_policy.federated_handler,
                                 F::Response, ActorError).await;
-                            
+
                             // If the policy failed, exit
                             let Ok(res) = res else {
                                 break;
@@ -235,7 +247,10 @@ where
         let _ = handle_policy!(
             self.actor.deinitialize(&mut context).await,
             |_| &self.error_policy.deinitialize,
-            (), ActorError).await?;
+            (),
+            ActorError
+        )
+        .await?;
         // TODO: Log any ignored errors here
 
         Ok(())
@@ -243,21 +258,21 @@ where
 
     /// Cleans up the actor
     pub async fn cleanup(&mut self) -> Result<(), ActorError> {
-
         // Cleanup the actor, following error policy
         let _ = handle_policy!(
             self.actor.cleanup().await,
             |_| &self.error_policy.cleanup,
-            (), ActorError).await?;
-        
+            (),
+            ActorError
+        )
+        .await?;
+
         // Close the message channel
         self.message.close();
 
         Ok(())
     }
 }
-
-
 
 /// # SupervisorErrorPolicy
 /// The error policies used by an actor supervisor.

@@ -23,7 +23,6 @@ pub trait Message: Any + Clone + Send + Sync + 'static {
     type Response: Any + Clone + Send + Sync + 'static;
 }
 
-
 /// # Notification
 /// The [`Notification`] trait must be implemented for any notifications.
 /// It requires notifications to be [`Send`] + [`Sync`] + ''static`.
@@ -32,11 +31,9 @@ pub trait Notification: Clone + Send + Sync + 'static {}
 
 impl<T> Notification for T where T: Clone + Send + Sync + 'static {}
 
-
 /// # DynMessageResponse
 /// Internal type alias for dyn [`Any`] + [`Send`] + [`Sync`] + 'static
 pub(crate) type DynMessageResponse = dyn Any + Send + Sync + 'static;
-
 
 /// # LocalMessage
 /// An enum that contains each different type of message sent to an actor.
@@ -45,7 +42,7 @@ pub enum LocalMessage<F: Message, M: Message> {
     /// A federated message
     Federated(F, Option<oneshot::Sender<F::Response>>),
     /// A message
-    Message(M, Option<oneshot::Sender<M::Response>>)
+    Message(M, Option<oneshot::Sender<M::Response>>),
 }
 
 impl<F: Message, M: Message> AsMessageType<F, M> for LocalMessage<F, M> {
@@ -57,14 +54,13 @@ impl<F: Message, M: Message> AsMessageType<F, M> for LocalMessage<F, M> {
     }
 }
 
-
 /// # MessageType
 /// An enum that contains the contents of a message minus its responder
 pub enum MessageType<F: Message, M: Message> {
     /// A Federated message
     Federated(F),
     /// A message
-    Message(M)
+    Message(M),
 }
 
 /// # AsMessageType
@@ -79,7 +75,7 @@ pub(crate) enum DualMessage<F: Message, M: Message> {
     /// A LocalMessage
     LocalMessage(LocalMessage<F, M>),
     /// A Foreign Message
-    ForeignMessage(ForeignMessage<F>)
+    ForeignMessage(ForeignMessage<F>),
 }
 
 impl<F: Message, M: Message> AsMessageType<F, M> for DualMessage<F, M> {

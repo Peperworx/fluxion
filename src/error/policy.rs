@@ -1,7 +1,3 @@
-
-
-
-
 /// # ErrorPolicyCommand
 /// An [`ErrorPolicyCommand`] contains one step in an [`ErrorPolicy`]
 #[derive(Debug, Clone)]
@@ -36,7 +32,6 @@ impl<E: Clone> ErrorPolicy<E> {
     pub fn contained(&self) -> &Vec<ErrorPolicyCommand<E>> {
         &self.0
     }
-
 }
 
 impl<E: Clone> Default for ErrorPolicy<E> {
@@ -54,7 +49,7 @@ impl<E: Clone> Default for ErrorPolicy<E> {
 /// If the contained result is Ok, then the operation as a whole succeeded. If the result
 /// is an Err, then the operation failed, but the policy succeeded. This can happen if an error is ignored.
 /// If an Err is returned, then both the policy and operation failed with the contained error.
-/// 
+///
 /// ## Usage
 /// ```
 /// handle_policy!(
@@ -66,9 +61,9 @@ impl<E: Clone> Default for ErrorPolicy<E> {
 macro_rules! handle_policy {
     ($checked:expr, $policy:expr, $ret:ty, $e:ty) => {
         async {
-            
+
             // The previous result.
-            // Run the operation once. 
+            // Run the operation once.
             let mut prev: Result<$ret, $e> = $checked;
 
             // If ok, then return.
@@ -131,7 +126,7 @@ macro_rules! handle_policy {
                         }
                     },
                     $crate::error::policy::ErrorPolicyCommand::IgnoreIf(test) => {
-                        
+
                         // If an error was returned and matches test, then ignore the error
                         // and return.
                         if prev.as_ref().is_err_and(|e| e == test)  {
@@ -157,12 +152,10 @@ macro_rules! handle_policy {
     };
 }
 
-
 /// # _error_policy_resolve_single
 /// Internally used error policy macro to resolve a single policy command.
 #[macro_export]
 macro_rules! _error_policy_resolve_single {
-
     (run;) => {
         $crate::error::policy::ErrorPolicyCommand::Run
     };
@@ -185,9 +178,8 @@ macro_rules! _error_policy_resolve_single {
 
     (loop $e:expr;) => {
         $crate::error::policy::ErrorPolicyCommand::Loop($e)
-    }
-
-}    
+    };
+}
 
 /// # error_policy
 /// This macro provides a DSL for defining error policies.
@@ -196,30 +188,30 @@ macro_rules! _error_policy_resolve_single {
 /// Any command marked terminal will immediately return a success.
 /// If marked as always terminal, the command will always return.
 /// The commands are as follows:
-/// 
+///
 /// ## `run` -- terminal
 /// Runs the operation that the error policy handles errors for. Takes no arguments.
 /// Example:
 /// `run;`
-/// 
+///
 /// ## `fail` -- always terminal
 /// If the operation has not been run yet, then it runs the operation. Then it directly returns the result returned by the operation,
 /// with an Ok(res) if the result was a success, or an Err(e) if not.
-/// 
+///
 /// ## `ignore` -- always terminal
 /// If the operation has not been run yet, then it runs the operation. Returns a Ok(res) reguardless of the result.
-/// 
+///
 /// ## `failif` -- terminal
 /// If the operation has not been run yet, then it runs the operation. Fails the same as `fail` if the error is equal to the argument,
 /// or continues to the next operation if not.
-/// 
+///
 /// ## `ignoreif` -- terminal
 /// If the operation has not been run yet, then it runs the operation. Ignores the same as `ignore` if the error is equal to the argument,
 /// or continues to the next operation if not.
-/// 
+///
 /// ## `loop`
 /// Restarts the policy the number of time in the argument. Multiple `loop`s are not supported yet.
-/// 
+///
 /// ## Example
 /// ```
 /// error_policy! {

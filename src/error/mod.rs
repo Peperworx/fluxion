@@ -2,12 +2,10 @@
 
 use thiserror::Error;
 
-
 /// Contains error policy handling systems.
 /// # Todo
 /// This may be better as a separate crate.
 pub mod policy;
-
 
 /// # ActorError
 /// An error type returned by an actor, as the result of failed communication with an actor,
@@ -16,9 +14,9 @@ pub mod policy;
 pub enum ActorError {
     #[error("A foreign message failed to send.")]
     ForeignSendFail,
-    #[error("A foreign message failed to send a response")] 
+    #[error("A foreign message failed to send a response")]
     ForeignRespondFailed,
-    #[error("A foreign message failed to recieve a response")] 
+    #[error("A foreign message failed to recieve a response")]
     ForeignResponseFailed,
     #[error("A foreign message responded with an unxepected type.")]
     ForeignResponseUnexpected,
@@ -32,11 +30,9 @@ pub enum ActorError {
     MessageChannelClosed,
     #[error("A message failed to recieve a response")]
     MessageResponseFailed,
-    #[error("A federated message failed to recieve a response")] 
+    #[error("A federated message failed to recieve a response")]
     FederatedResponseFailed,
-    
 }
-
 
 /// # SystemError
 /// An error type returned when an operation on a system fails.

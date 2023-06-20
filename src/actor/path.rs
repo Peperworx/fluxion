@@ -20,7 +20,7 @@ impl ActorPath {
         }
 
         // Split into parts
-        let parts = schema.split(":").map(|v| v.to_string()).collect::<Vec<_>>();
+        let parts = schema.split(':').map(|v| v.to_string()).collect::<Vec<_>>();
 
         // Get the first as the actor id
         let actor = parts.last()?.clone();
@@ -49,7 +49,7 @@ impl ActorPath {
     /// Pops off the first system, returning the remainder
     pub fn popfirst(&self) -> ActorPath {
         // If there are no systems, then return self
-        if self.systems.len() == 0 {
+        if self.systems.is_empty() {
             return self.clone();
         }
 
@@ -63,7 +63,6 @@ impl ActorPath {
         }
     }
 }
-
 
 impl ToString for ActorPath {
     fn to_string(&self) -> String {

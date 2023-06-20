@@ -1,10 +1,11 @@
 //! The context that is passed to the actor which allows it to interact with the system
 
-use crate::{system::System, message::{Notification, Message}};
+use crate::{
+    message::{Message, Notification},
+    system::System,
+};
 
 use super::{handle::ActorHandle, path::ActorPath};
-
-
 
 /// # ActorContext
 pub struct ActorContext<F: Message, N: Notification> {
