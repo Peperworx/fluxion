@@ -13,3 +13,5 @@ Fluxion implements three different methods of communication:
 Fluxion allows an external task to subscribe to an mpsc channel over which messages bound to Foreign actors are sent. This external task can then relay them as it sees fit. See the example `foreign` for more details.
 
 ## Usage
+
+In Fluxion, there are multiple ways to create a system. This depends on if you want to use Federated Messages and/or Notifications. In the future this will be behind a feature flag, but for now a placeholder type that is automatically implemented is used.
