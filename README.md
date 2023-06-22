@@ -156,3 +156,6 @@ let foreign_channel = system..get_foreign().await.unwrap();
 // Get a handle to a foreign actor
 let handle = system.get_actor::<TestMessage>("system1:system2:actor").await.unwrap();
 ```
+
+## License
+Fluxion is Dual-Licensed under Apache 2.0 and MIT.
