@@ -36,3 +36,18 @@ pub mod system;
 
 /// Contains error types for the crate
 pub mod error;
+
+pub use actor::{
+    Actor, context::ActorContext,
+    handle::ActorHandle,
+    path::ActorPath,
+    supervisor::SupervisorErrorPolicy
+};
+
+pub use message::{
+    Message, Notification,
+    handler::{HandleFederated, HandleMessage, HandleNotification}
+};
+
+pub use system::System;
+pub use error::{SystemError, ActorError, policy::{ErrorPolicy, ErrorPolicyCommand}};

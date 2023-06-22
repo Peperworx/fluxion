@@ -1,11 +1,9 @@
 use fluxion::{
-    actor::{context::ActorContext, supervisor::SupervisorErrorPolicy, Actor},
-    error::ActorError,
-    message::{
-        handler::{HandleFederated, HandleMessage, HandleNotification},
-        Message, Notification,
-    },
-    system::System,
+    ActorContext, SupervisorErrorPolicy, Actor,
+    ActorError,
+    HandleFederated, HandleMessage, HandleNotification,
+    Message, Notification,
+    System, system,
 };
 
 #[derive(Clone, Debug)]
@@ -97,8 +95,8 @@ impl HandleFederated<TestFederated> for TestActor {
 
 #[tokio::main]
 async fn main() {
-    let host = System::<TestFederated, ()>::new("host");
-    let other = System::<TestFederated, ()>::new("other");
+    let host = system::new::<TestFederated, ()>("host");
+    let other = system::new::<TestFederated, ()>("other");
 
     let mut foreign_host = host.get_foreign().await.unwrap();
     let other2 = other.clone();
