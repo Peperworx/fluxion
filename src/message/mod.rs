@@ -86,3 +86,17 @@ impl<F: Message, M: Message> AsMessageType<F, M> for DualMessage<F, M> {
         }
     }
 }
+
+
+/// # DefaultFederated
+/// The default federated message used by a system
+#[derive(Clone)]
+pub struct DefaultFederated;
+impl Message for DefaultFederated {
+    type Response = ();
+}
+
+/// # DefaultNotification
+/// The default notification used by a system
+#[derive(Clone)]
+pub struct DefaultNotification;

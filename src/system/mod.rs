@@ -15,7 +15,7 @@ use crate::{
     message::{
         foreign::ForeignMessage,
         handler::{HandleFederated, HandleMessage, HandleNotification},
-        Message, Notification,
+        Message, Notification, DefaultNotification, DefaultFederated,
     },
 };
 
@@ -65,8 +65,9 @@ where
     F: Message,
     N: Notification,
 {
-    /// Creates a new system with the given id.
-    pub fn new(id: &str) -> Self {
+    /// Creates a new system with the given id and types for federated messages and notification.
+    /// Use this function when you are using both federated messages and notifications.
+    pub fn new(id: &str) -> System<F, N> {
         // Create the foreign channel
         let (foreign_sender, foreign_reciever) = mpsc::channel(64);
 
@@ -85,6 +86,9 @@ where
             notification,
         }
     }
+
+
+    /// Creates a new system that uses notifications but not federated messages
 
     /// Returns the foreign channel reciever wrapped in an [`Option<T>`].
     /// [`None`] will be returned if the foreign reciever has already been retrieved.
@@ -297,4 +301,22 @@ where
             tokio::task::yield_now().await;
         }
     }
+}
+
+
+
+/// Creates a new system that does not use federated messages or notifications
+pub fn new_none(id: &str) -> System<DefaultFederated, DefaultNotification> {
+    System::new(id)
+}
+
+
+/// Creates a new system that uses federated messages but not notifications.
+pub fn new_federated<F: Message>(id: &str) -> System<F, DefaultNotification> {
+    System::new(id)
+}
+
+/// Creates a new system that uses notifications but not federated messages
+pub fn new_notifications<N: Notification>(id: &str) -> System<DefaultFederated, N> {
+    System::new(id)
 }

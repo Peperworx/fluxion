@@ -11,3 +11,5 @@ Fluxion implements three different methods of communication:
 - Notifications are generic to every actor. They can not recieve response, and are sent to every instance of every actor.
 
 Fluxion allows an external task to subscribe to an mpsc channel over which messages bound to Foreign actors are sent. This external task can then relay them as it sees fit. See the example `foreign` for more details.
+
+## Usage
