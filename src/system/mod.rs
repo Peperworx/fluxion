@@ -31,6 +31,9 @@ type ActorType<F> = Box<dyn ActorEntry<Federated = F> + Send + Sync + 'static>;
 /// The foreign channel is an mpsc channel, the Reciever for which can be retrieved once by a single outside source using [`System::get_foreign`].
 /// When a Message or Foreign Message is sent to an external actor, or a Notification is sent at all, the foreign
 /// channel will be notified.
+/// 
+/// ## Using Clone
+/// System uses [`Arc`] internally, so a [`System`] can be cloned where needed.
 #[derive(Clone)]
 pub struct System<F, N>
 where
