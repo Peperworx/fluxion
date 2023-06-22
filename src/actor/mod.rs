@@ -12,13 +12,13 @@ use self::context::ActorContext;
 /// Contains the context that is passed to the actor which allows it to interact with the system
 pub mod context;
 
-/// Contains implementation of [`ActorPath`], which provides utilities for working with actor identifiers.
+/// Contains implementation of [`crate::actor::path::ActorPath`], which provides utilities for working with actor identifiers.
 pub mod path;
 
-/// Contains [`ActorHandle`], a struct that is used for interacting with Actors, and other supporting types.
+/// Contains [`crate::actor::handle::ActorHandle`], a struct that is used for interacting with Actors, and other supporting types.
 pub mod handle;
 
-/// Contains [`ActorSupervisor`], a struct containing a task that handles an actor's lifecycle.
+/// Contains [`crate::actor::supervisor::ActorSupervisor`], a struct containing a task that handles an actor's lifecycle.
 pub mod supervisor;
 
 /// # Actor

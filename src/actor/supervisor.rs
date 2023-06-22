@@ -1,3 +1,6 @@
+//! Contains `ActorSupervisor`, a struct containing a task that handles an actor's lifecycle.
+
+
 use tokio::sync::{broadcast, mpsc};
 
 use crate::{

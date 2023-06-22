@@ -1,4 +1,7 @@
 # Fluxion
+[![crates.io](https://img.shields.io/crates/l/fluxion?style=for-the-badge)](https://crates.io/crates/fluxion)
+[![crates.io](https://img.shields.io/crates/v/fluxion?style=for-the-badge)](https://crates.io/crates/fluxion)
+[![docs.rs](https://img.shields.io/docsrs/fluxion?style=for-the-badge)](https://docs.rs/fluxion)
 
 Distributed actor framework written in rust.
 

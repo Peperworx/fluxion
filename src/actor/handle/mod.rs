@@ -1,4 +1,4 @@
-//! Contains [`ActorHandle`] (and its various implementations), a trait that is used for interacting with Actors.
+//! Contains [`crate::actor::handle::ActorHandle`] (and its various implementations), a trait that is used for interacting with Actors.
 
 
 
@@ -11,11 +11,11 @@ use crate::{
 use super::path::ActorPath;
 
 
-/// Contains [`LocalHandler`], an implementor of [`super::ActorHandle`] used for communicating with local actors.
+/// Contains [`crate::actor::handle::local::LocalHandle`], an implementor of [`ActorHandle`] used for communicating with local actors.
 pub mod local;
 
 
-/// Contains [`ForeignHandler`], an implementor of [`super::ActorHandle`] used for communicating with foreign actors.
+/// Contains [`crate::actor::handle::foreign::ForeignHandle`], an implementor of [`ActorHandle`] used for communicating with foreign actors.
 pub mod foreign;
 
 

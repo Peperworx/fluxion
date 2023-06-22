@@ -1,4 +1,4 @@
-//! Contains [`ForeignHandler`], an implementor of [`super::ActorHandle`] used for communicating with foreign actors.
+/// Contains [`ForeignHandle`], an implementor of [`ActorHandle`] used for communicating with foreign actors.
 
 
 use tokio::sync::{mpsc, oneshot};
@@ -18,7 +18,7 @@ use super::ActorHandle;
 /// # ForeignHandle
 /// [`ForeignHandle`] serves as an [`ActorHandle`] for foreign actors.
 /// This works by holding an [`mpsc::Sender`] which references the reciever held by the [`System`].
-/// When the [`System`] confirms that the corresponding [`mpsc::Reciever`] has been claimed,
+/// When the [`System`] confirms that the corresponding [`mpsc::Receiver`] has been claimed,
 /// all messages will be converted to [`ForeignMessage`]s and sent over the channel to be handled by an
 /// external task.
 pub struct ForeignHandle<F: Message, N: Notification> {

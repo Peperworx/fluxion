@@ -19,7 +19,7 @@ pub enum ErrorPolicyCommand<E> {
 /// # ErrorPolicy
 /// [`ErrorPolicy`] dictates how a recieved error is to be handled.
 /// An error policy is constructed from a [`Vec`] of [`ErrorPolicyCommand`]s,
-/// however users should use the [`error_policy`] macro.
+/// however users should use the [`crate::error_policy`] macro.
 #[derive(Clone, Debug)]
 pub struct ErrorPolicy<E: Clone>(Vec<ErrorPolicyCommand<E>>);
 
