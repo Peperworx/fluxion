@@ -1,5 +1,11 @@
 [package]
 name = "fluxion"
+license = "MIT OR Apache-2.0"
+description = "Fluxion is an actor framework written in rust and designed for distributed systems."
+repository = "https://github.com/peperworx/fluxion"
+categories = ["concurrency"]
+keywords = ["actor", "distributed", "async", "fluxion"]
+readme = "README.md"
 version = "0.1.0"
 edition = "2021"
 
