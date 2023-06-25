@@ -58,6 +58,9 @@ where
 
     /// The notification broadcast
     notification: broadcast::Sender<N>,
+
+    /// The foreign notification sender
+    foreign_notification: broadcast::Sender<N>,
 }
 
 impl<F, N> System<F, N>
@@ -228,13 +231,14 @@ where
     }
 
     /// Returns a notification reciever associated with the system's notification broadcaster.
-    pub fn subscribe_notify(&self) -> broadcast::Receiver<N> {
+    pub(crate) fn subscribe_notify(&self) -> broadcast::Receiver<N> {
         self.notification.subscribe()
     }
 
-    /// Notifies all actors on this system.
-    /// Returns the number of actors notified
+    /// Notifies all actors.
+    /// Returns the number of actors notified on this sytem
     pub fn notify(&self, notification: N) -> usize {
+        let _ = self.foreign_notification.send(notification.clone());
         self.notification.send(notification).unwrap_or(0)
     }
 
@@ -243,6 +247,16 @@ where
         while !self.notification.is_empty() {
             tokio::task::yield_now().await;
         }
+    }
+
+    /// Subscribes to the foreign notification sender
+    pub fn subscribe_foreign_notify(&self) -> broadcast::Receiver<N> {
+        self.foreign_notification.subscribe()
+    }
+
+    /// Notifies only actors on this sytem
+    pub fn notify_local(&self, notification: N) -> usize {
+        self.notification.send(notification).unwrap_or(0)
     }
 
     /// Shutsdown all actors on the system, drains the shutdown channel, and then clears all actors
@@ -292,6 +306,9 @@ pub fn new<F: Message, N: Notification>(id: &str) -> System<F, N> {
     // Create the notification sender
     let (notification, _) = broadcast::channel(64);
 
+    // Create the foreign notification sender
+    let (foreign_notification, _) = broadcast::channel(64);
+
     // Create the shutdown sender
     let (shutdown, _) = broadcast::channel(8);
 
@@ -302,6 +319,7 @@ pub fn new<F: Message, N: Notification>(id: &str) -> System<F, N> {
         shutdown,
         actors: Default::default(),
         notification,
+        foreign_notification
     }
 }
 
