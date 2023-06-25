@@ -70,8 +70,10 @@ where
 {
     
 
-
-    /// Creates a new system that uses notifications but not federated messages
+    /// Gets the system's id
+    pub fn get_id(&self) -> &str {
+        &self.id
+    }
 
     /// Returns the foreign channel reciever wrapped in an [`Option<T>`].
     /// [`None`] will be returned if the foreign reciever has already been retrieved.
