@@ -28,9 +28,9 @@ pub trait Message: Any + Clone + Send + Sync + 'static {
 }
 
 #[cfg(features="serde")]
-pub trait Message: Any + Serialize + Deserialize + Clone + Send + Sync + 'static {
+pub trait Message: Any + Serialize + for<'a> Deserialize<'a> + Clone + Send + Sync + 'static {
     /// The response type of the message
-    type Response: Any + Serialize + Deserialize + Clone + Send + Sync + 'static;
+    type Response: Any + Serialize + for<'a> Deserialize<'a> + Clone + Send + Sync + 'static;
 }
 
 /// # Notification
@@ -44,10 +44,10 @@ pub trait Notification: Clone + Send + Sync + 'static {}
 impl<T> Notification for T where T: Clone + Send + Sync + 'static {}
 
 #[cfg(features="serde")]
-pub trait Notification: Clone + Serialize + Deserialize + Send + Sync + 'static {}
+pub trait Notification: Clone + Serialize + for<'a> Deserialize<'a> + Send + Sync + 'static {}
 
 #[cfg(features="serde")]
-impl<T> Notification for T where T: Clone + Serialize + Deserialize + Send + Sync + 'static {}
+impl<T> Notification for T where T: Clone + Serialize + for<'a> Deserialize<'a> + Send + Sync + 'static {}
 
 /// # DynMessageResponse
 /// Internal type alias for dyn [`Any`] + [`Send`] + [`Sync`] + 'static
@@ -109,7 +109,9 @@ impl<F: Message, M: Message> AsMessageType<F, M> for DualMessage<F, M> {
 /// # DefaultFederated
 /// The default federated message used by a system
 #[derive(Clone)]
+#[cfg_attr(features = "serde", derive(Serialize, Deserialize))]
 pub struct DefaultFederated;
+
 impl Message for DefaultFederated {
     type Response = ();
 }
@@ -117,4 +119,5 @@ impl Message for DefaultFederated {
 /// # DefaultNotification
 /// The default notification used by a system
 #[derive(Clone)]
+#[cfg_attr(features = "serde", derive(Serialize, Deserialize))]
 pub struct DefaultNotification;

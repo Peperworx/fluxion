@@ -18,6 +18,6 @@ thiserror = "1.0.40"
 tokio = { version = "1.28.2", features = ["rt", "rt-multi-thread", "sync", "macros"] }
 
 [features]
-default = []
+default = ["serde"]
 # Enables serde support for messages
 serde = ["dep:serde"]
