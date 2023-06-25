@@ -3,7 +3,7 @@ use fluxion::{
     ActorError,
     HandleFederated, HandleMessage, HandleNotification,
     Message, Notification,
-    System, system,
+    system,
 };
 
 #[derive(Clone, Debug)]
