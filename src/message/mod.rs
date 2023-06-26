@@ -1,7 +1,8 @@
 //! Contains the implementation of messages and surrounding types.
 
 use std::any::Any;
-#[cfg(features="serde")]
+
+#[cfg(feature="serde")]
 use serde::{Serialize, Deserialize};
 
 
@@ -21,13 +22,13 @@ pub mod foreign;
 /// The [`Message`] trait should be implemented for any message, including Messages, and Federated Messages.
 /// Both [`Message`] and [`Message::Response`] require messages to be [`Any`] + [`Clone`] + [`Send`] + [`Sync`] + `'static`.
 /// Why require Any? Sometimes messages may be passed around as a `dyn Any` (as is the case with foreign channels).
-#[cfg(not(features="serde"))]
+#[cfg(not(feature="serde"))]
 pub trait Message: Any + Clone + Send + Sync + 'static {
     /// The response type of the message
     type Response: Any + Clone + Send + Sync + 'static;
 }
 
-#[cfg(features="serde")]
+#[cfg(feature="serde")]
 pub trait Message: Any + Serialize + for<'a> Deserialize<'a> + Clone + Send + Sync + 'static {
     /// The response type of the message
     type Response: Any + Serialize + for<'a> Deserialize<'a> + Clone + Send + Sync + 'static;
@@ -37,21 +38,23 @@ pub trait Message: Any + Serialize + for<'a> Deserialize<'a> + Clone + Send + Sy
 /// The [`Notification`] trait must be implemented for any notifications.
 /// It requires notifications to be [`Send`] + [`Sync`] + ''static`.
 /// This trait is automatically implemented for all types which implement its subtraits.
-#[cfg(not(features="serde"))]
+#[cfg(not(feature="serde"))]
 pub trait Notification: Clone + Send + Sync + 'static {}
 
-#[cfg(not(features="serde"))]
+#[cfg(not(feature="serde"))]
 impl<T> Notification for T where T: Clone + Send + Sync + 'static {}
 
-#[cfg(features="serde")]
+#[cfg(feature="serde")]
 pub trait Notification: Clone + Serialize + for<'a> Deserialize<'a> + Send + Sync + 'static {}
 
-#[cfg(features="serde")]
+#[cfg(feature="serde")]
 impl<T> Notification for T where T: Clone + Serialize + for<'a> Deserialize<'a> + Send + Sync + 'static {}
 
 /// # DynMessageResponse
 /// Internal type alias for dyn [`Any`] + [`Send`] + [`Sync`] + 'static
+#[cfg(not(feature="bincode"))]
 pub(crate) type DynMessageResponse = dyn Any + Send + Sync + 'static;
+
 
 /// # LocalMessage
 /// An enum that contains each different type of message sent to an actor.
@@ -109,7 +112,7 @@ impl<F: Message, M: Message> AsMessageType<F, M> for DualMessage<F, M> {
 /// # DefaultFederated
 /// The default federated message used by a system
 #[derive(Clone)]
-#[cfg_attr(features = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DefaultFederated;
 
 impl Message for DefaultFederated {
@@ -119,5 +122,5 @@ impl Message for DefaultFederated {
 /// # DefaultNotification
 /// The default notification used by a system
 #[derive(Clone)]
-#[cfg_attr(features = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DefaultNotification;

@@ -235,7 +235,11 @@ where
                                 },
                                 DualMessage::ForeignMessage(ForeignMessage::Message(_, Some(responder), _)) => {
                                     // Box and send the response
+                                    #[cfg(not(feature="bincode"))]
                                     let _ = responder.send(Box::new(res));
+
+                                    #[cfg(feature="bincode")]
+                                    let _ = responder.send(bincode::serialize(&res).or(Err(ActorError::ForeignRespondFailed))?);
                                 },
                                 _ => {}
                             };

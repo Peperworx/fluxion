@@ -5,8 +5,10 @@ use tokio::sync::oneshot;
 
 use crate::{actor::path::ActorPath, error::ActorError};
 
-use super::{AsMessageType, DynMessageResponse, Message, MessageType};
+use super::{AsMessageType, Message, MessageType};
 
+#[cfg(not(feature="bincode"))]
+use super::DynMessageResponse;
 /// # ForeignMessage
 /// The enum sent along a foreign message channel.
 #[derive(Debug)]
@@ -15,9 +17,16 @@ pub enum ForeignMessage<F: Message> {
     /// as well as its responder oneshot and target
     FederatedMessage(F, Option<oneshot::Sender<F::Response>>, ActorPath),
     /// Contains a message sent to a foreign actor as well as it's responder and target
+    #[cfg(not(feature="bincode"))]
     Message(
         Box<DynMessageResponse>,
         Option<oneshot::Sender<Box<DynMessageResponse>>>,
+        ActorPath,
+    ),
+    #[cfg(feature="bincode")]
+    Message(
+        Vec<u8>,
+        Option<oneshot::Sender<Vec<u8>>>,
         ActorPath,
     ),
 }
@@ -48,9 +57,13 @@ impl<F: Message, M: Message> AsMessageType<F, M> for ForeignMessage<F> {
             ForeignMessage::FederatedMessage(m, _, _) => MessageType::Federated(m.clone()),
             ForeignMessage::Message(m, _, _) => {
                 // Downcast
+                #[cfg(not(feature="bincode"))]
                 let m = m
                     .downcast_ref::<M>()
                     .ok_or(ActorError::ForeignResponseUnexpected)?;
+
+                #[cfg(feature="bincode")]
+                let m: M = bincode::deserialize(&m).or(Err(ActorError::ForeignResponseUnexpected))?;
 
                 MessageType::Message(m.clone())
             }
@@ -110,7 +123,14 @@ pub(crate) trait ForeignMessenger {
 
         // Put the message into a foreign message
         let foreign = ForeignMessage::<Self::Federated>::Message(
-            Box::new(message),
+            {
+                #[cfg(not(feature="bincode"))]
+                let v = Box::new(message);
+                #[cfg(feature="bincode")]
+                let v = bincode::serialize(&message).or(Err(ActorError::ForeignSendFail))?;
+
+                v
+            },
             foreign_responder,
             target_actor.clone(),
         );
@@ -128,9 +148,13 @@ pub(crate) trait ForeignMessenger {
             let res = source.await.or(Err(ActorError::ForeignRespondFailed))?;
 
             // Downcast
+            #[cfg(not(feature="bincode"))]
             let res = res
                 .downcast_ref::<M::Response>()
                 .ok_or(ActorError::ForeignResponseUnexpected)?;
+            
+            #[cfg(feature="bincode")]
+            let res: M::Response = bincode::deserialize(&res).or(Err(ActorError::ForeignResponseUnexpected))?;
 
             // Relay the response
             target
