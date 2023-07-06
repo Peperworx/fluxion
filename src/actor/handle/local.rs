@@ -7,12 +7,17 @@ use tokio::sync::{mpsc, oneshot};
 use crate::{
     error::ActorError,
     message::{
-        foreign::{ForeignMessage, ForeignReceiver},
-        DualMessage, LocalMessage, Message,
+        LocalMessage, Message, MT,
     },
 };
 
 use crate::actor::{path::ActorPath, ActorEntry};
+
+#[cfg(feature = "foreign")]
+use crate::message::{
+    foreign::{ForeignMessage, ForeignReceiver},
+    DualMessage
+};
 
 use super::ActorHandle;
 
@@ -28,7 +33,7 @@ where
     M: Message,
 {
     /// The message sender for the actor
-    pub(crate) message_sender: mpsc::Sender<DualMessage<F, M>>,
+    pub(crate) message_sender: mpsc::Sender<MT<F, M>>,
 
     /// The id of the actor
     pub(crate) path: ActorPath,
@@ -43,8 +48,11 @@ where
 {
     /// Sends a raw message to the actor
     async fn send_raw_message(&self, message: LocalMessage<F, M>) -> Result<(), ActorError> {
+        #[cfg(feature = "foreign")]
+        let message = DualMessage::LocalMessage(message);
+
         self.message_sender
-            .send(DualMessage::LocalMessage(message))
+            .send(message)
             .await
             .or(Err(ActorError::MessageSendError))
     }
@@ -114,6 +122,7 @@ where
 
 /// [`ForeignReceiver`] is implemented for [`LocalHandle`], allowing the handle to recieve foreign messages
 /// without knowing the message type while stored in the system.
+#[cfg(feature = "foreign")]
 #[async_trait::async_trait]
 impl<F, M> ForeignReceiver for LocalHandle<F, M>
 where

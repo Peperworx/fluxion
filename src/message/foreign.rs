@@ -74,6 +74,7 @@ impl<F: Message, M: Message> AsMessageType<F, M> for ForeignMessage<F> {
 /// # ForeignReciever
 /// [`ForeignReciever`] is a trait that can be implemented on any type that can recieve a foreign message.
 /// This is used to abstract over actors stored in a system so that it is not necessary to know the type of their messages.
+#[cfg(feature = "foreign")]
 #[async_trait::async_trait]
 pub(crate) trait ForeignReceiver {
     /// The type of the federated message that is sent by both the local and foreign system
@@ -88,7 +89,7 @@ pub(crate) trait ForeignReceiver {
 
 /// # ForeignMessenger
 /// [`ForeignMessenger`] is a trait that can be implemented on any type that is used to send messages to a foreign actor.
-
+#[cfg(feature = "foreign")]
 #[async_trait::async_trait]
 pub(crate) trait ForeignMessenger {
     /// The type of the federated message that is sent by both the local and foreign system

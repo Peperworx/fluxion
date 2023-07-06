@@ -2,10 +2,10 @@
 
 use crate::{
     message::{Message, Notification},
-    system::System,
+    system::{System, GetActorReturn},
 };
 
-use super::{handle::ActorHandle, path::ActorPath};
+use super::path::ActorPath;
 
 /// # ActorContext
 /// [`ActorContext`] provides methods to allow an actor to interact with its [`System`] and other actors.
@@ -21,7 +21,7 @@ pub struct ActorContext<F: Message, N: Notification> {
 impl<F: Message, N: Notification> ActorContext<F, N> {
     /// Retrieves an actor from the system.
     /// Returns [`None`] if the actor does not exist or if an actor tries to retrieve its own handle.
-    pub async fn get_actor<M: Message>(&self, id: &str) -> Option<Box<dyn ActorHandle<F, M>>> {
+    pub async fn get_actor<M: Message>(&self, id: &str) -> Option<GetActorReturn<F, M>> {
         // If the the id matches the actor's own path, then return None
         if ActorPath::new(id).as_ref() == Some(&self.path) {
             None

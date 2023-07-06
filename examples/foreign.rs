@@ -5,15 +5,16 @@ use fluxion::{
     Message, Notification,
     system,
 };
+use serde::{Serialize, Deserialize};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct TestMessage;
 
 impl Message for TestMessage {
     type Response = ();
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct TestFederated;
 
 impl Message for TestFederated {

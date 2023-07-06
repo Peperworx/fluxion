@@ -23,3 +23,5 @@ default = []
 # Enables serde support for messages
 serde = ["dep:serde"]
 bincode = ["serde", "dep:bincode"]
+foreign = []
+notifications = []

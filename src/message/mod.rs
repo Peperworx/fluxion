@@ -10,13 +10,24 @@ use tokio::sync::oneshot;
 
 use crate::error::ActorError;
 
+#[cfg(feature="foreign")]
 use self::foreign::ForeignMessage;
 
 /// Contains message handling traits that can be implemented by actors
 pub mod handler;
 
 /// Contains an implementation of a foreign message
+#[cfg(feature = "foreign")]
 pub mod foreign;
+
+
+/// # MT
+/// Which type of message to handle. This is toggled based on the "foreign" feature.
+#[cfg(feature = "foreign")]
+pub(crate) type MT<F, M> = DualMessage<F, M>;
+#[cfg(not(feature = "foreign"))]
+pub(crate) type MT<F, M> = LocalMessage<F, M>;
+
 
 /// # Message
 /// The [`Message`] trait should be implemented for any message, including Messages, and Federated Messages.
@@ -53,6 +64,7 @@ impl<T> Notification for T where T: Clone + Serialize + for<'a> Deserialize<'a> 
 /// # DynMessageResponse
 /// Internal type alias for dyn [`Any`] + [`Send`] + [`Sync`] + 'static
 #[cfg(not(feature="bincode"))]
+#[cfg(feature="foreign")]
 pub(crate) type DynMessageResponse = dyn Any + Send + Sync + 'static;
 
 
@@ -92,6 +104,7 @@ pub(crate) trait AsMessageType<F: Message, M: Message> {
 
 /// # DualMessage
 /// An internal enum that stores both a LocalMessage and a ForeignMessage, used in an actor's message channel.
+#[cfg(feature="foreign")]
 pub(crate) enum DualMessage<F: Message, M: Message> {
     /// A LocalMessage
     LocalMessage(LocalMessage<F, M>),
@@ -99,6 +112,7 @@ pub(crate) enum DualMessage<F: Message, M: Message> {
     ForeignMessage(ForeignMessage<F>),
 }
 
+#[cfg(feature="foreign")]
 impl<F: Message, M: Message> AsMessageType<F, M> for DualMessage<F, M> {
     fn as_message_type(&self) -> Result<MessageType<F, M>, ActorError> {
         match self {

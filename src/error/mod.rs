@@ -32,6 +32,8 @@ pub enum ActorError {
     MessageResponseFailed,
     #[error("A federated message failed to recieve a response")]
     FederatedResponseFailed,
+    #[error("There was an error handling a notification")]
+    NotificationError,
 }
 
 /// # SystemError

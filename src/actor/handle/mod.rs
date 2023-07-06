@@ -16,6 +16,7 @@ pub mod local;
 
 
 /// Contains [`crate::actor::handle::foreign::ForeignHandle`], an implementor of [`ActorHandle`] used for communicating with foreign actors.
+#[cfg(feature = "foreign")]
 pub mod foreign;
 
 
