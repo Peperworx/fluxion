@@ -63,9 +63,20 @@ impl<F: Message, M: Message> AsMessageType<F, M> for ForeignMessage<F> {
                     .ok_or(ActorError::ForeignResponseUnexpected)?;
 
                 #[cfg(feature="bincode")]
-                let m: M = bincode::deserialize(&m).or(Err(ActorError::ForeignResponseUnexpected))?;
+                #[cfg(not(feature="foreign"))]
+                let m = &m;
 
-                MessageType::Message(m.clone())
+                #[cfg(feature="bincode")]
+                let m: M = bincode::deserialize(m).or(Err(ActorError::ForeignResponseUnexpected))?;
+
+                
+                #[cfg(any(not(feature="foreign"), not(feature="bincode")))]
+                let res = MessageType::Message(m.clone());
+                
+                #[cfg(feature="foreign")]
+                #[cfg(feature="bincode")]
+                let res = MessageType::Message(m);
+                res
             }
         })
     }
@@ -156,8 +167,15 @@ pub(crate) trait ForeignMessenger {
             
             #[cfg(feature="bincode")]
             let res: M::Response = bincode::deserialize(&res).or(Err(ActorError::ForeignResponseUnexpected))?;
+            
+            
 
             // Relay the response
+            #[cfg(all(feature="bincode", feature = "foreign"))]
+            target
+                .send(res)
+                .or(Err(ActorError::ForeignResponseRelayFail))?;
+            #[cfg(not(all(feature="bincode", feature = "foreign")))]
             target
                 .send(res.clone())
                 .or(Err(ActorError::ForeignResponseRelayFail))?;
