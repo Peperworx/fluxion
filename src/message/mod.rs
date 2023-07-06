@@ -2,6 +2,9 @@
 
 use std::any::Any;
 
+#[cfg(not(feature = "federated"))]
+use std::marker::PhantomData;
+
 #[cfg(feature="serde")]
 use serde::{Serialize, Deserialize};
 
@@ -71,6 +74,7 @@ pub(crate) type DynMessageResponse = dyn Any + Send + Sync + 'static;
 /// # LocalMessage
 /// An enum that contains each different type of message sent to an actor.
 /// Used to reduce the nuber of mpsc channels required.
+#[cfg(feature="federated")]
 pub enum LocalMessage<F: Message, M: Message> {
     /// A federated message
     Federated(F, Option<oneshot::Sender<F::Response>>),
@@ -78,23 +82,38 @@ pub enum LocalMessage<F: Message, M: Message> {
     Message(M, Option<oneshot::Sender<M::Response>>),
 }
 
+#[cfg(not(feature="federated"))]
+pub struct LocalMessage<F: Message, M: Message>(pub M, pub Option<oneshot::Sender<M::Response>>, pub PhantomData<F>);
+
 impl<F: Message, M: Message> AsMessageType<F, M> for LocalMessage<F, M> {
     fn as_message_type(&self) -> Result<MessageType<F, M>, ActorError> {
-        Ok(match self {
+        #[cfg(feature="federated")]
+        let res = match self {
             LocalMessage::Federated(m, _) => MessageType::Federated(m.clone()),
             LocalMessage::Message(m, _) => MessageType::Message(m.clone()),
-        })
+        };
+        
+        #[cfg(not(feature="federated"))]
+        let res = MessageType(self.0.clone(), self.2);
+
+        Ok(res)
     }
 }
 
 /// # MessageType
-/// An enum that contains the contents of a message minus its responder
+/// An enum that contains the contents of a message minus its responder. 
+#[cfg(feature="federated")]
 pub enum MessageType<F: Message, M: Message> {
     /// A Federated message
+    
     Federated(F),
     /// A message
     Message(M),
 }
+
+#[cfg(not(feature="federated"))]
+pub struct MessageType<F: Message, M: Message>(pub M, pub PhantomData<F>);
+
 
 /// # AsMessageType
 /// Converts a struct into a MessageType

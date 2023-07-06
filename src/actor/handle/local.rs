@@ -2,6 +2,9 @@
 
 use std::any::Any;
 
+#[cfg(not(feature = "federated"))]
+use std::marker::PhantomData;
+
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
@@ -18,6 +21,7 @@ use crate::message::{
     foreign::{ForeignMessage, ForeignReceiver},
     DualMessage
 };
+
 
 use super::ActorHandle;
 
@@ -75,8 +79,14 @@ where
 
     /// Sends a message to the referenced actor and does not wait for a response.
     async fn send(&self, message: M) -> Result<(), ActorError> {
+        #[cfg(feature="federated")]
         self.send_raw_message(LocalMessage::<F, M>::Message(message, None))
-            .await
+            .await?;
+        #[cfg(not(feature="federated"))]
+        self.send_raw_message(LocalMessage::<F, M>(message, None, PhantomData::default()))
+            .await?;
+
+        Ok(())
     }
 
     /// Sends a message to the actor and waits for a response.
@@ -85,7 +95,11 @@ where
         let (responder, reciever) = oneshot::channel();
 
         // Send the message
+        #[cfg(feature="federated")]
         self.send_raw_message(LocalMessage::<F, M>::Message(message, Some(responder)))
+            .await?;
+        #[cfg(not(feature="federated"))]
+        self.send_raw_message(LocalMessage::<F, M>(message, Some(responder), PhantomData::default()))
             .await?;
 
         // Await a response
@@ -96,12 +110,14 @@ where
     }
 
     /// Sends a federated message to the referenced actor and does not wait for a response.
+    #[cfg(feature="federated")]
     async fn send_federated(&self, message: F) -> Result<(), ActorError> {
         self.send_raw_message(LocalMessage::<F, M>::Federated(message, None))
             .await
     }
 
     /// Sends a federated message to the referenced actor and waits for a response.
+    #[cfg(feature="federated")]
     async fn request_federated(&self, message: F) -> Result<F::Response, ActorError> {
         // Create the responder
         let (responder, reciever) = oneshot::channel();

@@ -83,11 +83,13 @@ impl<F: Message, M: Message, N: Notification> ActorHandle<F, M> for ForeignHandl
     }
 
     /// Sends a federated message to the referenced actor and does not wait for a response
+    #[cfg(feature = "federated")]
     async fn send_federated(&self, message: F) -> Result<(), ActorError> {
         self.send_federated_foreign(message, None, &self.path).await
     }
 
     /// Sends a federated message to the referenced actor and waits for a response.
+    #[cfg(feature = "federated")]
     async fn request_federated(&self, message: F) -> Result<F::Response, ActorError> {
         // Create the responder
         let (responder, reciever) = oneshot::channel();

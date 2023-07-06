@@ -148,6 +148,7 @@ impl<F: Message, N> System<F, N> {
     }
 
     /// Sends a foreign message to a local actor
+    #[cfg(feature = "federated")]
     async fn send_foreign_to_local(&self, foreign: ForeignMessage<F>) -> Result<(), ActorError> {
         match foreign {
             ForeignMessage::FederatedMessage(message, responder, target) => {
@@ -179,12 +180,34 @@ impl<F: Message, N> System<F, N> {
                     return Err(ActorError::ForeignTargetNotFound);
                 };
 
+                
                 // Send the message
                 actor
                     .handle_foreign(ForeignMessage::Message(message, responder, target))
                     .await
             }
         }
+    }
+
+
+    #[cfg(not(feature = "federated"))]
+    async fn send_foreign_to_local(&self, foreign: ForeignMessage<F>) -> Result<(), ActorError> {
+        // Get actors as read
+        let actors = self.actors.read().await;
+
+        // Get the local actor
+        let actor = actors.get(foreign.target.actor());
+
+        // If it does not exist, then error
+        let Some(actor) = actor else {
+            return Err(ActorError::ForeignTargetNotFound);
+        };
+
+        
+        // Send the message
+        actor
+            .handle_foreign(foreign)
+            .await
     }
 }
 

@@ -40,9 +40,11 @@ where
     async fn request(&self, message: M) -> Result<M::Response, ActorError>;
 
     /// Sends a federated message to the referenced actor and does not wait for a response.
+    #[cfg(feature="federated")]
     async fn send_federated(&self, message: F) -> Result<(), ActorError>;
 
     /// Sends a federated message to the referenced actor and waits for a response.
+    #[cfg(feature="federated")]
     async fn request_federated(&self, message: F) -> Result<F::Response, ActorError>;
 }
 

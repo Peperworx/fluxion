@@ -1,8 +1,6 @@
 //! Contains `ActorSupervisor`, a struct containing a task that handles an actor's lifecycle.
 
 
-
-
 use tokio::sync::{broadcast, mpsc};
 
 use crate::{
@@ -10,7 +8,8 @@ use crate::{
     error_policy, handle_policy,
     message::{
         handler::{HandleFederated, HandleMessage, HandleNotification},
-        AsMessageType, LocalMessage, Message, MessageType, Notification, MT,
+        AsMessageType, Message, MessageType, Notification, MT,
+        
     },
     system::System,
 };
@@ -18,8 +17,11 @@ use crate::{
 #[cfg(feature = "foreign")]
 use crate::message::{
     foreign::ForeignMessage,
-    DualMessage
+    DualMessage,
 };
+
+#[cfg(any(feature = "foreign", feature = "federated"))]
+use crate::message::LocalMessage;
 
 #[cfg(not(feature = "notifications"))]
 use std::marker::PhantomData;
@@ -227,6 +229,7 @@ where
                     };
 
                     // Given the message type, call the proper handler
+                    #[cfg(feature = "federated")]
                     match message_type {
                         MessageType::Federated(m) => {
                             let res = handle_policy!(
@@ -308,6 +311,66 @@ where
                             }
                         },
                     };
+
+                    // Do the same thing if federated messages are not enabled.
+                    #[cfg(not(feature = "federated"))]
+                    {   
+                        let res = handle_policy!(
+                            self.actor.message(&mut context, message_type.0.clone()).await,
+                            |_| &self.error_policy.message_handler,
+                            M::Response, ActorError).await;
+    
+                        // If the policy failed, exit
+                        let Ok(res) = res else {
+                            break;
+                        };
+    
+                        // If the policy succeeded, but we failed to recieve, then continue.
+                        let Ok(res) = res else {
+                            continue;
+                        };
+    
+                        // Match on the responder, and respond if found
+                        // Use the if let if the foreign feature is not enabled.
+                        #[cfg(feature = "foreign")]
+                        match message {
+                            #[cfg(not(feature = "federated"))]
+                            DualMessage::LocalMessage(LocalMessage(_, Some(responder), _)) => {
+                                // Just send the response, ignoring the error
+                                let _ = responder.send(res);
+                            },
+                            #[cfg(feature = "federated")]
+                            DualMessage::LocalMessage(LocalMessage::Message(_, Some(responder))) => {
+                                // Just send the response, ignoring the error
+                                let _ = responder.send(res);
+                            },
+                            #[cfg(feature = "federated")]
+                            DualMessage::ForeignMessage(ForeignMessage::Message(_, Some(responder), _)) => {
+                                // Box and send the response
+                                #[cfg(not(feature="bincode"))]
+                                let _ = responder.send(Box::new(res));
+    
+                                #[cfg(feature="bincode")]
+                                let _ = responder.send(bincode::serialize(&res).or(Err(ActorError::ForeignRespondFailed))?);
+                            },
+                            #[cfg(not(feature = "federated"))]
+                            DualMessage::ForeignMessage(ForeignMessage { responder: Some(responder), .. }) => {
+                                // Box and send the response
+                                #[cfg(not(feature="bincode"))]
+                                let _ = responder.send(Box::new(res));
+    
+                                #[cfg(feature="bincode")]
+                                let _ = responder.send(bincode::serialize(&res).or(Err(ActorError::ForeignRespondFailed))?);
+                            },
+                            _ => {}
+                        };
+    
+                        #[cfg(not(feature = "foreign"))]
+                        if let Some(responder) = message.1 {
+                            // Just send the response, ignoring the error
+                            let _ = responder.send(res);
+                        }
+                    }
                 }
             }
         }

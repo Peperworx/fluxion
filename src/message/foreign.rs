@@ -7,11 +7,15 @@ use crate::{actor::path::ActorPath, error::ActorError};
 
 use super::{AsMessageType, Message, MessageType};
 
+#[cfg(not(feature = "federated"))]
+use std::marker::PhantomData;
+
 #[cfg(not(feature="bincode"))]
 use super::DynMessageResponse;
 /// # ForeignMessage
 /// The enum sent along a foreign message channel.
 #[derive(Debug)]
+#[cfg(feature = "federated")]
 pub enum ForeignMessage<F: Message> {
     /// Contains a federated message sent to a foreign actor
     /// as well as its responder oneshot and target
@@ -31,6 +35,26 @@ pub enum ForeignMessage<F: Message> {
     ),
 }
 
+#[derive(Debug)]
+#[cfg(not(feature = "federated"))]
+pub struct ForeignMessage<F: Message> {
+    /// PhantomData to hold F
+    _phantom: PhantomData<F>,
+    /// The message contents
+    #[cfg(not(feature="bincode"))]
+    pub contents: Box<DynMessageResponse>,
+    #[cfg(feature="bincode")]
+    pub contents: Vec<u8>,
+    /// The message responder
+    #[cfg(not(feature="bincode"))]
+    pub responder: Option<oneshot::Sender<Box<DynMessageResponse>>>,
+    #[cfg(feature="bincode")]
+    pub responder: Option<oneshot::Sender<Vec<u8>>>,
+    /// The message target
+    pub target: ActorPath,
+}
+
+#[cfg(feature = "federated")]
 impl<F: Message> ForeignMessage<F> {
     /// Gets the target of the message
     pub fn get_target(&self) -> &ActorPath {
@@ -51,6 +75,24 @@ impl<F: Message> ForeignMessage<F> {
     }
 }
 
+#[cfg(not(feature = "federated"))]
+impl<F: Message> ForeignMessage<F> {
+    /// Gets the target of the message
+    pub fn get_target(&self) -> &ActorPath {
+        &self.target
+    }
+
+    /// Pops an actor off of target
+    pub fn pop_target(self) -> Self {
+        ForeignMessage {
+            _phantom: self._phantom,
+            contents: self.contents,
+            responder: self.responder,
+            target: self.target.popfirst(),
+        }
+    }
+}
+#[cfg(feature = "federated")]
 impl<F: Message, M: Message> AsMessageType<F, M> for ForeignMessage<F> {
     fn as_message_type(&self) -> Result<MessageType<F, M>, ActorError> {
         Ok(match self {
@@ -71,14 +113,69 @@ impl<F: Message, M: Message> AsMessageType<F, M> for ForeignMessage<F> {
 
                 
                 #[cfg(any(not(feature="foreign"), not(feature="bincode")))]
-                let res = MessageType::Message(m.clone());
+                let res = {
+                    #[cfg(feature = "federated")]
+                    let res = MessageType::<F, M>::Message(m.clone());
+
+                    #[cfg(not(feature = "federated"))]
+                    let res = MessageType::<F, M>(m, PhantomData::default());
+
+                    res
+                };
                 
                 #[cfg(feature="foreign")]
                 #[cfg(feature="bincode")]
-                let res = MessageType::Message(m);
+                let res = {
+                    #[cfg(feature = "federated")]
+                    let res = MessageType::Message(m);
+
+                    #[cfg(not(feature = "federated"))]
+                    let res = MessageType::<F, M>(m, PhantomData::default());
+
+                    res
+                };
+                
                 res
             }
         })
+    }
+}
+
+#[cfg(not(feature = "federated"))]
+impl<F: Message, M: Message> AsMessageType<F, M> for ForeignMessage<F> {
+    fn as_message_type(&self) -> Result<MessageType<F, M>, ActorError> {
+        // Downcast
+        #[cfg(not(feature="bincode"))]
+        let m = self.contents
+            .downcast_ref::<M>()
+            .ok_or(ActorError::ForeignResponseUnexpected)?;
+        
+        
+        #[cfg(feature="bincode")]
+        let m: M = bincode::deserialize(&self.contents).or(Err(ActorError::ForeignResponseUnexpected))?;
+        
+        #[cfg(any(not(feature="foreign"), not(feature="bincode")))]
+        let res = {
+            #[cfg(feature = "federated")]
+            let res = MessageType::<F, M>::Message(m);
+
+            #[cfg(not(feature = "federated"))]
+            let res = MessageType::<F,M>(m.clone(), PhantomData::default());
+            res
+        };
+        
+        #[cfg(feature="foreign")]
+        #[cfg(feature="bincode")]
+        let res = {
+            #[cfg(feature = "federated")]
+            let res = MessageType::<F, M>::Message(m);
+
+            #[cfg(not(feature = "federated"))]
+            let res = MessageType::<F, M>(m, PhantomData::default());
+            res
+        };
+        
+        Ok(res)
     }
 }
 
@@ -126,7 +223,11 @@ pub(crate) trait ForeignMessenger {
         target_actor: &ActorPath,
     ) -> Result<(), ActorError> {
         // If we should wait for a response, then do so
+    
         let (foreign_responder, responder_recieve) = if responder.is_some() {
+            #[cfg(feature = "bincode")]
+            let channel = oneshot::channel::<Vec<u8>>();
+            #[cfg(not(feature = "bincode"))]
             let channel = oneshot::channel();
             (Some(channel.0), Some(channel.1))
         } else {
@@ -134,6 +235,7 @@ pub(crate) trait ForeignMessenger {
         };
 
         // Put the message into a foreign message
+        #[cfg(feature = "federated")]
         let foreign = ForeignMessage::<Self::Federated>::Message(
             {
                 #[cfg(not(feature="bincode"))]
@@ -146,6 +248,21 @@ pub(crate) trait ForeignMessenger {
             foreign_responder,
             target_actor.clone(),
         );
+
+        #[cfg(not(feature = "federated"))]
+        let foreign = ForeignMessage{
+            _phantom: PhantomData::default(),
+            contents: {
+                #[cfg(not(feature="bincode"))]
+                let v = Box::new(message);
+                #[cfg(feature="bincode")]
+                let v = bincode::serialize(&message).or(Err(ActorError::ForeignSendFail))?;
+
+                v
+            },
+            responder: foreign_responder,
+            target: target_actor.clone(),
+        };
 
         // If someone is listening for a foreign message, then send the foreign message
         if self.can_send_foreign().await {
@@ -186,6 +303,7 @@ pub(crate) trait ForeignMessenger {
 
     /// This function is automatically implemented. It takes a local federated message, and
     /// sends it using [`ForeignMessenger::send_raw_foreign`]
+    #[cfg(feature = "federated")]
     async fn send_federated_foreign(
         &self,
         federated: Self::Federated,
