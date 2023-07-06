@@ -9,7 +9,7 @@ use crate::{
         foreign::{ForeignMessage, ForeignMessenger},
         Message, Notification,
     },
-    system::System, actor::path::ActorPath,
+    system::System, actor::path::ActorPath, ActorID,
 };
 
 use super::ActorHandle;
@@ -56,8 +56,8 @@ impl<F: Message, N: Notification> ForeignMessenger for ForeignHandle<F, N> {
 
 #[async_trait::async_trait]
 impl<F: Message, M: Message, N: Notification> ActorHandle<F, M> for ForeignHandle<F, N> {
-    /// Gets the referenced actor's path.
-    fn get_path(&self) -> &ActorPath {
+    /// Gets the referenced actor's id.
+    fn get_id(&self) -> &ActorID {
         &self.path
     }
 

@@ -10,7 +10,6 @@ use tokio::sync::{mpsc, Mutex};
 use crate::{
     actor::{
         handle::local::LocalHandle,
-        path::ActorPath,
         supervisor::{ActorSupervisor, SupervisorErrorPolicy},
         Actor, ActorEntry,
     },
@@ -23,9 +22,12 @@ use crate::{
 
 #[cfg(feature="foreign")]
 use crate::{
-    actor::handle::{
-        foreign::ForeignHandle,
-        ActorHandle
+    actor::{
+        ActorID,
+        handle::{
+            foreign::ForeignHandle,
+            ActorHandle
+        }
     },
     error::ActorError
 };
@@ -110,7 +112,7 @@ impl<F: Message, N> System<F, N> {
     }
 
     /// Returns true if the given [`ActorPath`] is a foreign actor
-    pub fn is_foreign(&self, actor: &ActorPath) -> bool {
+    pub fn is_foreign(&self, actor: &crate::actor::path::ActorPath) -> bool {
         // If the first system in the actor exists and it it not this system, then it is a foreign system
         actor.first().is_some_and(|v| v != self.id)
     }
@@ -250,8 +252,14 @@ where
         id: &str,
         error_policy: SupervisorErrorPolicy,
     ) -> Result<LocalHandle<F, M>, SystemError> {
+        #[cfg(feature = "foreign")]
+        let id = &(self.id.clone() + ":" + id);
+
         // Convert id to a path
-        let path = ActorPath::new(&(self.id.clone() + ":" + id)).ok_or(SystemError::InvalidPath)?;
+        #[cfg(feature = "foreign")]
+        let path = ActorID::new(id).ok_or(SystemError::InvalidPath)?;
+        #[cfg(not(feature = "foreign"))]
+        let path = id.to_string();
 
         // Lock write access to the actor map
         let mut actors = self.actors.write().await;
@@ -295,7 +303,11 @@ where
     /// Retrieves an actor from the system, returning None if the actor does not exist
     pub async fn get_actor<M: Message>(&self, id: &str) -> Option<GetActorReturn<F, M>> {
         // Get the actor path
-        let path = ActorPath::new(id)?;
+        #[cfg(feature = "foreign")]
+        let path = ActorID::new(id)?;
+        #[cfg(not(feature = "foreign"))]
+        let path = id.to_string();
+        
 
         // If the first system exists and it is not this system, then create a foreign actor handle
         #[cfg(feature = "foreign")]
@@ -311,8 +323,13 @@ where
         // Lock read access to the actor map
         let actors = self.actors.read().await;
 
+
         // Try to get the actor
+        #[cfg(feature = "foreign")]
         let actor = actors.get(path.actor())?;
+
+        #[cfg(not(feature = "foreign"))]
+        let actor = actors.get(&path)?;
 
         // If foreign messages are not enabled, get actual actor, not the PhantomData
         #[cfg(not(feature = "foreign"))]

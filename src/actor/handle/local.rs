@@ -9,9 +9,9 @@ use crate::{
     message::{
         LocalMessage, Message, MT,
     },
+    actor::ActorEntry, ActorID,
 };
 
-use crate::actor::{path::ActorPath, ActorEntry};
 
 #[cfg(feature = "foreign")]
 use crate::message::{
@@ -36,7 +36,7 @@ where
     pub(crate) message_sender: mpsc::Sender<MT<F, M>>,
 
     /// The id of the actor
-    pub(crate) path: ActorPath,
+    pub(crate) id: ActorID,
 }
 
 
@@ -68,9 +68,9 @@ where
     F: Message,
     M: Message,
 {
-    /// Gets the referenced actor's path.
-    fn get_path(&self) -> &ActorPath {
-        &self.path
+    /// Gets the referenced actor's id.
+    fn get_id(&self) -> &ActorID {
+        &self.id
     }
 
     /// Sends a message to the referenced actor and does not wait for a response.

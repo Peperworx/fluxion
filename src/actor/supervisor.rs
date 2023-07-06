@@ -24,7 +24,7 @@ use crate::message::{
 #[cfg(not(feature = "notifications"))]
 use std::marker::PhantomData;
 
-use super::{context::ActorContext, handle::local::LocalHandle, path::ActorPath, Actor};
+use super::{context::ActorContext, handle::local::LocalHandle, ActorID, Actor};
 
 /// # ActorSupervisor
 /// [`ActorSupervisor`] handles an actor's lifecycle and the reciept of messages.
@@ -33,8 +33,8 @@ pub struct ActorSupervisor<A, F: Message, N: Notification, M: Message> {
     /// The actor managed by this supervisor
     actor: A,
 
-    /// This actor's path
-    path: ActorPath,
+    /// This actor's id
+    id: ActorID,
 
     /// The actor's error policy
     error_policy: SupervisorErrorPolicy,
@@ -63,7 +63,7 @@ where
     /// Returns the new supervisor alongside the handle that holds the message sender.
     pub fn new(
         actor: A,
-        path: ActorPath,
+        id: ActorID,
         system: &System<F, N>,
         error_policy: SupervisorErrorPolicy,
     ) -> (ActorSupervisor<A, F, N, M>, LocalHandle<F, M>) {
@@ -87,13 +87,13 @@ where
             message,
             shutdown,
             error_policy,
-            path: path.clone(),
+            id: id.clone(),
         };
 
         // Create the handle
         let handle = LocalHandle {
             message_sender,
-            path,
+            id,
         };
 
         // Return both
@@ -138,7 +138,7 @@ where
     pub async fn run(&mut self, system: System<F, N>) -> Result<(), ActorError> {
         // Create a new actor context for this actor to use
         let mut context = ActorContext {
-            path: self.path.clone(),
+            id: self.id.clone(),
             system,
         };
 

@@ -16,6 +16,7 @@ use self::context::ActorContext;
 pub mod context;
 
 /// Contains implementation of [`crate::actor::path::ActorPath`], which provides utilities for working with actor identifiers.
+#[cfg(feature = "foreign")]
 pub mod path;
 
 /// Contains [`crate::actor::handle::ActorHandle`], a struct that is used for interacting with Actors, and other supporting types.
@@ -23,6 +24,13 @@ pub mod handle;
 
 /// Contains [`crate::actor::supervisor::ActorSupervisor`], a struct containing a task that handles an actor's lifecycle.
 pub mod supervisor;
+
+/// # Actor ID
+/// Aliased to ActorPath when foreign actors are enabled. Otherwise, it is just a String.
+#[cfg(feature = "foreign")]
+pub type ActorID = path::ActorPath;
+#[cfg(not(feature = "foreign"))]
+pub type ActorID = String;
 
 /// # Actor
 /// The core [`Actor`] trait must be implemented for every actor.

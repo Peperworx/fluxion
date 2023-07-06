@@ -40,7 +40,7 @@ pub mod error;
 pub use actor::{
     Actor, context::ActorContext,
     handle::ActorHandle,
-    path::ActorPath,
+    ActorID,
     supervisor::SupervisorErrorPolicy
 };
 

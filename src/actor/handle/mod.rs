@@ -8,7 +8,8 @@ use crate::{
     message::Message
 };
 
-use super::path::ActorPath;
+
+use super::ActorID;
 
 
 /// Contains [`crate::actor::handle::local::LocalHandle`], an implementor of [`ActorHandle`] used for communicating with local actors.
@@ -29,8 +30,8 @@ where
     F: Message,
     M: Message,
 {
-    /// Gets the referenced actor's path.
-    fn get_path(&self) -> &ActorPath;
+    /// Gets the referenced actor's id.
+    fn get_id(&self) -> &ActorID;
 
     /// Sends a message to the referenced actor and does not wait for a response.
     async fn send(&self, message: M) -> Result<(), ActorError>;
