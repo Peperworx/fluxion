@@ -89,7 +89,7 @@ impl HandleFederated<TestFederated> for TestActor {
             .get_actor::<TestMessage>("other:test")
             .await
             .unwrap();
-        ar.send(TestMessage).await.unwrap();
+        ar.request(TestMessage).await.unwrap();
         Ok(())
     }
 }
@@ -102,7 +102,7 @@ async fn main() {
     let mut foreign_host = host.get_foreign().await.unwrap();
     let other2 = other.clone();
 
-    tokio::task::spawn(async move {
+    let relay_host = tokio::task::spawn(async move {
         while let Some(message) = foreign_host.recv().await {
             other2.relay_foreign(message).await.unwrap();
         }
@@ -112,7 +112,7 @@ async fn main() {
     let mut foreign_other = other.get_foreign().await.unwrap();
     let host2 = host.clone();
 
-    tokio::task::spawn(async move {
+    let relay_other = tokio::task::spawn(async move {
         while let Some(message) = foreign_other.recv().await {
             host2.relay_foreign(message).await.unwrap();
         }
@@ -127,9 +127,24 @@ async fn main() {
         .await
         .unwrap();
 
+    
+
     let ar = other.get_actor::<TestMessage>("host:test").await.unwrap();
     ar.request_federated(TestFederated).await.unwrap();
 
+
+    // Note that at this point, the task relaying foreign messages has a chance to relay the foreign message *after* the system has been shutdown.
+    // This may cause dropped messages.
+    // This can be negated by ensuring that the foreign recievers have drained before shutting down, or by simply using `request` instead of `send`
+    // for any critical messages.
+    // Additionally, a notification can be sent here and drained, which will await until all actors process the notification,
+    // allowing actors to finish handling the current message.
+    // This example just uses the method of using `request` instead of `send`, and aborting the relaying task, which prevents runtime panics due to the unwraps.
+    // All messages sent using `request` will block until they return, and all messages sent using `send` will not panic.
+    // Note however that a `request` made in response to a `send` may not block, and in this case the notification method is better.
+    // Fluxion does not mandate a specific behavior to handle this, as different implementations may prefer different behaviors.
+    relay_host.abort();
+    relay_other.abort();
 
     other.shutdown().await;
     host.shutdown().await;

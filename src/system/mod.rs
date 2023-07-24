@@ -126,7 +126,7 @@ impl<F: Message, N> System<F, N> {
     pub async fn relay_foreign(&self, foreign: ForeignMessage<F>) -> Result<(), ActorError> {
         // Get the target
         let target = foreign.get_target();
-
+        
         // If it is a foreign actor or the lenth of the systems is larger than 1
         if self.is_foreign(target) || target.systems().len() > 1 {
             // Pop off the target if the top system is us (ex. "thissystem:foreign:actor")
@@ -385,6 +385,11 @@ where
         // Send the shutdown signal
         let res = self.shutdown.send(()).unwrap_or(0);
 
+        // Drain the shutdown list. We do this before removing the actors so that we can ensure actors are properly cleaned up before dropping them.
+        // This ensures that there will be no runtime errors due to actors being referenced during a shutdown, but may cause dropped messages.
+        // Dropped messages can be fixed by usign request instead of send for any critical messages.
+        self.drain_shutdown().await;
+
         // Borrow the actor map as writable
         let mut actors = self.actors.write().await;
 
@@ -394,9 +399,6 @@ where
 
         // Remove the lock
         drop(actors);
-
-        // Drain the shutdown list
-        self.drain_shutdown().await;
 
         res
     }
@@ -416,7 +418,7 @@ where
 
 /// Creates a new system with the given id and types for federated messages and notification.
 /// Use this function when you are using both federated messages and notifications.
-pub fn new<F: Message, N: Notification>(id: &str) -> System<F, N> {
+fn new_internal<F: Message, N: Notification>(id: &str) -> System<F, N> {
     
 
     // Create the notification sender
@@ -459,18 +461,29 @@ pub fn new<F: Message, N: Notification>(id: &str) -> System<F, N> {
     }
 }
 
+#[cfg(feature = "notifications")]
+#[cfg(feature = "federated")]
+pub fn new<F: Message, N: Notification>(id: &str) -> System<F, N> {
+    new_internal(id)
+}
+
+#[cfg(not(feature = "notifications"))]
+#[cfg(not(feature = "federated"))]
 /// Creates a new system that does not use federated messages or notifications
-pub fn new_none(id: &str) -> System<DefaultFederated, DefaultNotification> {
-    new(id)
+pub fn new(id: &str) -> System<DefaultFederated, DefaultNotification> {
+    new_internal(id)
 }
 
-
+#[cfg(not(feature = "notifications"))]
+#[cfg(feature = "federated")]
 /// Creates a new system that uses federated messages but not notifications.
-pub fn new_federated<F: Message>(id: &str) -> System<F, DefaultNotification> {
-    new(id)
+pub fn new<F: Message>(id: &str) -> System<F, DefaultNotification> {
+    new_internal(id)
 }
 
+#[cfg(feature = "notifications")]
+#[cfg(not(feature = "federated"))]
 /// Creates a new system that uses notifications but not federated messages
-pub fn new_notifications<N: Notification>(id: &str) -> System<DefaultFederated, N> {
-    new(id)
+pub fn new<N: Notification>(id: &str) -> System<DefaultFederated, N> {
+    new_internal(id)
 }
