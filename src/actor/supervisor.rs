@@ -7,14 +7,26 @@ use crate::{
     error::{policy::ErrorPolicy, ActorError},
     error_policy, handle_policy,
     message::{
-        foreign::ForeignMessage,
         handler::{HandleFederated, HandleMessage, HandleNotification},
-        AsMessageType, DualMessage, LocalMessage, Message, MessageType, Notification,
+        AsMessageType, Message, MessageType, Notification, MT,
+        
     },
     system::System,
 };
 
-use super::{context::ActorContext, handle::local::LocalHandle, path::ActorPath, Actor};
+#[cfg(feature = "foreign")]
+use crate::message::{
+    foreign::ForeignMessage,
+    DualMessage,
+};
+
+#[cfg(any(feature = "foreign", feature = "federated"))]
+use crate::message::LocalMessage;
+
+#[cfg(not(feature = "notifications"))]
+use std::marker::PhantomData;
+
+use super::{context::ActorContext, handle::local::LocalHandle, ActorID, Actor};
 
 /// # ActorSupervisor
 /// [`ActorSupervisor`] handles an actor's lifecycle and the reciept of messages.
@@ -23,17 +35,20 @@ pub struct ActorSupervisor<A, F: Message, N: Notification, M: Message> {
     /// The actor managed by this supervisor
     actor: A,
 
-    /// This actor's path
-    path: ActorPath,
+    /// This actor's id
+    id: ActorID,
 
     /// The actor's error policy
     error_policy: SupervisorErrorPolicy,
 
     /// The notification reciever
+    #[cfg(feature = "notifications")]
     notify: broadcast::Receiver<N>,
+    #[cfg(not(feature = "notifications"))]
+    _notify: PhantomData<N>,
 
     /// The message reciever
-    message: mpsc::Receiver<DualMessage<F, M>>,
+    message: mpsc::Receiver<MT<F, M>>,
 
     /// The shutdown reciever
     shutdown: broadcast::Receiver<()>,
@@ -50,7 +65,7 @@ where
     /// Returns the new supervisor alongside the handle that holds the message sender.
     pub fn new(
         actor: A,
-        path: ActorPath,
+        id: ActorID,
         system: &System<F, N>,
         error_policy: SupervisorErrorPolicy,
     ) -> (ActorSupervisor<A, F, N, M>, LocalHandle<F, M>) {
@@ -58,6 +73,7 @@ where
         let (message_sender, message) = mpsc::channel(64);
 
         // Subscribe to the notification broadcaster
+        #[cfg(feature = "notifications")]
         let notify = system.subscribe_notify();
 
         // Subscribe to the shutdown reciever
@@ -66,17 +82,20 @@ where
         // Create the supervisor
         let supervisor = Self {
             actor,
+            #[cfg(feature = "notifications")]
             notify,
+            #[cfg(not(feature = "notifications"))]
+            _notify: PhantomData::default(),
             message,
             shutdown,
             error_policy,
-            path: path.clone(),
+            id: id.clone(),
         };
 
         // Create the handle
         let handle = LocalHandle {
             message_sender,
-            path,
+            id,
         };
 
         // Return both
@@ -91,11 +110,37 @@ where
     N: Notification,
     M: Message,
 {
+
+    /// Handles a notification.
+    /// If notifications are not enabled, this will return immediately.
+    #[cfg(feature = "notifications")]
+    async fn handle_notification(&mut self, context: &mut ActorContext<F, N>, notification: Result<Result<N, broadcast::error::RecvError>, broadcast::error::RecvError> ) -> Result<(), ActorError> {
+        // If the policy failed, then exit the loop
+        let Ok(notification) = notification else {
+            return Err(ActorError::NotificationError);
+        };
+
+        // If the policy succeeded, but we failed to recieve, then continue. Otherwise handle it.
+        let Ok(notification) = notification else {
+            return Ok(());
+        };
+
+        // Call the handler, handling error policy
+        let _ = handle_policy!(
+            self.actor.notified(context, notification.clone()).await,
+            |_| &self.error_policy.notification_handler,
+            (), ActorError).await?;
+        
+        Ok(())
+    }
+
+    
+
     /// Runs the actor, only returning an error after all error policy options have been exhausted.
     pub async fn run(&mut self, system: System<F, N>) -> Result<(), ActorError> {
         // Create a new actor context for this actor to use
         let mut context = ActorContext {
-            path: self.path.clone(),
+            id: self.id.clone(),
             system,
         };
 
@@ -118,32 +163,35 @@ where
                     // Just shutdown no matter what happened
                     break;
                 },
-                notification = handle_policy!(
-                    self.notify.recv().await,
-                    |e: &broadcast::error::RecvError | match e {
-                        broadcast::error::RecvError::Closed => &self.error_policy.notification_channel_closed,
-                        broadcast::error::RecvError::Lagged(_) => &self.error_policy.notification_channel_lagged,
-                    },
-                    N, broadcast::error::RecvError) => {
+                
+                notification = async {
+                    #[cfg(not(feature = "notifications"))]
+                    {
+                        loop {
+                            tokio::task::yield_now().await;
+                        }
+                        //Err(broadcast::error::RecvError::Closed)
+                    }
+                    #[cfg(feature = "notifications")]
+                    {
+                        handle_policy!(
+                            self.notify.recv().await,
+                            |e: &broadcast::error::RecvError | match e {
+                                broadcast::error::RecvError::Closed => &self.error_policy.notification_channel_closed,
+                                broadcast::error::RecvError::Lagged(_) => &self.error_policy.notification_channel_lagged,
+                            },
+                            N, broadcast::error::RecvError).await
+                    }
+                } => {
+                    // Prevent a warning
+                    #[cfg(not(feature = "notifications"))]
+                    #[allow(clippy::let_unit_value)]
+                    let _ = notification;
 
+                    #[cfg(feature = "notifications")]
+                    let res = self.handle_notification(&mut context, notification).await;
 
-                    // If the policy failed, then exit the loop
-                    let Ok(notification) = notification else {
-                        break;
-                    };
-
-                    // If the policy succeeded, but we failed to recieve, then continue. Otherwise handle it.
-                    let Ok(notification) = notification else {
-                        continue;
-                    };
-
-                    // Call the handler, handling error policy
-                    let res = handle_policy!(
-                        self.actor.notified(&mut context, notification.clone()).await,
-                        |_| &self.error_policy.notification_handler,
-                        (), ActorError).await;
-
-                    // If the policy failed, then exit the loop
+                    #[cfg(feature = "notifications")]
                     if res.is_err() {
                         break;
                     }
@@ -151,7 +199,7 @@ where
                 message = handle_policy!(
                     self.message.recv().await.ok_or(ActorError::MessageChannelClosed),
                     |_| &self.error_policy.message_channel_closed,
-                    DualMessage<F, M>, ActorError) => {
+                    MT<F, M>, ActorError) => {
 
 
                     // If the policy failed, then exit the loop
@@ -181,6 +229,7 @@ where
                     };
 
                     // Given the message type, call the proper handler
+                    #[cfg(feature = "federated")]
                     match message_type {
                         MessageType::Federated(m) => {
                             let res = handle_policy!(
@@ -199,10 +248,19 @@ where
                             };
 
                             // Match on the responder
+                            #[cfg(feature = "foreign")]
                             let responder = match message {
                                 DualMessage::LocalMessage(LocalMessage::Federated(_, Some(responder))) => Some(responder),
                                 DualMessage::ForeignMessage(ForeignMessage::FederatedMessage(_, Some(responder), _)) => Some(responder),
                                 _ => None
+                            };
+
+                            // If foreign messages are not enabled, use if let to get the responder out of the message
+                            #[cfg(not(feature = "foreign"))]
+                            let responder = if let LocalMessage::Federated(_, responder) = message {
+                                responder
+                            } else {
+                                None
                             };
 
                             // If we need to respond, do so
@@ -228,6 +286,8 @@ where
                             };
 
                             // Match on the responder, and respond if found
+                            // Use the if let if the foreign feature is not enabled.
+                            #[cfg(feature = "foreign")]
                             match message {
                                 DualMessage::LocalMessage(LocalMessage::Message(_, Some(responder))) => {
                                     // Just send the response, ignoring the error
@@ -243,8 +303,74 @@ where
                                 },
                                 _ => {}
                             };
+
+                            #[cfg(not(feature = "foreign"))]
+                            if let LocalMessage::Message(_, Some(responder)) = message {
+                                // Just send the response, ignoring the error
+                                let _ = responder.send(res);
+                            }
                         },
                     };
+
+                    // Do the same thing if federated messages are not enabled.
+                    #[cfg(not(feature = "federated"))]
+                    {   
+                        let res = handle_policy!(
+                            self.actor.message(&mut context, message_type.0.clone()).await,
+                            |_| &self.error_policy.message_handler,
+                            M::Response, ActorError).await;
+    
+                        // If the policy failed, exit
+                        let Ok(res) = res else {
+                            break;
+                        };
+    
+                        // If the policy succeeded, but we failed to recieve, then continue.
+                        let Ok(res) = res else {
+                            continue;
+                        };
+    
+                        // Match on the responder, and respond if found
+                        // Use the if let if the foreign feature is not enabled.
+                        #[cfg(feature = "foreign")]
+                        match message {
+                            #[cfg(not(feature = "federated"))]
+                            DualMessage::LocalMessage(LocalMessage(_, Some(responder), _)) => {
+                                // Just send the response, ignoring the error
+                                let _ = responder.send(res);
+                            },
+                            #[cfg(feature = "federated")]
+                            DualMessage::LocalMessage(LocalMessage::Message(_, Some(responder))) => {
+                                // Just send the response, ignoring the error
+                                let _ = responder.send(res);
+                            },
+                            #[cfg(feature = "federated")]
+                            DualMessage::ForeignMessage(ForeignMessage::Message(_, Some(responder), _)) => {
+                                // Box and send the response
+                                #[cfg(not(feature="bincode"))]
+                                let _ = responder.send(Box::new(res));
+    
+                                #[cfg(feature="bincode")]
+                                let _ = responder.send(bincode::serialize(&res).or(Err(ActorError::ForeignRespondFailed))?);
+                            },
+                            #[cfg(not(feature = "federated"))]
+                            DualMessage::ForeignMessage(ForeignMessage { responder: Some(responder), .. }) => {
+                                // Box and send the response
+                                #[cfg(not(feature="bincode"))]
+                                let _ = responder.send(Box::new(res));
+    
+                                #[cfg(feature="bincode")]
+                                let _ = responder.send(bincode::serialize(&res).or(Err(ActorError::ForeignRespondFailed))?);
+                            },
+                            _ => {}
+                        };
+    
+                        #[cfg(not(feature = "foreign"))]
+                        if let Some(responder) = message.1 {
+                            // Just send the response, ignoring the error
+                            let _ = responder.send(res);
+                        }
+                    }
                 }
             }
         }

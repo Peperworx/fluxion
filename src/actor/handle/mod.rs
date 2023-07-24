@@ -8,7 +8,8 @@ use crate::{
     message::Message
 };
 
-use super::path::ActorPath;
+
+use super::ActorID;
 
 
 /// Contains [`crate::actor::handle::local::LocalHandle`], an implementor of [`ActorHandle`] used for communicating with local actors.
@@ -16,6 +17,7 @@ pub mod local;
 
 
 /// Contains [`crate::actor::handle::foreign::ForeignHandle`], an implementor of [`ActorHandle`] used for communicating with foreign actors.
+#[cfg(feature = "foreign")]
 pub mod foreign;
 
 
@@ -28,8 +30,8 @@ where
     F: Message,
     M: Message,
 {
-    /// Gets the referenced actor's path.
-    fn get_path(&self) -> &ActorPath;
+    /// Gets the referenced actor's id.
+    fn get_id(&self) -> &ActorID;
 
     /// Sends a message to the referenced actor and does not wait for a response.
     async fn send(&self, message: M) -> Result<(), ActorError>;
@@ -38,9 +40,11 @@ where
     async fn request(&self, message: M) -> Result<M::Response, ActorError>;
 
     /// Sends a federated message to the referenced actor and does not wait for a response.
+    #[cfg(feature="federated")]
     async fn send_federated(&self, message: F) -> Result<(), ActorError>;
 
     /// Sends a federated message to the referenced actor and waits for a response.
+    #[cfg(feature="federated")]
     async fn request_federated(&self, message: F) -> Result<F::Response, ActorError>;
 }
 

@@ -6,7 +6,7 @@ repository = "https://github.com/peperworx/fluxion"
 categories = ["concurrency"]
 keywords = ["actor", "distributed", "async", "fluxion"]
 readme = "README.md"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -19,7 +19,10 @@ thiserror = "1.0.40"
 tokio = { version = "1.28.2", features = ["rt", "rt-multi-thread", "sync", "macros"] }
 
 [features]
-default = []
+default = ["foreign", "notifications", "federated", "bincode"]
 # Enables serde support for messages
 serde = ["dep:serde"]
 bincode = ["serde", "dep:bincode"]
+foreign = []
+notifications = []
+federated = []

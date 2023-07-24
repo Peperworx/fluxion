@@ -2,17 +2,26 @@
 
 use std::any::Any;
 
+#[cfg(not(feature = "federated"))]
+use std::marker::PhantomData;
+
 use tokio::sync::{mpsc, oneshot};
 
 use crate::{
     error::ActorError,
     message::{
-        foreign::{ForeignMessage, ForeignReceiver},
-        DualMessage, LocalMessage, Message,
+        LocalMessage, Message, MT,
     },
+    actor::ActorEntry, ActorID,
 };
 
-use crate::actor::{path::ActorPath, ActorEntry};
+
+#[cfg(feature = "foreign")]
+use crate::message::{
+    foreign::{ForeignMessage, ForeignReceiver},
+    DualMessage
+};
+
 
 use super::ActorHandle;
 
@@ -28,10 +37,10 @@ where
     M: Message,
 {
     /// The message sender for the actor
-    pub(crate) message_sender: mpsc::Sender<DualMessage<F, M>>,
+    pub(crate) message_sender: mpsc::Sender<MT<F, M>>,
 
     /// The id of the actor
-    pub(crate) path: ActorPath,
+    pub(crate) id: ActorID,
 }
 
 
@@ -43,8 +52,11 @@ where
 {
     /// Sends a raw message to the actor
     async fn send_raw_message(&self, message: LocalMessage<F, M>) -> Result<(), ActorError> {
+        #[cfg(feature = "foreign")]
+        let message = DualMessage::LocalMessage(message);
+
         self.message_sender
-            .send(DualMessage::LocalMessage(message))
+            .send(message)
             .await
             .or(Err(ActorError::MessageSendError))
     }
@@ -60,15 +72,21 @@ where
     F: Message,
     M: Message,
 {
-    /// Gets the referenced actor's path.
-    fn get_path(&self) -> &ActorPath {
-        &self.path
+    /// Gets the referenced actor's id.
+    fn get_id(&self) -> &ActorID {
+        &self.id
     }
 
     /// Sends a message to the referenced actor and does not wait for a response.
     async fn send(&self, message: M) -> Result<(), ActorError> {
+        #[cfg(feature="federated")]
         self.send_raw_message(LocalMessage::<F, M>::Message(message, None))
-            .await
+            .await?;
+        #[cfg(not(feature="federated"))]
+        self.send_raw_message(LocalMessage::<F, M>(message, None, PhantomData::default()))
+            .await?;
+
+        Ok(())
     }
 
     /// Sends a message to the actor and waits for a response.
@@ -77,7 +95,11 @@ where
         let (responder, reciever) = oneshot::channel();
 
         // Send the message
+        #[cfg(feature="federated")]
         self.send_raw_message(LocalMessage::<F, M>::Message(message, Some(responder)))
+            .await?;
+        #[cfg(not(feature="federated"))]
+        self.send_raw_message(LocalMessage::<F, M>(message, Some(responder), PhantomData::default()))
             .await?;
 
         // Await a response
@@ -88,12 +110,14 @@ where
     }
 
     /// Sends a federated message to the referenced actor and does not wait for a response.
+    #[cfg(feature="federated")]
     async fn send_federated(&self, message: F) -> Result<(), ActorError> {
         self.send_raw_message(LocalMessage::<F, M>::Federated(message, None))
             .await
     }
 
     /// Sends a federated message to the referenced actor and waits for a response.
+    #[cfg(feature="federated")]
     async fn request_federated(&self, message: F) -> Result<F::Response, ActorError> {
         // Create the responder
         let (responder, reciever) = oneshot::channel();
@@ -114,6 +138,7 @@ where
 
 /// [`ForeignReceiver`] is implemented for [`LocalHandle`], allowing the handle to recieve foreign messages
 /// without knowing the message type while stored in the system.
+#[cfg(feature = "foreign")]
 #[async_trait::async_trait]
 impl<F, M> ForeignReceiver for LocalHandle<F, M>
 where

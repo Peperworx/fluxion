@@ -2,6 +2,9 @@
 
 use std::any::Any;
 
+#[cfg(not(feature = "federated"))]
+use std::marker::PhantomData;
+
 #[cfg(feature="serde")]
 use serde::{Serialize, Deserialize};
 
@@ -10,13 +13,24 @@ use tokio::sync::oneshot;
 
 use crate::error::ActorError;
 
+#[cfg(feature="foreign")]
 use self::foreign::ForeignMessage;
 
 /// Contains message handling traits that can be implemented by actors
 pub mod handler;
 
 /// Contains an implementation of a foreign message
+#[cfg(feature = "foreign")]
 pub mod foreign;
+
+
+/// # MT
+/// Which type of message to handle. This is toggled based on the "foreign" feature.
+#[cfg(feature = "foreign")]
+pub(crate) type MT<F, M> = DualMessage<F, M>;
+#[cfg(not(feature = "foreign"))]
+pub(crate) type MT<F, M> = LocalMessage<F, M>;
+
 
 /// # Message
 /// The [`Message`] trait should be implemented for any message, including Messages, and Federated Messages.
@@ -53,12 +67,14 @@ impl<T> Notification for T where T: Clone + Serialize + for<'a> Deserialize<'a> 
 /// # DynMessageResponse
 /// Internal type alias for dyn [`Any`] + [`Send`] + [`Sync`] + 'static
 #[cfg(not(feature="bincode"))]
+#[cfg(feature="foreign")]
 pub(crate) type DynMessageResponse = dyn Any + Send + Sync + 'static;
 
 
 /// # LocalMessage
 /// An enum that contains each different type of message sent to an actor.
 /// Used to reduce the nuber of mpsc channels required.
+#[cfg(feature="federated")]
 pub enum LocalMessage<F: Message, M: Message> {
     /// A federated message
     Federated(F, Option<oneshot::Sender<F::Response>>),
@@ -66,23 +82,38 @@ pub enum LocalMessage<F: Message, M: Message> {
     Message(M, Option<oneshot::Sender<M::Response>>),
 }
 
+#[cfg(not(feature="federated"))]
+pub struct LocalMessage<F: Message, M: Message>(pub M, pub Option<oneshot::Sender<M::Response>>, pub PhantomData<F>);
+
 impl<F: Message, M: Message> AsMessageType<F, M> for LocalMessage<F, M> {
     fn as_message_type(&self) -> Result<MessageType<F, M>, ActorError> {
-        Ok(match self {
+        #[cfg(feature="federated")]
+        let res = match self {
             LocalMessage::Federated(m, _) => MessageType::Federated(m.clone()),
             LocalMessage::Message(m, _) => MessageType::Message(m.clone()),
-        })
+        };
+        
+        #[cfg(not(feature="federated"))]
+        let res = MessageType(self.0.clone(), self.2);
+
+        Ok(res)
     }
 }
 
 /// # MessageType
-/// An enum that contains the contents of a message minus its responder
+/// An enum that contains the contents of a message minus its responder. 
+#[cfg(feature="federated")]
 pub enum MessageType<F: Message, M: Message> {
     /// A Federated message
+    
     Federated(F),
     /// A message
     Message(M),
 }
+
+#[cfg(not(feature="federated"))]
+pub struct MessageType<F: Message, M: Message>(pub M, pub PhantomData<F>);
+
 
 /// # AsMessageType
 /// Converts a struct into a MessageType
@@ -92,6 +123,7 @@ pub(crate) trait AsMessageType<F: Message, M: Message> {
 
 /// # DualMessage
 /// An internal enum that stores both a LocalMessage and a ForeignMessage, used in an actor's message channel.
+#[cfg(feature="foreign")]
 pub(crate) enum DualMessage<F: Message, M: Message> {
     /// A LocalMessage
     LocalMessage(LocalMessage<F, M>),
@@ -99,6 +131,7 @@ pub(crate) enum DualMessage<F: Message, M: Message> {
     ForeignMessage(ForeignMessage<F>),
 }
 
+#[cfg(feature="foreign")]
 impl<F: Message, M: Message> AsMessageType<F, M> for DualMessage<F, M> {
     fn as_message_type(&self) -> Result<MessageType<F, M>, ActorError> {
         match self {
