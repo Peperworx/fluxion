@@ -72,7 +72,7 @@ impl HandleMessage<TestMessage> for TestActor {
         context: &mut ActorContext<F, N>,
         _message: TestMessage,
     ) -> Result<(), ActorError> {
-        println!("message on {:?}", context.get_path());
+        println!("message on {:?}", context.get_id());
         Ok(())
     }
 }
@@ -84,7 +84,7 @@ impl HandleFederated<TestFederated> for TestActor {
         context: &mut ActorContext<TestFederated, N>,
         _message: TestFederated,
     ) -> Result<(), ActorError> {
-        println!("federated message on {:?}", context.get_path());
+        println!("federated message on {:?}", context.get_id());
         let ar = context
             .get_actor::<TestMessage>("other:test")
             .await
@@ -108,6 +108,7 @@ async fn main() {
         }
     });
 
+    
     let mut foreign_other = other.get_foreign().await.unwrap();
     let host2 = host.clone();
 
@@ -117,6 +118,7 @@ async fn main() {
         }
     });
 
+    
     host.add_actor(TestActor, "test", SupervisorErrorPolicy::default())
         .await
         .unwrap();
@@ -127,6 +129,7 @@ async fn main() {
 
     let ar = other.get_actor::<TestMessage>("host:test").await.unwrap();
     ar.request_federated(TestFederated).await.unwrap();
+
 
     other.shutdown().await;
     host.shutdown().await;

@@ -156,7 +156,7 @@ impl<F: Message, N> System<F, N> {
                 let actors = self.actors.read().await;
 
                 // Get the local actor
-                let actor = actors.get(target.actor());
+                let actor = actors.get(&(self.id.clone() + ":" + target.actor()));
 
                 // If it does not exist, then error
                 let Some(actor) = actor else {
@@ -173,7 +173,7 @@ impl<F: Message, N> System<F, N> {
                 let actors = self.actors.read().await;
 
                 // Get the local actor
-                let actor = actors.get(target.actor());
+                let actor = actors.get(&(self.id.clone() + ":" + target.actor()));
 
                 // If it does not exist, then error
                 let Some(actor) = actor else {
