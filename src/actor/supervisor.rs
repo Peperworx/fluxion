@@ -173,6 +173,7 @@ where
     
 
     /// Runs the actor, only returning an error after all error policy options have been exhausted.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, system)))]
     pub async fn run(&mut self, system: System<F, N>) -> Result<(), ActorError> {
 
         #[cfg(feature = "tracing")]
@@ -516,6 +517,7 @@ where
     }
 
     /// Cleans up the actor
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     pub async fn cleanup(&mut self) -> Result<(), ActorError> {
         
         #[cfg(feature = "tracing")]
