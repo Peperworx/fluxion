@@ -409,9 +409,19 @@ where
 
         // Start the supervisor task
         tokio::spawn(async {
-            // TODO: Log this.
-            let _ = supervisor.run(system).await;
-            let _ = supervisor.cleanup().await;
+            let run_result = supervisor.run(system).await;
+
+            if let Err(e) = run_result {
+                #[cfg(feature = "tracing")]
+                event!(Level::ERROR, supervisor=supervisor.get_id().to_string(), error=format!("{}", e), "Actor runtime terminated by error.");
+            }
+
+            let cleanup_result = supervisor.cleanup().await;
+
+            if let Err(e) = cleanup_result {
+                #[cfg(feature = "tracing")]
+                event!(Level::ERROR, supervisor=supervisor.get_id().to_string(), error=format!("{}", e), "Actor cleanup terminated by error.");
+            }
 
             drop(supervisor);
         });
