@@ -37,15 +37,15 @@ pub(crate) type MT<F, M> = LocalMessage<F, M>;
 /// Both [`Message`] and [`Message::Response`] require messages to be [`Any`] ~ [`Debug`] + [`Clone`] + [`Send`] + [`Sync`] + `'static`.
 /// Why require Any? Sometimes messages may be passed around as a `dyn Any` (as is the case with foreign channels).
 #[cfg(not(feature="serde"))]
-pub trait Message: Any + std::fmt::Debug + Clone + Send + Sync + 'static {
+pub trait Message: Any + Clone + Send + Sync + 'static {
     /// The response type of the message
-    type Response: Any + std::fmt::Debug + Clone + Send + Sync + 'static;
+    type Response: Any + Clone + Send + Sync + 'static;
 }
 
 #[cfg(feature="serde")]
-pub trait Message: Any + std::fmt::Debug + Serialize + for<'a> Deserialize<'a> + Clone + Send + Sync + 'static {
+pub trait Message: Any + Serialize + for<'a> Deserialize<'a> + Clone + Send + Sync + 'static {
     /// The response type of the message
-    type Response: Any + std::fmt::Debug + Serialize + for<'a> Deserialize<'a> + Clone + Send + Sync + 'static;
+    type Response: Any + Serialize + for<'a> Deserialize<'a> + Clone + Send + Sync + 'static;
 }
 
 /// # Notification
@@ -59,10 +59,10 @@ pub trait Notification: Clone + Send + Sync + 'static {}
 impl<T> Notification for T where T: Clone + Send + Sync + 'static {}
 
 #[cfg(feature="serde")]
-pub trait Notification: std::fmt::Debug + Clone + Serialize + for<'a> Deserialize<'a> + Send + Sync + 'static {}
+pub trait Notification: Clone + Serialize + for<'a> Deserialize<'a> + Send + Sync + 'static {}
 
 #[cfg(feature="serde")]
-impl<T> Notification for T where T: std::fmt::Debug + Clone + Serialize + for<'a> Deserialize<'a> + Send + Sync + 'static {}
+impl<T> Notification for T where T: Clone + Serialize + for<'a> Deserialize<'a> + Send + Sync + 'static {}
 
 /// # DynMessageResponse
 /// Internal type alias for dyn [`Any`] + [`Send`] + [`Sync`] + 'static

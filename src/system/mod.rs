@@ -2,12 +2,14 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use cfg_if::cfg_if;
+
 use tokio::sync::{broadcast, RwLock};
 
 #[cfg(feature = "foreign")]
 use tokio::sync::{mpsc, Mutex};
-use tracing::{debug, trace, event, Level};
+
+#[cfg(feature = "tracing")]
+use tracing::{event, Level};
 
 use crate::{
     actor::{
@@ -18,7 +20,7 @@ use crate::{
     error::SystemError,
     message::{
         handler::{HandleFederated, HandleMessage, HandleNotification},
-        Message, Notification, DefaultNotification, DefaultFederated,
+        Message, Notification
     },
 };
 
@@ -155,7 +157,7 @@ impl<F: Message, N> System<F, N> {
     }
 
     /// Relays a foreign message to this system
-    #[cfg_attr(feature = "tracing", tracing::instrument)]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, foreign)))]
     pub async fn relay_foreign(&self, foreign: ForeignMessage<F>) -> Result<(), ActorError> {
         // Get the target
         let target = foreign.get_target();
@@ -194,7 +196,7 @@ impl<F: Message, N> System<F, N> {
 
     /// Sends a foreign message to a local actor
     #[cfg(feature = "federated")]
-    #[cfg_attr(feature = "tracing", tracing::instrument)]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, foreign)))]
     async fn send_foreign_to_local(&self, foreign: ForeignMessage<F>) -> Result<(), ActorError> {
         #[cfg(feature = "tracing")]
         event!(Level::DEBUG, system=self.id, "Sending foreign message to local actor");
@@ -250,7 +252,7 @@ impl<F: Message, N> System<F, N> {
 
 
     #[cfg(not(feature = "federated"))]
-    #[cfg_attr(feature = "tracing", tracing::instrument)]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, foreign)))]
     async fn send_foreign_to_local(&self, foreign: ForeignMessage<F>) -> Result<(), ActorError> {
         #[cfg(feature = "tracing")]
         event!(Level::DEBUG, system=self.id, "Sending foreign message to local actor. Federated messages are disabled.");
@@ -259,12 +261,12 @@ impl<F: Message, N> System<F, N> {
         let actors = self.actors.read().await;
 
         // Get the local actor
-        let actor = actors.get(foreign.target.actor());
+        let actor = actors.get(foreign.get_target().actor());
 
         // If it does not exist, then error
         let Some(actor) = actor else {
             #[cfg(feature = "tracing")]
-            event!(Level::ERROR, system=self.id, actor=target.actor(), "Failed to retrieve actor while processing foreign message.");
+            event!(Level::ERROR, system=self.id, actor=foreign.get_target().actor(), "Failed to retrieve actor while processing foreign message.");
             return Err(ActorError::ForeignTargetNotFound);
         };
 
@@ -278,9 +280,9 @@ impl<F: Message, N> System<F, N> {
 
 #[cfg(feature = "foreign")]
 #[cfg(feature = "notifications")]
-impl<F: Message, N: Notification> System<F, N> {
+impl<F: Message, N> System<F, N> {
     /// Subscribes to the foreign notification sender
-    #[cfg_attr(feature = "tracing", tracing::instrument)]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     pub fn subscribe_foreign_notify(&self) -> broadcast::Receiver<N> {
         #[cfg(feature = "tracing")]
         event!(Level::DEBUG, system=self.id, "Party subscribed to the foreign notification sender");
@@ -289,7 +291,7 @@ impl<F: Message, N: Notification> System<F, N> {
     }
 
     /// Notifies only actors on this sytem
-    #[cfg_attr(feature = "tracing", tracing::instrument)]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, notification)))]
     pub fn notify_local(&self, notification: N) -> usize {
         #[cfg(feature = "tracing")]
         event!(Level::DEBUG, system=self.id, "Party sent a notification that is only visible on the local system.");
@@ -301,9 +303,9 @@ impl<F: Message, N: Notification> System<F, N> {
 
 
 #[cfg(feature = "notifications")]
-impl<F: Message, N: Notification> System<F, N> {
+impl<F: Message, N: Clone> System<F, N> {
     /// Returns a notification reciever associated with the system's notification broadcaster.
-    #[cfg_attr(feature = "tracing", tracing::instrument)]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     pub(crate) fn subscribe_notify(&self) -> broadcast::Receiver<N> {
         #[cfg(feature = "tracing")]
         event!(Level::DEBUG, system=self.id, "Party subscribed to the local notification sender");
@@ -313,7 +315,7 @@ impl<F: Message, N: Notification> System<F, N> {
 
     /// Notifies all actors.
     /// Returns the number of actors notified on this sytem
-    #[cfg_attr(feature = "tracing", tracing::instrument)]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, notification)))]
     pub fn notify(&self, notification: N) -> usize {
         #[cfg(feature = "tracing")]
         event!(Level::DEBUG, system=self.id, "Sending notification");
@@ -330,7 +332,7 @@ impl<F: Message, N: Notification> System<F, N> {
     }
 
     /// Yields the current task until all notifications have been recieved
-    #[cfg_attr(feature = "tracing", tracing::instrument)]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     pub async fn drain_notify(&self) {
         #[cfg(feature = "tracing")]
         event!(Level::DEBUG, system=self.id, "Draining notifications");
@@ -359,10 +361,9 @@ where
     }
 
     /// Adds an actor to the system
-    #[cfg_attr(feature = "tracing", tracing::instrument)]
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, actor, error_policy)))]
     pub async fn add_actor<
-        #[cfg(not(feature = "tracing"))] A: Actor + HandleNotification<N> + HandleFederated<F> + HandleMessage<M>,
-        #[cfg(feature = "tracing")] A: Actor + HandleNotification<N> + HandleFederated<F> + HandleMessage<M> + std::fmt::Debug,
+        A: Actor + HandleNotification<N> + HandleFederated<F> + HandleMessage<M>,
         M: Message,
     >(
         &self,
@@ -438,6 +439,7 @@ where
     }
 
     /// Retrieves an actor from the system, returning None if the actor does not exist
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     pub async fn get_actor<M: Message>(&self, id: &str) -> Option<GetActorReturn<F, M>> {
 
         #[cfg(feature = "tracing")]
@@ -517,6 +519,7 @@ where
     /// # Note
     /// This does not shutdown the system itself, but only actors running on the system. The system is cleaned up at drop.
     /// Even after calling this function, actors can still be added to the system. This returns the number of actors shutdown.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     pub async fn shutdown(&self) -> usize {
 
         #[cfg(feature = "tracing")]
@@ -553,6 +556,7 @@ where
     }
 
     /// Subscribes to the shutdown reciever
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     pub(crate) fn subscribe_shutdown(&self) -> broadcast::Receiver<()> {
         #[cfg(feature = "tracing")]
         event!(Level::DEBUG, system=self.id, "Party subscribed to shutdown notification.");
@@ -561,6 +565,7 @@ where
     }
 
     /// Waits until all actors have shutdown
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     async fn drain_shutdown(&self) {
         #[cfg(feature = "tracing")]
         event!(Level::DEBUG, system=self.id, "Draining shutdown");
@@ -628,20 +633,20 @@ pub fn new<F: Message, N: Notification>(id: &str) -> System<F, N> {
 #[cfg(not(feature = "notifications"))]
 #[cfg(not(feature = "federated"))]
 /// Creates a new system that does not use federated messages or notifications
-pub fn new(id: &str) -> System<DefaultFederated, DefaultNotification> {
+pub fn new(id: &str) -> System<crate::message::DefaultFederated, crate::message::DefaultNotification> {
     new_internal(id)
 }
 
 #[cfg(not(feature = "notifications"))]
 #[cfg(feature = "federated")]
 /// Creates a new system that uses federated messages but not notifications.
-pub fn new<F: Message>(id: &str) -> System<F, DefaultNotification> {
+pub fn new<F: Message>(id: &str) -> System<F, crate::message::DefaultNotification> {
     new_internal(id)
 }
 
 #[cfg(feature = "notifications")]
 #[cfg(not(feature = "federated"))]
 /// Creates a new system that uses notifications but not federated messages
-pub fn new<N: Notification>(id: &str) -> System<DefaultFederated, N> {
+pub fn new<N: Notification>(id: &str) -> System<crate::message::DefaultFederated, N> {
     new_internal(id)
 }

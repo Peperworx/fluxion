@@ -22,7 +22,8 @@ tracing = { version = "0.1.37", optional = true }
 tracing-subscriber = "0.3.17"
 
 [features]
-default = ["foreign", "notifications", "federated", "bincode", "tracing"]
+default = ["full"]
+full = ["foreign", "notifications", "federated", "bincode", "tracing"]
 # Enables serde support for messages
 serde = ["dep:serde"]
 bincode = ["serde", "dep:bincode"]
@@ -30,3 +31,11 @@ foreign = []
 notifications = []
 federated = []
 tracing = ["dep:tracing"]
+
+[[example]]
+name = "foreign"
+
+[package.metadata.cargo-feature-combinations]
+
+# Exclude features from the feature combination matrix
+denylist = ["default", "full"]
