@@ -19,6 +19,7 @@ serde = { version = "1.0.164", features = ["derive"], optional = true }
 thiserror = "1.0.40"
 tokio = { version = "1.28.2", features = ["rt", "rt-multi-thread", "sync", "macros"] }
 tracing = { version = "0.1.37", optional = true }
+tracing-subscriber = "0.3.17"
 
 [features]
 default = ["foreign", "notifications", "federated", "bincode", "tracing"]
