@@ -3,6 +3,9 @@
 
 use tokio::sync::{broadcast, mpsc};
 
+#[cfg(feature = "tracing")]
+use tracing::{event, Level};
+
 use crate::{
     error::{policy::ErrorPolicy, ActorError},
     error_policy, handle_policy,
@@ -63,21 +66,36 @@ where
 {
     /// Creates a new supervisor with the given actor and actor id.
     /// Returns the new supervisor alongside the handle that holds the message sender.
+    #[cfg_attr(feature = "tracing", tracing::instrument(skip(actor, system, error_policy)))]
     pub fn new(
         actor: A,
         id: ActorID,
         system: &System<F, N>,
         error_policy: SupervisorErrorPolicy,
     ) -> (ActorSupervisor<A, F, N, M>, LocalHandle<F, M>) {
+
+        #[cfg(feature = "tracing")]
+        event!(Level::TRACE, system=system.get_id(), actor=id.to_string(), "Creating new actor supervisor.");
+
         // Create a new message channel
         let (message_sender, message) = mpsc::channel(64);
+
+        #[cfg(feature = "tracing")]
+        event!(Level::TRACE, system=system.get_id(), actor=id.to_string(), "Created supervisor message channel.");
 
         // Subscribe to the notification broadcaster
         #[cfg(feature = "notifications")]
         let notify = system.subscribe_notify();
 
+        #[cfg(feature = "notifications")]
+        #[cfg(feature = "tracing")]
+        event!(Level::TRACE, system=system.get_id(), actor=id.to_string(), "Created supervisor notification channel.");
+
         // Subscribe to the shutdown reciever
         let shutdown = system.subscribe_shutdown();
+
+        #[cfg(feature = "tracing")]
+        event!(Level::TRACE, system=system.get_id(), actor=id.to_string(), "Created supervisor shutdown channel.");
 
         // Create the supervisor
         let supervisor = Self {
@@ -97,6 +115,9 @@ where
             message_sender,
             id,
         };
+
+        #[cfg(feature = "tracing")]
+        event!(Level::TRACE, system=system.get_id(), actor=supervisor.id.to_string(), "Created supervisor and actor handle.");
 
         // Return both
         (supervisor, handle)
