@@ -64,8 +64,10 @@ impl ActorPath {
     }
 }
 
-impl ToString for ActorPath {
-    fn to_string(&self) -> String {
-        self.systems.join(":") + ":" + &self.actor
+
+
+impl std::fmt::Display for ActorPath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&(self.systems.join(":") + ":" + &self.actor))
     }
 }

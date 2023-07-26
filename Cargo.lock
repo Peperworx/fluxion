@@ -40,6 +40,7 @@ version = "0.5.1"
 dependencies = [
  "async-trait",
  "bincode",
+ "cfg-if",
  "serde",
  "thiserror",
  "tokio",
