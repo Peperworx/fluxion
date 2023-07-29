@@ -162,20 +162,20 @@ impl<F: Message, N> System<F, N> {
         // Get the target
         let target = foreign.get_target();
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::DEBUG, system=self.id, "Relaying foreign message to {}.", target);
         
         // If it is a foreign actor or the lenth of the systems is larger than 1
         if self.is_foreign(target) || target.systems().len() > 1 {
 
-            #[cfg(feature = "tracing")]
+            #[cfg(all(feature = "tracing", debug_assertions))]
             event!(Level::TRACE, system=self.id, "Determined message is targeted at another system.");
 
             // Pop off the target if the top system is us (ex. "thissystem:foreign:actor")
             let foreign = if self.is_foreign(target) {
                 foreign
             } else {
-                #[cfg(feature = "tracing")]
+                #[cfg(all(feature = "tracing", debug_assertions))]
                 event!(Level::TRACE, system=self.id, "Popped off the current system ID from the path.");
                 foreign.pop_target()
             };
@@ -186,7 +186,7 @@ impl<F: Message, N> System<F, N> {
                 .await
                 .or(Err(ActorError::ForeignSendFail))
         } else {
-            #[cfg(feature = "tracing")]
+            #[cfg(all(feature = "tracing", debug_assertions))]
             event!(Level::TRACE, system=self.id, "Determined message is targeted at this system.");
 
             // Send to a local actor
@@ -198,12 +198,12 @@ impl<F: Message, N> System<F, N> {
     #[cfg(feature = "federated")]
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, foreign)))]
     async fn send_foreign_to_local(&self, foreign: ForeignMessage<F>) -> Result<(), ActorError> {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::DEBUG, system=self.id, "Sending foreign message to local actor.");
 
         match foreign {
             ForeignMessage::FederatedMessage(message, responder, target) => {
-                #[cfg(feature = "tracing")]
+                #[cfg(all(feature = "tracing", debug_assertions))]
                 event!(Level::TRACE, system=self.id, actor=target.actor(), "Foreign message is a federated message.");
 
                 // Get actors as read
@@ -225,7 +225,7 @@ impl<F: Message, N> System<F, N> {
                     .await
             }
             ForeignMessage::Message(message, responder, target) => {
-                #[cfg(feature = "tracing")]
+                #[cfg(all(feature = "tracing", debug_assertions))]
                 event!(Level::TRACE, system=self.id, actor=target.actor(), "Foreign message is a regular message.");
 
                 // Get actors as read
@@ -254,7 +254,7 @@ impl<F: Message, N> System<F, N> {
     #[cfg(not(feature = "federated"))]
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, foreign)))]
     async fn send_foreign_to_local(&self, foreign: ForeignMessage<F>) -> Result<(), ActorError> {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::DEBUG, system=self.id, "Sending foreign message to local actor. Federated messages are disabled..");
 
         // Get actors as read
@@ -284,7 +284,7 @@ impl<F: Message, N> System<F, N> {
     /// Subscribes to the foreign notification sender
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     pub fn subscribe_foreign_notify(&self) -> broadcast::Receiver<N> {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::DEBUG, system=self.id, "Party subscribed to the foreign notification sender.");
 
         self.foreign.foreign_notification.subscribe()
@@ -293,7 +293,7 @@ impl<F: Message, N> System<F, N> {
     /// Notifies only actors on this sytem
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, notification)))]
     pub fn notify_local(&self, notification: N) -> usize {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::DEBUG, system=self.id, "Party sent a notification that is only visible on the local system..");
 
         self.notification.send(notification).unwrap_or(0)
@@ -307,7 +307,7 @@ impl<F: Message, N: Clone> System<F, N> {
     /// Returns a notification reciever associated with the system's notification broadcaster.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     pub(crate) fn subscribe_notify(&self) -> broadcast::Receiver<N> {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::DEBUG, system=self.id, "Party subscribed to the local notification sender.");
 
         self.notification.subscribe()
@@ -317,16 +317,16 @@ impl<F: Message, N: Clone> System<F, N> {
     /// Returns the number of actors notified on this sytem
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, notification)))]
     pub fn notify(&self, notification: N) -> usize {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::DEBUG, system=self.id, "Sending notification.");
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=self.id, "Sending notification over foreign channel.");
 
         #[cfg(feature = "foreign")]
         let _ = self.foreign.foreign_notification.send(notification.clone());
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=self.id, "Sending notification over local channel.");
         self.notification.send(notification).unwrap_or(0)
     }
@@ -334,14 +334,14 @@ impl<F: Message, N: Clone> System<F, N> {
     /// Yields the current task until all notifications have been recieved
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     pub async fn drain_notify(&self) {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::DEBUG, system=self.id, "Draining notifications.");
 
         while !self.notification.is_empty() {
             tokio::task::yield_now().await;
         }
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=self.id, "Notifications drained.");
     }
 }
@@ -372,7 +372,7 @@ where
         error_policy: SupervisorErrorPolicy,
     ) -> Result<LocalHandle<F, M>, SystemError> {
         
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::DEBUG, system=self.id, actor=id, "Adding actor to system.");
         
         #[cfg(feature = "foreign")]
@@ -398,13 +398,13 @@ where
         // Initialize the supervisor
         let (mut supervisor, handle) = ActorSupervisor::new(actor, path, self, error_policy);
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=self.id, actor=id, "Initializing actor supervisor.");
 
         // Clone the system
         let system = self.clone();
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=self.id, actor=id, "Spawning supervisor task.");
 
         // Start the supervisor task
@@ -426,7 +426,7 @@ where
             drop(supervisor);
         });
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=self.id, actor=id, "Supervisor task spawned.");
 
         // Insert the handle into the map
@@ -441,7 +441,7 @@ where
 
         actors.insert(id.to_string(), v);
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=self.id, actor=id, "Actor handle inserted.");
 
         // Return the handle
@@ -452,7 +452,7 @@ where
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     pub async fn get_actor<M: Message>(&self, id: &str) -> Option<GetActorReturn<F, M>> {
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::DEBUG, system=self.id, actor=id, "Retrieving actor.");
 
         // Get the actor path
@@ -466,7 +466,7 @@ where
         // If the first system exists and it is not this system, then create a foreign actor handle
         #[cfg(feature = "foreign")]
         if path.first().unwrap_or(&self.id) != self.id {
-            #[cfg(feature = "tracing")]
+            #[cfg(all(feature = "tracing", debug_assertions))]
             event!(Level::TRACE, system=self.id, actor=id, "Retrieving as a foreign actor handle.");
 
             // Create and return a foreign handle
@@ -477,7 +477,7 @@ where
             }));
         }
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=self.id, actor=id, "Retrieving as a local actor handle.");
 
         // Lock read access to the actor map
@@ -499,7 +499,7 @@ where
         let actor = actor.as_any().downcast_ref::<LocalHandle<F, M>>();
 
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         if actor.is_some() {
             event!(Level::TRACE, system=self.id, actor=id, "Found local actor.");
         } else {
@@ -538,7 +538,7 @@ where
         // Send the shutdown signal
         let res = self.shutdown.send(()).unwrap_or(0);
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=self.id, "Shutdown signal sent.");
 
         // Drain the shutdown list. We do this before removing the actors so that we can ensure actors are properly cleaned up before dropping them.
@@ -546,7 +546,7 @@ where
         // Dropped messages can be fixed by usign request instead of send for any critical messages.
         self.drain_shutdown().await;
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=self.id, "Shutdown drained.");
 
         // Borrow the actor map as writable
@@ -559,7 +559,7 @@ where
         // Remove the lock
         drop(actors);
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=self.id, "All actor handles in system dropped..");
 
         res
@@ -568,7 +568,7 @@ where
     /// Subscribes to the shutdown reciever
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     pub(crate) fn subscribe_shutdown(&self) -> broadcast::Receiver<()> {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::DEBUG, system=self.id, "Party subscribed to shutdown notification..");
 
         self.shutdown.subscribe()
@@ -577,14 +577,14 @@ where
     /// Waits until all actors have shutdown
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     async fn drain_shutdown(&self) {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::DEBUG, system=self.id, "Draining shutdown.");
 
         while !self.shutdown.is_empty() {
             tokio::task::yield_now().await;
         }
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=self.id, "Shutdown drained. All listening actors are offline..");
     }
 }

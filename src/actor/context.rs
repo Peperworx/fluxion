@@ -27,7 +27,7 @@ impl<F: Message, N: Notification> ActorContext<F, N> {
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     pub async fn get_actor<M: Message>(&self, id: &str) -> Option<GetActorReturn<F, M>> {
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.id.to_string(), "Retrieving a handle to {} from an actor context", id);
 
         #[cfg(not(feature = "foreign"))]
@@ -37,7 +37,7 @@ impl<F: Message, N: Notification> ActorContext<F, N> {
 
         // If the the id matches the actor's own path, then return None
         if Some(&new_id) == Some(&self.id) {
-            #[cfg(feature = "tracing")]
+            #[cfg(all(feature = "tracing", debug_assertions))]
             event!(Level::TRACE, actor=self.id.to_string(), "Actor attempted to retrieve its own handle.");
 
             None

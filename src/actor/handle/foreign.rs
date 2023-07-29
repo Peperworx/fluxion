@@ -45,7 +45,7 @@ impl<F: Message, N: Notification> ForeignMessenger for ForeignHandle<F, N> {
         message: ForeignMessage<Self::Federated>,
     ) -> Result<(), ActorError> {
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.path.to_string(), "Sending a raw foreign message via a ForeignHandle");
 
         self.foreign
@@ -71,7 +71,7 @@ impl<F: Message, M: Message, N: Notification> ActorHandle<F, M> for ForeignHandl
     /// Sends a message to the referenced actor and does not wait for a response.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, message)))]
     async fn send(&self, message: M) -> Result<(), ActorError> {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.path.to_string(), "Sending a regular message via a ForeignHandle.");
 
         self.send_message_foreign(message, None, &self.path).await
@@ -80,7 +80,7 @@ impl<F: Message, M: Message, N: Notification> ActorHandle<F, M> for ForeignHandl
     /// Sends a message to the actor and waits for a response.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, message)))]
     async fn request(&self, message: M) -> Result<M::Response, ActorError> {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.path.to_string(), "Sending a request via a ForeignHandle.");
 
         // Create the responder
@@ -90,13 +90,13 @@ impl<F: Message, M: Message, N: Notification> ActorHandle<F, M> for ForeignHandl
         self.send_message_foreign(message, Some(responder), &self.path)
             .await?;
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.path.to_string(), "Sending a request via a ForeignHandle.");
 
         // Await a response
         let res = reciever.await;
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.path.to_string(), "ForeignHandle recieved response.");
 
         // Return the result with the error converted
@@ -107,7 +107,7 @@ impl<F: Message, M: Message, N: Notification> ActorHandle<F, M> for ForeignHandl
     #[cfg(feature = "federated")]
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, message)))]
     async fn send_federated(&self, message: F) -> Result<(), ActorError> {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.path.to_string(), "Sending a federated message via a ForeignHandle.");
 
         self.send_federated_foreign(message, None, &self.path).await
@@ -117,7 +117,7 @@ impl<F: Message, M: Message, N: Notification> ActorHandle<F, M> for ForeignHandl
     #[cfg(feature = "federated")]
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, message)))]
     async fn request_federated(&self, message: F) -> Result<F::Response, ActorError> {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.path.to_string(), "Sending a federated request via a ForeignHandle.");
 
         // Create the responder
@@ -127,13 +127,13 @@ impl<F: Message, M: Message, N: Notification> ActorHandle<F, M> for ForeignHandl
         self.send_federated_foreign(message, Some(responder), &self.path)
             .await?;
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.path.to_string(), "ForeignHandle awaiting response for foreign request.");
 
         // Await a response
         let res = reciever.await;
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.path.to_string(), "ForeignHandle recieved response to foreign request.");
 
         // Return the result with the error converted

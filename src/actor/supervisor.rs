@@ -79,13 +79,13 @@ where
         error_policy: SupervisorErrorPolicy,
     ) -> (ActorSupervisor<A, F, N, M>, LocalHandle<F, M>) {
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=system.get_id(), actor=id.to_string(), "Creating new actor supervisor.");
 
         // Create a new message channel
         let (message_sender, message) = mpsc::channel(64);
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=system.get_id(), actor=id.to_string(), "Created supervisor message channel.");
 
         // Subscribe to the notification broadcaster
@@ -93,13 +93,13 @@ where
         let notify = system.subscribe_notify();
 
         #[cfg(feature = "notifications")]
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=system.get_id(), actor=id.to_string(), "Created supervisor notification channel.");
 
         // Subscribe to the shutdown reciever
         let shutdown = system.subscribe_shutdown();
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=system.get_id(), actor=id.to_string(), "Created supervisor shutdown channel.");
 
         // Create the supervisor
@@ -121,7 +121,7 @@ where
             id,
         };
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, system=system.get_id(), actor=supervisor.id.to_string(), "Created supervisor and actor handle.");
 
         // Return both
@@ -158,7 +158,7 @@ where
             return Ok(());
         };
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, supervisor=self.id.to_string(), "Handling notification.");
 
         // Call the handler, handling error policy
@@ -176,7 +176,7 @@ where
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, system)))]
     pub async fn run(&mut self, system: System<F, N>) -> Result<(), ActorError> {
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::DEBUG, supervisor=self.id.to_string(), "Running actor supervisor.");
 
         // Create a new actor context for this actor to use
@@ -185,7 +185,7 @@ where
             system,
         };
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::DEBUG, supervisor=self.id.to_string(), "Initializing actor.");
 
         // Initialize the actor, following error policy.
@@ -199,7 +199,9 @@ where
 
         #[cfg(feature = "tracing")]
         match err {
-            Ok(_) => event!(Level::TRACE, supervisor=self.id.to_string(), "Sucessfully initialized actor."),
+            Ok(_) => if cfg!(debug_assertions) {
+                 event!(Level::TRACE, supervisor=self.id.to_string(), "Sucessfully initialized actor.")
+            } else { () },
             Err(e) => event!(Level::WARN, supervisor=self.id.to_string(), error=format!("{}", e), "Initializing actor failed, but error policy succeeded."),
         };
 
@@ -209,8 +211,8 @@ where
             tokio::select! {
                 _ = self.shutdown.recv() => {
                     // Just shutdown no matter what happened
-                    #[cfg(feature = "tracing")]
-                    event!(Level::INFO, supervisor=self.id.to_string(), "Actor recieved shutdown signal. Exiting main loop.");
+                    #[cfg(all(feature = "tracing", debug_assertions))]
+                    event!(Level::DEBUG, supervisor=self.id.to_string(), "Actor recieved shutdown signal. Exiting main loop.");
                     break;
                 },
                 
@@ -233,7 +235,7 @@ where
                             N, broadcast::error::RecvError).await
                     }
                 } => {
-                    #[cfg(feature = "tracing")]
+                    #[cfg(all(feature = "tracing", debug_assertions))]
                     event!(Level::DEBUG, supervisor=self.id.to_string(), "Handling a notification.");
 
                     // Prevent a warning
@@ -304,7 +306,7 @@ where
                     #[cfg(feature = "federated")]
                     match message_type {
                         MessageType::Federated(m) => {
-                            #[cfg(feature = "tracing")]
+                            #[cfg(all(feature = "tracing", debug_assertions))]
                             event!(Level::DEBUG, supervisor=self.id.to_string(), "Handling a federated message.");
 
                             let res = handle_policy!(
@@ -348,14 +350,14 @@ where
 
                             // If we need to respond, do so
                             if let Some(responder) = responder {
-                                #[cfg(feature = "tracing")]
+                                #[cfg(all(feature = "tracing", debug_assertions))]
                                 event!(Level::DEBUG, supervisor=self.id.to_string(), "Sending response to federated message");
                                 // This is a oneshot, so ignore if error
                                 let _ = responder.send(res);
                             }
                         },
                         MessageType::Message(m) => {
-                            #[cfg(feature = "tracing")]
+                            #[cfg(all(feature = "tracing", debug_assertions))]
                             event!(Level::DEBUG, supervisor=self.id.to_string(), "Handling a message.");
 
                             let res = handle_policy!(
@@ -402,7 +404,7 @@ where
 
                             #[cfg(not(feature = "foreign"))]
                             if let LocalMessage::Message(_, Some(responder)) = message {
-                                #[cfg(feature = "tracing")]
+                                #[cfg(all(feature = "tracing", debug_assertions))]
                                 event!(Level::DEBUG, supervisor=self.id.to_string(), "Sending response to message");
                                 // Just send the response, ignoring the error
                                 let _ = responder.send(res);
@@ -413,7 +415,7 @@ where
                     // Do the same thing if federated messages are not enabled.
                     #[cfg(not(feature = "federated"))]
                     {   
-                        #[cfg(feature = "tracing")]
+                        #[cfg(all(feature = "tracing", debug_assertions))]
                         event!(Level::DEBUG, supervisor=self.id.to_string(), "Handling a message.");
                         
                         let res = handle_policy!(
@@ -445,21 +447,21 @@ where
                         match message {
                             #[cfg(not(feature = "federated"))]
                             DualMessage::LocalMessage(LocalMessage(_, Some(responder), _)) => {
-                                #[cfg(feature = "tracing")]
+                                #[cfg(all(feature = "tracing", debug_assertions))]
                                 event!(Level::DEBUG, supervisor=self.id.to_string(), "Sending response to message");
                                 // Just send the response, ignoring the error
                                 let _ = responder.send(res);
                             },
                             #[cfg(feature = "federated")]
                             DualMessage::LocalMessage(LocalMessage::Message(_, Some(responder))) => {
-                                #[cfg(feature = "tracing")]
+                                #[cfg(all(feature = "tracing", debug_assertions))]
                                 event!(Level::DEBUG, supervisor=self.id.to_string(), "Sending response to message");
                                 // Just send the response, ignoring the error
                                 let _ = responder.send(res);
                             },
                             #[cfg(feature = "federated")]
                             DualMessage::ForeignMessage(ForeignMessage::Message(_, Some(responder), _)) => {
-                                #[cfg(feature = "tracing")]
+                                #[cfg(all(feature = "tracing", debug_assertions))]
                                 event!(Level::DEBUG, supervisor=self.id.to_string(), "Sending response to message");
                                 // Box and send the response
                                 #[cfg(not(feature="bincode"))]
@@ -470,7 +472,7 @@ where
                             },
                             #[cfg(not(feature = "federated"))]
                             DualMessage::ForeignMessage(ForeignMessage { responder: Some(responder), .. }) => {
-                                #[cfg(feature = "tracing")]
+                                #[cfg(all(feature = "tracing", debug_assertions))]
                                 event!(Level::DEBUG, supervisor=self.id.to_string(), "Sending response to message");
                                 // Box and send the response
                                 #[cfg(not(feature="bincode"))]
@@ -484,7 +486,7 @@ where
     
                         #[cfg(not(feature = "foreign"))]
                         if let Some(responder) = message.1 {
-                            #[cfg(feature = "tracing")]
+                            #[cfg(all(feature = "tracing", debug_assertions))]
                                 event!(Level::DEBUG, supervisor=self.id.to_string(), "Sending response to message");
                             // Just send the response, ignoring the error
                             let _ = responder.send(res);
@@ -494,7 +496,7 @@ where
             }
         }
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::DEBUG, supervisor=self.id.to_string(), "Deinitializing actor.");
 
         // Deinitialize the actor, following error policy
@@ -509,7 +511,9 @@ where
 
         #[cfg(feature = "tracing")]
         match err {
-            Ok(_) => event!(Level::TRACE, supervisor=self.id.to_string(), "Sucessfully deinitialized actor."),
+            Ok(_) => if cfg!(debug_assertions) {
+                event!(Level::TRACE, supervisor=self.id.to_string(), "Sucessfully deinitialized actor.")
+           } else { () },
             Err(e) => event!(Level::WARN, supervisor=self.id.to_string(), error=format!("{}", e), "Denitializing actor failed, but error policy succeeded."),
         };
 
@@ -520,13 +524,13 @@ where
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
     pub async fn cleanup(&mut self) -> Result<(), ActorError> {
         
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::DEBUG, supervisor=self.id.to_string(), "Cleaning up actor");
         
         // Close the message channel
         self.message.close();
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, supervisor=self.id.to_string(), "Closed message channel.");
 
         // Cleanup the actor, following error policy

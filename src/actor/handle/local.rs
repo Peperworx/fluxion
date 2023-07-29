@@ -59,7 +59,7 @@ where
         #[cfg(feature = "foreign")]
         let message = DualMessage::LocalMessage(message);
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.id.to_string(), "Sending a raw local message via a LocalHandle");
 
         self.message_sender
@@ -88,7 +88,7 @@ where
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, message)))]
     async fn send(&self, message: M) -> Result<(), ActorError> {
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.id.to_string(), "Sending a regular message via a LocalHandle.");
 
         #[cfg(feature="federated")]
@@ -104,7 +104,7 @@ where
     /// Sends a message to the actor and waits for a response.
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, message)))]
     async fn request(&self, message: M) -> Result<M::Response, ActorError> {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.id.to_string(), "Sending a request via a LocalHandle.");
 
         // Create the responder
@@ -118,13 +118,13 @@ where
         self.send_raw_message(LocalMessage::<F, M>(message, Some(responder), PhantomData::default()))
             .await?;
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.id.to_string(), "Sending a request via a LocalHandle.");
 
         // Await a response
         let res = reciever.await;
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.id.to_string(), "LocalHandle recieved response.");
 
         // Return the result with the error converted
@@ -135,7 +135,7 @@ where
     #[cfg(feature="federated")]
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, message)))]
     async fn send_federated(&self, message: F) -> Result<(), ActorError> {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.id.to_string(), "Sending a federated message via a LocalHandle.");
 
         self.send_raw_message(LocalMessage::<F, M>::Federated(message, None))
@@ -146,7 +146,7 @@ where
     #[cfg(feature="federated")]
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, message)))]
     async fn request_federated(&self, message: F) -> Result<F::Response, ActorError> {
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.id.to_string(), "Sending a federated request via a LocalHandle.");
         
         // Create the responder
@@ -156,13 +156,13 @@ where
         self.send_raw_message(LocalMessage::<F, M>::Federated(message, Some(responder)))
             .await?;
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.id.to_string(), "LocalHandle awaiting response for foreign request.");
 
         // Await a response
         let res = reciever.await;
 
-        #[cfg(feature = "tracing")]
+        #[cfg(all(feature = "tracing", debug_assertions))]
         event!(Level::TRACE, actor=self.id.to_string(), "LocalHandle recieved response to foreign request.");
 
         // Return the result with the error converted
