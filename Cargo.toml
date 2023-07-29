@@ -6,7 +6,7 @@ repository = "https://github.com/peperworx/fluxion"
 categories = ["concurrency"]
 keywords = ["actor", "distributed", "async", "fluxion"]
 readme = "README.md"
-version = "0.5.1"
+version = "0.6.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -21,7 +21,7 @@ tracing = { version = "0.1.37", optional = true }
 tracing-subscriber = "0.3.17"
 
 [features]
-default = ["full"]
+default = ["foreign", "notifications", "federated", "bincode"]
 full = ["foreign", "notifications", "federated", "bincode", "tracing"]
 # Enables serde support for messages
 serde = ["dep:serde"]
