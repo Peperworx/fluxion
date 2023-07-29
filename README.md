@@ -16,23 +16,15 @@ Fluxion implements three different methods of communication:
 Fluxion allows an external task to subscribe to an mpsc channel over which messages bound to Foreign actors are sent. This external task can then relay them as it sees fit. See the example `foreign` for more details.
 
 ## Usage
-
-In Fluxion, there are multiple ways to create a system. This depends on if you want to use Federated Messages and/or Notifications. In the future this will be behind a feature flag, but for now a placeholder type that is automatically implemented is used. Creating a system in Fluxion is simple:
+Creating a system in Fluxion is simple:
 ```rust
 // Create a system that uses both federated messages and notifications
 let system = fluxion::system::new::<FederatedMessage, Notification>("id");
 
-// Notifications only
-let system = fluxion::system::new_notifications::<Notification>("id");
-
-// Federated messages only
-let system = fluxion::system::new_federated::<FederatedMessage>("id");
-
-// Neither
-let system = fluxion::system::new_none("id");
+// Specific generics will be disabled depending on the feature flags used.
 ```
 ### Defining Notifications, Messages, and Federated Messages
-Defining Notifications is even easier. You don't have too. The `Notification` trait is automatically implemented for any type which is `Clone + Send + Sync + 'static`. Derive `Clone` and you are good to go. Both Messages and Federated Messages are defined using the `Message` trait, and can be any type as long as they implement `Any + Clone + Send + Sync + 'static`. They require a response, but if you don't need to send any, `()` can be used.
+Both Messages and Federated Messages are defined using the `Message` trait, and can be any type as long as they implement `Any + Clone + Send + Sync + 'static`. They require a response, but if you don't need to send any, `()` can be used. Defining Notifications is even easier. You don't have too. The `Notification` trait is automatically implemented for any type which is `Clone + Send + Sync + 'static`. Derive `Clone` and you are good to go. 
 ```rust
 /// A test message
 #[derive(Clone)]

@@ -34,7 +34,7 @@ pub(crate) type MT<F, M> = LocalMessage<F, M>;
 
 /// # Message
 /// The [`Message`] trait should be implemented for any message, including Messages, and Federated Messages.
-/// Both [`Message`] and [`Message::Response`] require messages to be [`Any`] + [`Clone`] + [`Send`] + [`Sync`] + `'static`.
+/// Both [`Message`] and [`Message::Response`] require messages to be [`Any`] ~ [`Debug`] + [`Clone`] + [`Send`] + [`Sync`] + `'static`.
 /// Why require Any? Sometimes messages may be passed around as a `dyn Any` (as is the case with foreign channels).
 #[cfg(not(feature="serde"))]
 pub trait Message: Any + Clone + Send + Sync + 'static {
@@ -144,7 +144,7 @@ impl<F: Message, M: Message> AsMessageType<F, M> for DualMessage<F, M> {
 
 /// # DefaultFederated
 /// The default federated message used by a system
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DefaultFederated;
 
@@ -154,6 +154,6 @@ impl Message for DefaultFederated {
 
 /// # DefaultNotification
 /// The default notification used by a system
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DefaultNotification;

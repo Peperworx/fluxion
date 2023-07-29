@@ -7,6 +7,9 @@ use fluxion::{
 };
 use serde::{Serialize, Deserialize};
 
+#[cfg(feature = "tracing")]
+use tracing::Level;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct TestMessage;
 
@@ -20,6 +23,7 @@ struct TestFederated;
 impl Message for TestFederated {
     type Response = ();
 }
+
 
 struct TestActor;
 
@@ -96,6 +100,16 @@ impl HandleFederated<TestFederated> for TestActor {
 
 #[tokio::main]
 async fn main() {
+    #[cfg(feature = "tracing")]
+    let collector = tracing_subscriber::fmt()
+        // filter spans/events with level TRACE or higher.
+        .with_max_level(Level::TRACE)
+        // build but do not install the subscriber.
+        .finish();
+
+    #[cfg(feature = "tracing")]
+    tracing::subscriber::set_global_default(collector).unwrap();
+
     let host = system::new::<TestFederated, ()>("host");
     let other = system::new::<TestFederated, ()>("other");
 
