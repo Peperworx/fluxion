@@ -14,7 +14,7 @@ use crate::{
 
 use super::ActorHandle;
 
-#[cfg(feature = "tracing")]
+#[cfg(all(feature = "tracing", debug_assertions))]
 use tracing::{event, Level};
 
 /// # ForeignHandle

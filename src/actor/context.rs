@@ -5,7 +5,7 @@ use crate::{
     system::{System, GetActorReturn},
 };
 
-#[cfg(feature = "tracing")]
+#[cfg(all(feature = "tracing", debug_assertions))]
 use tracing::{event, Level};
 
 use super::ActorID;

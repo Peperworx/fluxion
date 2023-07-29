@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 
 use tokio::sync::{mpsc, oneshot};
 
-#[cfg(feature = "tracing")]
+#[cfg(all(feature = "tracing", debug_assertions))]
 use tracing::{event, Level};
 
 use crate::{
