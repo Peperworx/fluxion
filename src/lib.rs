@@ -38,11 +38,30 @@ pub mod system;
 pub mod error;
 
 pub use actor::{
-    Actor, context::ActorContext,
+    Actor,
     handle::ActorHandle,
     ActorID,
     supervisor::SupervisorErrorPolicy
 };
+
+#[cfg(not(feature = "foreign"))]
+use crate::message::DefaultFederated;
+
+#[cfg(not(feature="notifications"))]
+use crate::message::DefaultNotification;
+
+/// # ActorContext
+/// [`ActorContext`] provides methods to allow an actor to interact with its [`System`] and other actors.
+/// This is done instead of providing a [`System`] reference directly to disallow actors from calling notifications and calling into themselves, which
+/// can cause infinite loops.
+#[cfg(all(feature = "notifications", feature = "foreign"))]
+pub type ActorContext<F, N> = actor::context::ActorContext<F, N>;
+#[cfg(all(feature = "notifications", not(feature = "foreign")))]
+pub type ActorContext<N> = actor::context::ActorContext<DefaultFederated, N>;
+#[cfg(all(not(feature = "notifications"), feature = "foreign"))]
+pub type ActorContext<F> = actor::context::ActorContext<F, DefaultNotification>;
+#[cfg(all(not(feature = "notifications"), not(feature = "foreign")))]
+pub type ActorContext = actor::context::ActorContext<DefaultFederated, DefaultNotification>;
 
 pub use message::{
     Message, Notification,
