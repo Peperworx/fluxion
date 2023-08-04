@@ -29,13 +29,10 @@ struct TestActor;
 
 #[async_trait::async_trait]
 impl Actor for TestActor {
-
-    type Context = ActorContext<TestFederated, ()>;
-
     /// Called upon actor initialization, when the supervisor begins to run.
-    async fn initialize(
+    async fn initialize<F: Message, N: Notification>(
         &mut self,
-        _context: &mut Self::Context,
+        _context: &mut ActorContext<F, N>,
     ) -> Result<(), ActorError> {
         println!("initialize");
         Ok(())
@@ -44,9 +41,9 @@ impl Actor for TestActor {
     /// Called upon actor deinitialization, when the supervisor stops.
     /// Note that this will not be called if the initialize function fails.
     /// For handling cases of initialization failure, use [`Actor::cleanup`]
-    async fn deinitialize(
+    async fn deinitialize<F: Message, N: Notification>(
         &mut self,
-        _context: &mut Self::Context,
+        _context: &mut ActorContext<F, N>,
     ) -> Result<(), ActorError> {
         println!("deinitialize");
         Ok(())
@@ -103,7 +100,6 @@ impl HandleFederated<TestFederated> for TestActor {
 
 #[tokio::main]
 async fn main() {
-
     #[cfg(feature = "tracing")]
     let collector = tracing_subscriber::fmt()
         // filter spans/events with level TRACE or higher.

@@ -131,7 +131,7 @@ where
 
 impl<A, F, N, M> ActorSupervisor<A, F, N, M>
 where
-    A: Actor<Context = ActorContext<F, N>> + HandleNotification<N> + HandleFederated<F> + HandleMessage<M>,
+    A: Actor + HandleNotification<N> + HandleFederated<F> + HandleMessage<M>,
     F: Message,
     N: Notification,
     M: Message,
