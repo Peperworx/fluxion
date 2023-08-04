@@ -21,7 +21,7 @@ use crate::{
     message::{
         handler::{HandleFederated, HandleMessage, HandleNotification},
         Message, Notification
-    },
+    }, actor::context::ActorContext,
 };
 
 #[cfg(feature="foreign")]
@@ -363,7 +363,7 @@ where
     /// Adds an actor to the system
     #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, actor, error_policy)))]
     pub async fn add_actor<
-        A: Actor + HandleNotification<N> + HandleFederated<F> + HandleMessage<M>,
+        A: Actor<Context = ActorContext<F, N>> + HandleNotification<N> + HandleFederated<F> + HandleMessage<M>,
         M: Message,
     >(
         &self,
