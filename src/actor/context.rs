@@ -14,6 +14,7 @@ use super::ActorID;
 /// [`ActorContext`] provides methods to allow an actor to interact with its [`System`] and other actors.
 /// This is done instead of providing a [`System`] reference directly to disallow actors from calling notifications and calling into themselves, which
 /// can cause infinite loops.
+#[derive(Clone)]
 pub struct ActorContext<F: Message, N: Notification> {
     /// The actor's id
     pub(crate) id: ActorID,
