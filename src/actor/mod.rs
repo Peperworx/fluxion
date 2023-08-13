@@ -1,72 +1,55 @@
-//! Contains the implementation of actors and surrounding types.
+//! # Actor
+//! Fluxion's core unit is an Actor. Each Actor MUST implement the [`Actor`] trait, and MAY implement traits for handling different message types.
+//! If federated messages are enabled, the actor MUST implement a trait to handle federated messages.
+//! If notifications are enabled, the actor MAY implement a trait to handle notifications.
 
-use std::any::Any;
-
-use crate::{
-    error::ActorError,
-    message::{Message, Notification},
-};
-
-#[cfg(feature = "foreign")]
-use crate::message::foreign::ForeignReceiver;
-
-use self::context::ActorContext;
-
-/// Contains the context that is passed to the actor which allows it to interact with the system
-pub mod context;
-
-/// Contains implementation of [`crate::actor::path::ActorPath`], which provides utilities for working with actor identifiers.
-#[cfg(feature = "foreign")]
-pub mod path;
-
-/// Contains [`crate::actor::handle::ActorHandle`], a struct that is used for interacting with Actors, and other supporting types.
-pub mod handle;
-
-/// Contains [`crate::actor::supervisor::ActorSupervisor`], a struct containing a task that handles an actor's lifecycle.
-pub mod supervisor;
-
-/// # Actor ID
-/// Aliased to ActorPath when foreign actors are enabled. Otherwise, it is just a String.
-#[cfg(feature = "foreign")]
-pub type ActorID = path::ActorPath;
-#[cfg(not(feature = "foreign"))]
-pub type ActorID = String;
+pub struct ActorContext;
 
 /// # Actor
-/// The core [`Actor`] trait must be implemented for every actor.
-/// This trait requires that any implementor be [`Send`] + [`Sync`] + `'static`,
-/// and uses the `async_trait` crate to allow async functions to be contained,
-/// but this will be replaced as soon as async functions in traits are stabilized.
+/// This trait must be implemented for all Actors. It contains three functions, [`Actor::initialize`], [`Actor::deinitialize`], and [`Actor::cleanup`].
+/// Each have a default implementation which does nothing.
+/// 
+/// ## Initialization
+/// When an Actor is added to a system, a separate management, or "supervisor" task is started which oversees the Actor's lifetime.
+/// When this supervisor task is started, [`Actor::initialize`] is immediately called. If successful, the supervisor begins the Actor's
+/// main loop. Upon failure, the supervisor immediately skips to the cleanup phase.
+/// 
+/// ## Deinitialization
+/// If the actor's main loop exits, either gracefully or by an error, [`Actor::deinitialize`] is called. Reguardless of if this function
+/// fails or not, the actor skips to the cleanup phase.
+/// 
+/// ## Cleanup
+/// After the supervisor task exits, [`Actor::cleanup`] is called. In place of the ActorContext, an `Option<Self::Error>` is provided, containing None
+/// if the supervisor exited gracefully, or `Some(error)` if the supervisor task failed with an error. This function is always called.
+/// If [`Actor::cleanup`] returns an error, the error is simply logged if tracing is enabled.
+/// 
+/// ## Async
+/// 
+/// This trait uses `async_trait`. Once async functions in traits are stablized, this dependency will be removed.
 #[async_trait::async_trait]
-pub trait Actor: Send + Sync + 'static {
-    /// Called upon actor initialization, when the supervisor begins to run.
-    async fn initialize<F: Message, N: Notification>(
-        &mut self,
-        context: &mut ActorContext<F, N>,
-    ) -> Result<(), ActorError>;
+pub trait Actor {
 
-    /// Called upon actor deinitialization, when the supervisor stops.
-    /// Note that this will not be called if the initialize function fails.
-    /// For handling cases of initialization failure, use [`Actor::cleanup`]
-    async fn deinitialize<F: Message, N: Notification>(
-        &mut self,
-        context: &mut ActorContext<F, N>,
-    ) -> Result<(), ActorError>;
+    /// The error type returned by the actor
+    type Error;
 
-    /// Called when the actor supervisor is killed, either as the result of a graceful shutdown
-    /// or if initialization fails.
-    async fn cleanup(&mut self) -> Result<(), ActorError>;
+    /// The function run upon actor initialization
+    fn initialize(&mut self, _context: ActorContext) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    /// The function run upon actor deinitialization
+    fn deinitialize(&mut self, _context: ActorContext) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    /// The function run upon actor cleanup
+    fn cleanup(&mut self, _error: Option<Self::Error>) -> Result<(), Self::Error> {
+        Ok(())
+    }
 }
 
-/// # ActorEntry
-/// This trait is used for actor entries in the hashmap, and is automatically implemented for any
-/// types that meet its bounds
-#[cfg(feature = "foreign")] 
-pub(crate) trait ActorEntry: Any + ForeignReceiver {
-    fn as_any(&self) -> &dyn Any;
-}
+/// # Handler
+/// Actors MAY implement this trait to handle messages. 
+pub trait Handler<M> {
 
-#[cfg(not(feature = "foreign"))] 
-pub(crate) trait ActorEntry: Any{
-    fn as_any(&self) -> &dyn Any;
 }
