@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 
 use tokio::sync::{mpsc, oneshot};
 
-#[cfg(all(feature = "tracing", any(feature = "release_tracing", debug_assertions)))]
+#[cfg(release_tracing)]
 use tracing::Level;
 use crate::event;
 
@@ -55,7 +55,7 @@ where
     M: Message,
 {
     /// Sends a raw message to the actor
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, message)))]
+    #[cfg_attr(tracing, tracing::instrument(skip(self, message)))]
     async fn send_raw_message(&self, message: LocalMessage<F, M>) -> Result<(), ActorError> {
         #[cfg(feature = "foreign")]
         let message = DualMessage::LocalMessage(message);
@@ -86,7 +86,7 @@ where
     }
 
     /// Sends a message to the referenced actor and does not wait for a response.
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, message)))]
+    #[cfg_attr(tracing, tracing::instrument(skip(self, message)))]
     async fn send(&self, message: M) -> Result<(), ActorError> {
 
         
@@ -103,7 +103,7 @@ where
     }
 
     /// Sends a message to the actor and waits for a response.
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, message)))]
+    #[cfg_attr(tracing, tracing::instrument(skip(self, message)))]
     async fn request(&self, message: M) -> Result<M::Response, ActorError> {
         
         event!(Level::TRACE, actor=self.id.to_string(), "Sending a request via a LocalHandle.");
@@ -134,7 +134,7 @@ where
 
     /// Sends a federated message to the referenced actor and does not wait for a response.
     #[cfg(feature="federated")]
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, message)))]
+    #[cfg_attr(tracing, tracing::instrument(skip(self, message)))]
     async fn send_federated(&self, message: F) -> Result<(), ActorError> {
         
         event!(Level::TRACE, actor=self.id.to_string(), "Sending a federated message via a LocalHandle.");
@@ -145,7 +145,7 @@ where
 
     /// Sends a federated message to the referenced actor and waits for a response.
     #[cfg(feature="federated")]
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, message)))]
+    #[cfg_attr(tracing, tracing::instrument(skip(self, message)))]
     async fn request_federated(&self, message: F) -> Result<F::Response, ActorError> {
         
         event!(Level::TRACE, actor=self.id.to_string(), "Sending a federated request via a LocalHandle.");

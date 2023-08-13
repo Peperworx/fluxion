@@ -3,7 +3,7 @@
 
 use tokio::sync::{broadcast, mpsc};
 
-#[cfg(feature = "tracing")]
+#[cfg(tracing)]
 use tracing::Level;
 use crate::event;
 
@@ -72,7 +72,7 @@ where
 
     /// Creates a new supervisor with the given actor and actor id.
     /// Returns the new supervisor alongside the handle that holds the message sender.
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(actor, system, error_policy)))]
+    #[cfg_attr(tracing, tracing::instrument(skip(actor, system, error_policy)))]
     pub fn new(
         actor: A,
         id: ActorID,
@@ -141,11 +141,11 @@ where
     /// Handles a notification.
     /// If notifications are not enabled, this will return immediately.
     #[cfg(feature = "notifications")]
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, context, notification)))]
+    #[cfg_attr(tracing, tracing::instrument(skip(self, context, notification)))]
     async fn handle_notification(&mut self, context: &mut ActorContext<F, N>, notification: Result<Result<N, broadcast::error::RecvError>, broadcast::error::RecvError> ) -> Result<(), ActorError> {
         // If the policy failed, then exit the loop
         let Ok(notification) = notification else {
-            #[cfg(feature = "tracing")]
+            #[cfg(tracing)]
             event!(Level::ERROR, supervisor=self.id.to_string(), "Error policy failed when handling notification on supervisor.");
 
             return Err(ActorError::NotificationError);
@@ -153,7 +153,7 @@ where
 
         // If the policy succeeded, but we failed to recieve, then continue. Otherwise handle it.
         let Ok(notification) = notification else {
-            #[cfg(feature = "tracing")]
+            #[cfg(tracing)]
             event!(Level::WARN, supervisor=self.id.to_string(), "Error policy succeeded, but we failed to recieve notification.");
 
             return Ok(());
@@ -174,7 +174,7 @@ where
     
 
     /// Runs the actor, only returning an error after all error policy options have been exhausted.
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self, system)))]
+    #[cfg_attr(tracing, tracing::instrument(skip(self, system)))]
     pub async fn run(&mut self, system: System<F, N>) -> Result<(), ActorError> {
 
         
@@ -198,7 +198,7 @@ where
         )
         .await?;
 
-        #[cfg(feature = "tracing")]
+        #[cfg(tracing)]
         match _err {
             Ok(_) => {
                 event!(Level::TRACE, supervisor=self.id.to_string(), "Sucessfully deinitialized actor.");
@@ -251,7 +251,7 @@ where
 
                     #[cfg(feature = "notifications")]
                     if res.is_err() {
-                        #[cfg(feature = "tracing")]
+                        #[cfg(tracing)]
                         event!(Level::ERROR, supervisor=self.id.to_string(), "Actor failed to handle notification.");
 
                         break;
@@ -265,7 +265,7 @@ where
 
                     // If the policy failed, then exit the loop
                     let Ok(message) = message else {
-                        #[cfg(feature = "tracing")]
+                        #[cfg(tracing)]
                         if let Err(e) = message {
                             event!(Level::ERROR, supervisor=self.id.to_string(), error=format!("{}", e), "Actor failed to recieve message, error policy failed");
                         }
@@ -274,7 +274,7 @@ where
 
                     // If the policy succeeded, but we failed to recieve, then continue. Otherwise handle it.
                     let Ok(message) = message else {
-                        #[cfg(feature = "tracing")]
+                        #[cfg(tracing)]
                         if let Err(e) = message {
                             event!(Level::WARN, supervisor=self.id.to_string(), error=format!("{}", e), "Actor failed to recieve message, but the error policy succeeded");
                         }
@@ -289,7 +289,7 @@ where
 
                     // If the policy failed, exit
                     let Ok(message_type) = message_type else {
-                        #[cfg(feature = "tracing")]
+                        #[cfg(tracing)]
                         if let Err(e) = message_type {
                             event!(Level::ERROR, supervisor=self.id.to_string(), error=format!("{}", e), "Actor failed to convert message to proper type, error policy failed");
                         }
@@ -298,7 +298,7 @@ where
 
                     // If the policy succeeded, but we failed to recieve, then continue.
                     let Ok(message_type) = message_type else {
-                        #[cfg(feature = "tracing")]
+                        #[cfg(tracing)]
                         if let Err(e) = message_type {
                             event!(Level::WARN, supervisor=self.id.to_string(), error=format!("{}", e), "Actor failed to convert message to proper type, but the error policy succeeded");
                         }
@@ -319,7 +319,7 @@ where
 
                             // If the policy failed, exit
                             let Ok(res) = res else {
-                                #[cfg(feature = "tracing")]
+                                #[cfg(tracing)]
                                 if let Err(e) = res {
                                     event!(Level::ERROR, supervisor=self.id.to_string(), error=format!("{}", e), "Actor failed to handle federated message, error policy failed");
                                 }
@@ -328,7 +328,7 @@ where
 
                             // If the policy succeeded, but we failed to recieve, then continue.
                             let Ok(res) = res else {
-                                #[cfg(feature = "tracing")]
+                                #[cfg(tracing)]
                                 if let Err(e) = res {
                                     event!(Level::WARN, supervisor=self.id.to_string(), error=format!("{}", e), "Actor failed to handle federated message, but the error policy succeeded");
                                 }
@@ -370,7 +370,7 @@ where
 
                             // If the policy failed, exit
                             let Ok(res) = res else {
-                                #[cfg(feature = "tracing")]
+                                #[cfg(tracing)]
                                 if let Err(e) = res {
                                     event!(Level::ERROR, supervisor=self.id.to_string(), error=format!("{}", e), "Actor failed to handle message, error policy failed");
                                 }
@@ -379,7 +379,7 @@ where
 
                             // If the policy succeeded, but we failed to recieve, then continue.
                             let Ok(res) = res else {
-                                #[cfg(feature = "tracing")]
+                                #[cfg(tracing)]
                                 if let Err(e) = res {
                                     event!(Level::WARN, supervisor=self.id.to_string(), error=format!("{}", e), "Actor failed to handle message, but the error policy succeeded");
                                 }
@@ -428,7 +428,7 @@ where
     
                         // If the policy failed, exit
                         let Ok(res) = res else {
-                            #[cfg(feature = "tracing")]
+                            #[cfg(tracing)]
                             if let Err(e) = res {
                                 event!(Level::ERROR, supervisor=self.id.to_string(), error=format!("{}", e), "Actor failed to handle message, error policy failed");
                             }
@@ -437,7 +437,7 @@ where
     
                         // If the policy succeeded, but we failed to recieve, then continue.
                         let Ok(res) = res else {
-                            #[cfg(feature = "tracing")]
+                            #[cfg(tracing)]
                             if let Err(e) = res {
                                 event!(Level::WARN, supervisor=self.id.to_string(), error=format!("{}", e), "Actor failed to handle message, but the error policy succeeded");
                             }
@@ -512,7 +512,7 @@ where
         .await?;
         
 
-        #[cfg(feature = "tracing")]
+        #[cfg(tracing)]
         match _err {
             Ok(_) => {
                 event!(Level::TRACE, supervisor=self.id.to_string(), "Sucessfully deinitialized actor.");
@@ -526,7 +526,7 @@ where
     }
 
     /// Cleans up the actor
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
+    #[cfg_attr(tracing, tracing::instrument(skip(self)))]
     pub async fn cleanup(&mut self) -> Result<(), ActorError> {
         
         
@@ -551,7 +551,7 @@ where
         let res = match res {
             Ok(res) => res,
             Err(e) => {
-                #[cfg(feature = "tracing")]
+                #[cfg(tracing)]
                 event!(Level::ERROR, supervisor=self.id.to_string(), error=format!("{}", e), "Actor failed to cleanup, error policy failed");
 
                 return Err(e);
@@ -560,7 +560,7 @@ where
 
         // If the policy succeeded, but we failed to recieve, then log.
         if let Err(_) = res {
-            #[cfg(feature = "tracing")]
+            #[cfg(tracing)]
             if let Err(e) = res {
                 event!(Level::WARN, supervisor=self.id.to_string(), error=format!("{}", e), "Actor failed to recieve message, but the error policy succeeded");
             }

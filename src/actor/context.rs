@@ -5,7 +5,7 @@ use crate::{
     system::{System, GetActorReturn},
 };
 
-#[cfg(all(feature = "tracing", any(feature = "release_tracing", debug_assertions)))]
+#[cfg(release_tracing)]
 use tracing::Level;
 use crate::event;
 
@@ -26,7 +26,7 @@ pub struct ActorContext<F: Message, N: Notification> {
 impl<F: Message, N: Notification> ActorContext<F, N> {
     /// Retrieves an actor from the system.
     /// Returns [`None`] if the actor does not exist or if an actor tries to retrieve its own handle.
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
+    #[cfg_attr(tracing, tracing::instrument(skip(self)))]
     pub async fn get_actor<M: Message>(&self, id: &str) -> Option<GetActorReturn<F, M>> {
 
         

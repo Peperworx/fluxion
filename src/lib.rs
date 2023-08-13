@@ -38,12 +38,12 @@ pub mod system;
 pub mod error;
 
 // If tracing is enabled, pub use the event macro
-#[cfg(all(feature = "tracing", any(debug_assertions, feature = "release_tracing")))]
+#[cfg(release_tracing)]
 pub(crate) use tracing::event;
 
 // If release tracing is not enabled and debug assertions are off,
 // then we want to ignore Level::TRACE. So lets create a macro to do so.
-#[cfg(all(feature = "tracing", not(debug_assertions), not(feature = "release_tracing")))]
+#[cfg(all(tracing, not(release_tracing)))]
 #[macro_export]
 macro_rules! event {
     (Level::TRACE, $($_:tt)*) => {};
@@ -53,7 +53,7 @@ macro_rules! event {
 }
 
 // Otherwise define a dummy event macro.
-#[cfg(not(feature = "tracing"))]
+#[cfg(not(tracing))]
 #[macro_export]
 macro_rules! event {
     ($($_:tt)*) => {};
