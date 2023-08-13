@@ -37,6 +37,30 @@ pub mod system;
 /// Contains error types for the crate
 pub mod error;
 
+// If tracing is enabled, pub use the event macro
+#[cfg(release_tracing)]
+pub(crate) use tracing::event;
+
+// If release tracing is not enabled and debug assertions are off,
+// then we want to ignore Level::TRACE. So lets create a macro to do so.
+#[cfg(all(tracing, not(release_tracing)))]
+#[macro_export]
+macro_rules! event {
+    (Level::TRACE, $($_:tt)*) => {};
+    ($($x:tt)*) => {
+        tracing::event!($($x)*)
+    };
+}
+
+// Otherwise define a dummy event macro.
+#[cfg(not(tracing))]
+#[macro_export]
+macro_rules! event {
+    ($($_:tt)*) => {};
+}
+
+
+
 pub use actor::{
     Actor, context::ActorContext,
     handle::ActorHandle,

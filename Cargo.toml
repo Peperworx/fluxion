@@ -30,9 +30,13 @@ foreign = []
 notifications = []
 federated = []
 tracing = ["dep:tracing"]
+release_tracing = ["tracing"]
 
 [[example]]
 name = "foreign"
+
+[build-dependencies]
+cfg_aliases = "0.1.1"
 
 [package.metadata.cargo-feature-combinations]
 

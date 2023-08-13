@@ -5,8 +5,9 @@ use crate::{
     system::{System, GetActorReturn},
 };
 
-#[cfg(all(feature = "tracing", debug_assertions))]
-use tracing::{event, Level};
+#[cfg(release_tracing)]
+use tracing::Level;
+use crate::event;
 
 use super::ActorID;
 
@@ -25,10 +26,10 @@ pub struct ActorContext<F: Message, N: Notification> {
 impl<F: Message, N: Notification> ActorContext<F, N> {
     /// Retrieves an actor from the system.
     /// Returns [`None`] if the actor does not exist or if an actor tries to retrieve its own handle.
-    #[cfg_attr(feature = "tracing", tracing::instrument(skip(self)))]
+    #[cfg_attr(tracing, tracing::instrument(skip(self)))]
     pub async fn get_actor<M: Message>(&self, id: &str) -> Option<GetActorReturn<F, M>> {
 
-        #[cfg(all(feature = "tracing", debug_assertions))]
+        
         event!(Level::TRACE, actor=self.id.to_string(), "Retrieving a handle to {} from an actor context", id);
 
         #[cfg(not(feature = "foreign"))]
@@ -38,7 +39,7 @@ impl<F: Message, N: Notification> ActorContext<F, N> {
 
         // If the the id matches the actor's own path, then return None
         if Some(&new_id) == Some(&self.id) {
-            #[cfg(all(feature = "tracing", debug_assertions))]
+            
             event!(Level::TRACE, actor=self.id.to_string(), "Actor attempted to retrieve its own handle.");
 
             None

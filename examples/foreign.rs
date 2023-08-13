@@ -7,7 +7,7 @@ use fluxion::{
 };
 use serde::{Serialize, Deserialize};
 
-#[cfg(feature = "tracing")]
+#[cfg(tracing)]
 use tracing::Level;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -100,14 +100,14 @@ impl HandleFederated<TestFederated> for TestActor {
 
 #[tokio::main]
 async fn main() {
-    #[cfg(feature = "tracing")]
+    #[cfg(tracing)]
     let collector = tracing_subscriber::fmt()
         // filter spans/events with level TRACE or higher.
         .with_max_level(Level::TRACE)
         // build but do not install the subscriber.
         .finish();
 
-    #[cfg(feature = "tracing")]
+    #[cfg(tracing)]
     tracing::subscriber::set_global_default(collector).unwrap();
 
     let host = system::new::<TestFederated, ()>("host");
