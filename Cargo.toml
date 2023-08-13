@@ -30,6 +30,7 @@ foreign = []
 notifications = []
 federated = []
 tracing = ["dep:tracing"]
+release_tracing = ["tracing"]
 
 [[example]]
 name = "foreign"
