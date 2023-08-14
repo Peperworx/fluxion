@@ -1,4 +1,6 @@
-use fluxion::{message::Message, actor::{Actor, Handle, Handled}};
+#![cfg_attr(feature="nightly", feature(async_fn_in_trait))]
+
+use fluxion::{message::Message, actor::{Actor, Handle}};
 
 
 
@@ -21,7 +23,7 @@ struct TestActor;
 impl Actor for TestActor {
     type Error = ();
 }
-#[async_trait::async_trait]
+#[cfg_attr(async_trait, async_trait::async_trait)]
 impl Handle<TestMessage> for TestActor {
     async fn message(&mut self, message: TestMessage) -> Result<(), Self::Error> {
         println!("message 1");
@@ -29,7 +31,7 @@ impl Handle<TestMessage> for TestActor {
     }
 }
 
-#[async_trait::async_trait]
+#[cfg_attr(async_trait, async_trait::async_trait)]
 impl Handle<TestMessage2> for TestActor {
     async fn message(&mut self, message: TestMessage2) -> Result<(), Self::Error> {
         println!("message 2");
@@ -39,18 +41,5 @@ impl Handle<TestMessage2> for TestActor {
 
 #[tokio::main]
 async fn main() {
-    // Create an actor
-    let mut actor = TestActor;
-
-    // Directly send a message to the actor
-    actor.message(TestMessage).await.unwrap();
-
-    // Directly send a different message to the actor
-    actor.message(TestMessage2).await.unwrap();
-
-    // Indirectly send a message to the actor
-    TestMessage.handle(&mut actor).await.unwrap();
-
-    // Indirectly send a different message to the actor
-    TestMessage2.handle(&mut actor).await.unwrap();
+    
 }

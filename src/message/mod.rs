@@ -1,6 +1,11 @@
 //! # Message
 //! The [`Message`] trait encapsulates all Messages that can be sent between actors, including Notifications and Federated Messages.
 
+
+#[cfg(foreign)]
+pub mod foreign;
+
+
 /// # Message
 /// This trait is used to mark Messages. Notifications are just Messages with a response type of `()`.
 /// By default, all Messages and their responses must be [`Send`] + [`Sync`] + [`'static`].

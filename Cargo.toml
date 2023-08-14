@@ -12,9 +12,20 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = "0.1.68"
+async-trait = { version = "0.1.68", optional = true }
+serde = { version = "1.0.183", optional = true }
+thiserror-no-std = "2.0.2"
 tokio = { version = "1.31.0", features = ["full"] }
 
 
 [features]
+default = ["async-trait", "foreign"]
+# Enables async-trait for async functions in traits. If disabled, requires nightly.
+async-trait = ["dep:async-trait"]
+# Enables foreign message support.
+foreign = ["serde"]
+# Enables serde support
+serde = ["dep:serde"]
 
+[build-dependencies]
+cfg_aliases = "0.1.1"
