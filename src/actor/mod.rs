@@ -3,6 +3,16 @@
 //! If federated messages are enabled, the actor MUST implement a trait to handle federated messages.
 //! If notifications are enabled, the actor MAY implement a trait to handle notifications.
 
+use crate::message::Message;
+
+// Use alloc's version of box to enable async traits
+use alloc::boxed::Box;
+
+
+pub mod supervisor;
+
+pub mod wrapper;
+
 pub struct ActorContext;
 
 /// # Actor
@@ -24,32 +34,46 @@ pub struct ActorContext;
 /// If [`Actor::cleanup`] returns an error, the error is simply logged if tracing is enabled.
 /// 
 /// ## Async
-/// 
-/// This trait uses `async_trait`. Once async functions in traits are stablized, this dependency will be removed.
+/// This trait uses [`async_trait`]. Once async functions in traits are stablized, this dependency will be removed.
 #[async_trait::async_trait]
-pub trait Actor {
+pub trait Actor: Send + Sync + 'static {
 
     /// The error type returned by the actor
-    type Error;
+    type Error: Send + Sync + 'static;
 
     /// The function run upon actor initialization
-    fn initialize(&mut self, _context: ActorContext) -> Result<(), Self::Error> {
+    async fn initialize(&mut self, _context: ActorContext) -> Result<(), Self::Error> {
         Ok(())
     }
 
     /// The function run upon actor deinitialization
-    fn deinitialize(&mut self, _context: ActorContext) -> Result<(), Self::Error> {
+    async fn deinitialize(&mut self, _context: ActorContext) -> Result<(), Self::Error> {
         Ok(())
     }
 
     /// The function run upon actor cleanup
-    fn cleanup(&mut self, _error: Option<Self::Error>) -> Result<(), Self::Error> {
+    async fn cleanup(&mut self, _error: Option<Self::Error>) -> Result<(), Self::Error> {
         Ok(())
     }
 }
 
-/// # Handler
-/// Actors MAY implement this trait to handle messages. 
-pub trait Handler<M> {
-
+/// # Handle
+/// Actors MAY implement this trait to handle messages or notifications.
+#[async_trait::async_trait]
+pub trait Handle<M: Message>: Actor {
+    async fn message(&mut self, message: M) -> Result<M::Response, <Self as Actor>::Error>;
 }
+
+/// # Handled
+/// An iternal trait implemented for all [`Message`]s for which an [`Actor`] implements [`Handle`].
+#[async_trait::async_trait]
+pub trait Handled<A: Actor + Handle<Self>>: Message + Sized {
+    async fn handle(self, actor: &mut A) -> Result<Self::Response, A::Error> {
+        actor.message(self).await
+    }
+}
+
+impl<A, M> Handled<A> for M
+    where
+        M: Message,
+        A: Handle<M> {}
