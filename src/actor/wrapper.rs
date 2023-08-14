@@ -22,9 +22,6 @@ pub struct ActorWrapper<A: Actor> {
     actor: A,
     /// The actor's execution context, which contains its reference to the system
     context: ActorContext,
-    #[cfg(foreign)]
-    /// A registry of all [`Handle`] implementations which the user wishes to be available when foreign messages are enabled.
-    registry: BTreeMap<usize, fn(&mut Self, Vec<u8>) -> Result<Vec<u8>, A::Error>>,
 }
 
 impl<A: Actor> ActorWrapper<A> {
@@ -33,17 +30,11 @@ impl<A: Actor> ActorWrapper<A> {
         Self {
             actor,
             context: ActorContext,
-            registry: Default::default(),
         }
     }
-}
-
-
-impl<A: Actor> ActorWrapper<A> {
-    
 
     /// Dispatch a message to the contained actor.
-    async fn dispatch<M: Message>(&mut self, message: M) -> Result<M::Response, FluxionError<A::Error>> where A: Handle<M> {
+    pub async fn dispatch<M: Message>(&mut self, message: M) -> Result<M::Response, FluxionError<A::Error>> where A: Handle<M> {
         self.actor.message(message).await
     }
 }
