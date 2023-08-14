@@ -5,6 +5,9 @@ pub enum FluxionError<E> {
     #[cfg(serde)]
     #[error("error deserializing a foreign message")]
     DeserializeError,
+    #[cfg(serde)]
+    #[error("error serializing a foreign message")]
+    SerializeError,
     #[error("error from actor")]
     ActorError(E),
 }

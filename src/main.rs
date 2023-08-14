@@ -1,7 +1,6 @@
 #![cfg_attr(feature="nightly", feature(async_fn_in_trait))]
 
-use fluxion::{message::Message, actor::{Actor, Handle}};
-
+use fluxion::{message::Message, actor::{Actor, Handle}, error::FluxionError};
 
 
 struct TestMessage;
@@ -25,7 +24,7 @@ impl Actor for TestActor {
 }
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl Handle<TestMessage> for TestActor {
-    async fn message(&mut self, message: TestMessage) -> Result<(), Self::Error> {
+    async fn message(&mut self, message: TestMessage) -> Result<(), FluxionError<Self::Error>> {
         println!("message 1");
         Ok(())
     }
@@ -33,7 +32,7 @@ impl Handle<TestMessage> for TestActor {
 
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl Handle<TestMessage2> for TestActor {
-    async fn message(&mut self, message: TestMessage2) -> Result<(), Self::Error> {
+    async fn message(&mut self, message: TestMessage2) -> Result<(), FluxionError<Self::Error>> {
         println!("message 2");
         Ok(())
     }
