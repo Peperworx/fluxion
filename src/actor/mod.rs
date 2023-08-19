@@ -30,8 +30,8 @@ pub struct ActorContext;
 /// 
 /// ## Cleanup
 /// After the supervisor task exits, [`Actor::cleanup`] is called. In place of the ActorContext, an `Option<Self::Error>` is provided, containing None
-/// if the supervisor exited gracefully, or `Some(error)` if the supervisor task failed with an error. This function is always called.
-/// If [`Actor::cleanup`] returns an error, the error is simply logged if tracing is enabled.
+/// if the supervisor exited gracefully, or `Some(error)` if the supervisor task failed with an error. This function is always called on actor exit.
+/// If [`Actor::cleanup`] returns an error, the error is simply logged if tracing is enabled, and the actor stops.
 /// 
 /// ## Async
 /// This trait uses [`async_trait`] when on stable. Once async functions in traits are stablized, this dependency will be removed.
@@ -43,17 +43,17 @@ pub trait Actor: Send + Sync + 'static {
     type Error: Send + Sync + 'static;
 
     /// The function run upon actor initialization
-    async fn initialize(&mut self, _context: ActorContext) -> Result<(), FluxionError<Self::Error>> {
+    async fn initialize(&mut self, _context: &mut ActorContext) -> Result<(), FluxionError<Self::Error>> {
         Ok(())
     }
 
     /// The function run upon actor deinitialization
-    async fn deinitialize(&mut self, _context: ActorContext) -> Result<(), FluxionError<Self::Error>> {
+    async fn deinitialize(&mut self, _context: &mut ActorContext) -> Result<(), FluxionError<Self::Error>> {
         Ok(())
     }
 
     /// The function run upon actor cleanup
-    async fn cleanup(&mut self, _error: Option<Self::Error>) -> Result<(), FluxionError<Self::Error>> {
+    async fn cleanup(&mut self, _error: Option<FluxionError<Self::Error>>) -> Result<(), FluxionError<Self::Error>> {
         Ok(())
     }
 }
@@ -62,5 +62,6 @@ pub trait Actor: Send + Sync + 'static {
 /// Actors MAY implement this trait to handle messages or notifications.
 #[cfg_attr(async_trait, async_trait::async_trait)]
 pub trait Handle<M: Message>: Actor {
-    async fn message(&mut self, message: M) -> Result<M::Response, FluxionError<Self::Error>>;
+
+    async fn message(&mut self, message: M, _context: &mut ActorContext) -> Result<M::Response, FluxionError<M::Error>>;
 }

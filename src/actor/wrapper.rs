@@ -34,31 +34,23 @@ impl<A: Actor> ActorWrapper<A> {
     }
 
     /// Dispatch a message to the contained actor.
-    pub async fn dispatch<M: Message>(&mut self, message: M) -> Result<M::Response, FluxionError<A::Error>> where A: Handle<M> {
-        self.actor.message(message).await
+    pub async fn dispatch<M: Message>(&mut self, message: M) -> Result<M::Response, FluxionError<M::Error>> where A: Handle<M> {
+        self.actor.message(message, &mut self.context).await
     }
 
-    /// Dispatch a serialized message
-    #[cfg(serde)]
-    pub async fn dispatch_serialized<M, R, S, D>(&mut self, serializer: S, deserializer: D) -> Result<Vec<u8>, FluxionError<A::Error>>
-    where
-        M: Message<Response = R> + for<'a> Deserialize<'a>,
-        R: Serialize,
-        S: Serializer<Ok = Vec<u8>>,
-        D: for<'a> Deserializer<'a>,
-        A: Handle<M>,
-    {
+    /// Run actor initialization
+    pub async fn initialize(&mut self) -> Result<(), FluxionError<A::Error>> {
+        self.actor.initialize(&mut self.context).await
+    }
 
-        // Deserialize the message
-        let message = M::deserialize(deserializer).or(Err(FluxionError::DeserializeError))?;
+    /// Run actor deinitialization
+    pub async fn deinitialize(&mut self) -> Result<(), FluxionError<A::Error>> {
+        self.actor.deinitialize(&mut self.context).await
+    }
 
-        // Dispatch it
-        let resp = self.dispatch(message).await?;
-
-        // Serialize the response
-        let resp: Vec<u8> = resp.serialize(serializer).or(Err(FluxionError::SerializeError))?;
-
-        Ok(resp)
+    /// Run actor cleanup
+    pub async fn cleanup(&mut self, error: Option<FluxionError<A::Error>>) -> Result<(), FluxionError<A::Error>> {
+        self.actor.cleanup(error).await
     }
 }
 
