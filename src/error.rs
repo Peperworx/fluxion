@@ -8,6 +8,9 @@ pub enum FluxionError<E> {
     #[cfg(serde)]
     #[error("error serializing a foreign message")]
     SerializeError,
+    #[cfg(serde)]
+    #[error("message not in registry")]
+    NoRegistryEntry,
     #[error("error from actor")]
     ActorError(E),
 }

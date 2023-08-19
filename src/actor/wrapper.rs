@@ -1,13 +1,11 @@
-//! Contains a struct that wraps an implementor of [`Actor`]
-
-use core::any::{TypeId, Any};
-
-// Use alloc's version of box to enable async traits
-use alloc::{vec::Vec, collections::BTreeMap};
+//! # ActorWrapper
+//! Wraps an implementor of [`Actor`], to enable the registration and dispatch of messages, as well as handling actor context.
 
 #[cfg(serde)]
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
+use serde::{Serialize, Deserialize};
 
+
+use alloc::vec::Vec;
 
 use crate::message::Message;
 use crate::error::FluxionError;
@@ -16,7 +14,12 @@ use crate::error::FluxionError;
 use super::{ActorContext, Actor, Handle};
 
 /// # ActorWrapper
-/// This struct wraps an implementor of [`Actor`], and enables the registration and dispatch of foreign messages.
+/// This struct wraps an implementor of [`Actor`], and enables the registration and dispatch of messages.
+/// 
+/// ## Foreign Dispatching
+/// When the feature `serde` is enabled, [`ActorWrapper`] implements two functions, [`ActorWrapper::register`] and [`ActorWrapper::dispatch_serialized`].
+/// 
+/// 
 pub struct ActorWrapper<A: Actor> {
     /// The actual wrapped actor
     actor: A,

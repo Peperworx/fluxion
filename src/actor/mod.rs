@@ -65,3 +65,5 @@ pub trait Handle<M: Message>: Actor {
 
     async fn message(&mut self, message: M, _context: &mut ActorContext) -> Result<M::Response, FluxionError<M::Error>>;
 }
+
+
