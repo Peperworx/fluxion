@@ -1,5 +1,5 @@
 //! # Actor
-//! Fluxion's core unit is an Actor. Each Actor MUST implement the [`Actor`] trait, and MAY implement traits for handling different message types.
+//! Fluxion's core unit is an Actor. Each Actor MUST implement the [`Actor`] trait, and MAY implement traits for handling different message types, however only one will work as a foreign message.
 //! If federated messages are enabled, the actor MUST implement a trait to handle federated messages.
 //! If notifications are enabled, the actor MAY implement a trait to handle notifications.
 
@@ -62,8 +62,7 @@ pub trait Actor: Send + Sync + 'static {
 /// Actors MAY implement this trait to handle messages or notifications.
 #[cfg_attr(async_trait, async_trait::async_trait)]
 pub trait Handle<M: Message>: Actor {
-
-    async fn message(&mut self, message: M, _context: &mut ActorContext) -> Result<M::Response, FluxionError<M::Error>>;
+    async fn message(&mut self, message: M, _context: &mut ActorContext) -> Result<M::Response, FluxionError<Self::Error>>;
 }
 
 

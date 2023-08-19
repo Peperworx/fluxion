@@ -1,6 +1,6 @@
 use thiserror_no_std::Error;
 
-#[derive(Error)]
+#[derive(Error, Debug)]
 pub enum FluxionError<E> {
     #[cfg(serde)]
     #[error("error deserializing a foreign message")]

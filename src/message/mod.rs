@@ -3,19 +3,13 @@
 
 
 
-use alloc::vec::Vec;
-
-use crate::actor::Handle;
 
 #[cfg(serde)]
-use serde::{Serialize, Deserialize};
-
-use crate::{error::FluxionError, actor::Actor};
-
-#[cfg(foreign)]
-pub mod foreign;
-
-
+use {
+    serde::{Serialize, Deserialize},
+    crate::error::FluxionError,
+    alloc::vec::Vec
+};
 
 
 /// # Message
@@ -24,10 +18,18 @@ pub mod foreign;
 pub trait Message: Send + Sync + 'static {
     /// The message's response
     type Response: Send + Sync + 'static;
-
-    /// The error that may be returned when handling this message
-    type Error: Send + Sync + 'static;
 }
 
 
 
+/// # MessageSerializer
+/// This trait is used to simplify the serialization and deserialization of messages and their responses
+#[cfg(serde)]
+pub trait MessageSerializer {
+
+    /// Deserialize a message
+    fn deserialize<T: for<'a> Deserialize<'a>, E>(message: Vec<u8>) -> Result<T, FluxionError<E>>;
+
+    /// Serialize a message
+    fn serialize<T: Serialize, E>(message: T) -> Result<Vec<u8>, FluxionError<E>>;
+}
