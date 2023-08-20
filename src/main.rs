@@ -1,6 +1,6 @@
 #![cfg_attr(feature="nightly", feature(async_fn_in_trait))]
 
-use fluxion::{message::Message, actor::{Actor, Handle, ActorContext, wrapper::ActorWrapper}, error::FluxionError};
+use fluxion::{message::Message, actor::{Actor, Handle, ActorContext, wrapper::ActorWrapper, supervisor::{ActorSupervisor, Supervisor}}, error::FluxionError};
 
 struct TestMessage2;
 
@@ -23,7 +23,7 @@ impl Actor for TestActor {
 
 #[async_trait::async_trait]
 impl Handle<TestMessage> for TestActor {
-    async fn message(&mut self, _message: TestMessage, _context: &mut ActorContext) -> Result<(), FluxionError<()>> {
+    async fn message(&mut self, _message: &TestMessage, _context: &mut ActorContext) -> Result<(), FluxionError<()>> {
         println!("1");
         Ok(())
     }
@@ -32,7 +32,7 @@ impl Handle<TestMessage> for TestActor {
 
 #[async_trait::async_trait]
 impl Handle<TestMessage2> for TestActor {
-    async fn message(&mut self, _message: TestMessage2, _context: &mut ActorContext) -> Result<(), FluxionError<()>> {
+    async fn message(&mut self, _message: &TestMessage2, _context: &mut ActorContext) -> Result<(), FluxionError<()>> {
         println!("2");
         Ok(())
     }
@@ -42,7 +42,8 @@ impl Handle<TestMessage2> for TestActor {
 async fn main() {
     let actor = TestActor;
 
-    let mut actorw = ActorWrapper::new(actor);
 
-    actorw.dispatch(TestMessage).await.unwrap();
+    let (supervisor, actorref) = ActorSupervisor::new(actor);
+
+
 }

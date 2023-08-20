@@ -5,7 +5,8 @@
 
 use alloc::boxed::Box;
 
-use crate::message::Message;
+use crate::actor::actor_ref::ActorRef;
+use crate::message::{Message, Handler};
 use crate::error::FluxionError;
 
 #[cfg(serde)]
@@ -20,6 +21,8 @@ use super::{wrapper::ActorWrapper, Actor, Handle};
 pub struct ActorSupervisor<A: Actor> {
     /// The wrapped actor wrapper
     actor: ActorWrapper<A>,
+    /// The message channel
+    messages: flume::Receiver<Box<dyn Handler<A>>>,
 }
 
 /// # Supervisor
@@ -47,7 +50,9 @@ pub trait Supervisor {
     type Notification: Message;
 
     /// Create a new Supervisor
-    fn new(actor: Self::Actor) -> Self;
+    fn new(actor: Self::Actor) -> (Self, ActorRef<Self::Actor>)
+    where
+        Self: Sized;
 
     /// Pass a serialized foreign message to the actor, and recieve a serialized response.
     #[cfg(foreign)]
@@ -58,9 +63,12 @@ pub trait Supervisor {
         <Self::Foreign as Message>::Response: serde::Serialize;
     
     /// Dispatch a regular message
-    async fn dispatch<M: Message>(&mut self, message: M) -> Result<M::Response, FluxionError<<Self::Actor as Actor>::Error>>
+    async fn dispatch<M: Message>(&mut self, message: &M) -> Result<M::Response, FluxionError<<Self::Actor as Actor>::Error>>
     where
         Self::Actor: Handle<M>;
+
+    /// Run the supervisor
+    async fn run(&mut self) -> Result<(), FluxionError<<Self::Actor as Actor>::Error>>;
 }
 
 
@@ -87,10 +95,23 @@ impl<
     #[cfg(notification)]
     type Notification = A::Notification;
 
-    fn new(actor: Self::Actor) -> Self {
-        Self {
-            actor: ActorWrapper::new(actor)
-        }
+    fn new(actor: Self::Actor) -> (Self, ActorRef<Self::Actor>) {
+
+        // Create the message channel
+        let (message_sender, messages) = flume::unbounded();
+
+        // Create the supervisor
+        let supervisor = Self {
+            actor: ActorWrapper::new(actor),
+            messages
+        };
+
+        // Create the actor reference
+        let reference = ActorRef {
+            message_sender
+        };
+
+        (supervisor, reference)
     }
 
     #[cfg(foreign)]
@@ -105,24 +126,45 @@ impl<
         let message: Self::Foreign = Self::Serializer::deserialize(message)?;
 
         // Handle it
-        let res = self.actor.dispatch(message).await?;
+        let res = self.actor.dispatch(&message).await?;
 
         // Reserialize the response and return
         Self::Serializer::serialize(res)
     }
 
 
-    async fn dispatch<M: Message>(&mut self, message: M) -> Result<M::Response, FluxionError<<Self::Actor as Actor>::Error>>
+    async fn dispatch<M: Message>(&mut self, message: &M) -> Result<M::Response, FluxionError<<Self::Actor as Actor>::Error>>
     where
         Self::Actor: Handle<M>
     {
         self.actor.dispatch(message).await
     }
+
+
+    async fn run(&mut self) -> Result<(), FluxionError<<Self::Actor as Actor>::Error>> {
+        loop {
+            // Receive the message
+            let mut message = self.messages.recv_async().await.unwrap();
+
+
+            let message = message.as_mut();
+            
+
+            message.handle(&mut self.actor);
+        }
+
+        Ok(())
+    }
 }
 
 /// # SupervisorActor
 /// A quick and dirty way to require different traits for an actor wrapped by a supervisor, depending on the feature flags
-pub trait SupervisorActor: Actor{
+#[cfg_matrix::cfg_matrix(
+    Handle<Self::Foreign>: foreign,
+    Handle<Self::Federated>: federated,
+    Handle<Self::Notification>: notification
+)]
+pub trait SupervisorActor: Actor {
 
     /// The foreign message type
     #[cfg(foreign)]

@@ -31,8 +31,8 @@ impl<A: Actor> ActorWrapper<A> {
     }
 
     /// Dispatch a message to the contained actor.
-    pub async fn dispatch<M: Message>(&mut self, message: M) -> Result<M::Response, FluxionError<A::Error>> where A: Handle<M> {
-        self.actor.message(message, &mut self.context).await
+    pub async fn dispatch<M: Message>(&mut self, message: &M) -> Result<M::Response, FluxionError<A::Error>> where A: Handle<M> {
+        self.actor.message(&message, &mut self.context).await
     }
 
     /// Run actor initialization

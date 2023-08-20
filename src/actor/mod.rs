@@ -13,6 +13,7 @@ pub mod supervisor;
 
 pub mod wrapper;
 
+pub mod actor_ref;
 pub struct ActorContext;
 
 /// # Actor
@@ -62,7 +63,7 @@ pub trait Actor: Send + Sync + 'static {
 /// Actors MAY implement this trait to handle messages or notifications.
 #[cfg_attr(async_trait, async_trait::async_trait)]
 pub trait Handle<M: Message>: Actor {
-    async fn message(&mut self, message: M, _context: &mut ActorContext) -> Result<M::Response, FluxionError<Self::Error>>;
+    async fn message(&mut self, message: &M, _context: &mut ActorContext) -> Result<M::Response, FluxionError<Self::Error>>;
 }
 
 
