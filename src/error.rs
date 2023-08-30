@@ -12,6 +12,8 @@ pub enum FluxionError<E> {
     ResponseFailed,
     #[error("message failed to send")]
     SendError,
+    #[error("error converting between message response types")]
+    ResponseConversionError,
     #[error("error from actor")]
     ActorError(E),
 }

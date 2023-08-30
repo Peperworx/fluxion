@@ -63,9 +63,14 @@ pub trait Supervisor {
         <Self::Foreign as Message>::Response: serde::Serialize;
     
     /// Dispatch a regular message
-    async fn dispatch<M: Message>(&mut self, message: &M) -> Result<M::Response, FluxionError<<Self::Actor as Actor>::Error>>
+    /// Here we do some fun generic magic to allow actors to implement multiple messages by using an enum that implements From<M>
+    /// for different message types, and a response which implementes TryInto for different message types.
+    async fn dispatch<R, M, T>(&mut self, message: &T) -> Result<T::Response, FluxionError<<Self::Actor as Actor>::Error>>
     where
-        Self::Actor: Handle<M>;
+        Self::Actor: Handle<M>,
+        R: TryInto<T::Response>,
+        M: Message<Response = R> + for <'a> From<&'a T>,
+        T: Message;
 
     /// Run the supervisor
     async fn run(&mut self) -> Result<(), FluxionError<<Self::Actor as Actor>::Error>>;
@@ -133,11 +138,21 @@ impl<
     }
 
 
-    async fn dispatch<M: Message>(&mut self, message: &M) -> Result<M::Response, FluxionError<<Self::Actor as Actor>::Error>>
+    async fn dispatch<R, M, T>(&mut self, message: &T) -> Result<T::Response, FluxionError<<Self::Actor as Actor>::Error>>
     where
-        Self::Actor: Handle<M>
+        Self::Actor: Handle<M>,
+        R: TryInto<T::Response>,
+        M: Message<Response = R> + for <'a> From<&'a T>,
+        T: Message
     {
-        self.actor.dispatch(message).await
+        // Convert the message
+        let message = M::from(message);
+
+        // Handle the message
+        let res = self.actor.dispatch(&message).await?;
+
+        // Try to convert the response
+        res.try_into().or(Err(FluxionError::ResponseConversionError))
     }
 
 
@@ -146,39 +161,14 @@ impl<
             // Receive the message
             let mut message = self.messages.recv_async().await.unwrap();
 
-
+            // Retreive a mutable reference to the message
             let message = message.as_mut();
             
-
-            message.handle(&mut self.actor);
+            // Run the handler
+            message.handle(&mut self.actor).await?;
         }
 
         Ok(())
     }
 }
 
-/// # SupervisorActor
-/// A quick and dirty way to require different traits for an actor wrapped by a supervisor, depending on the feature flags
-#[cfg_matrix::cfg_matrix(
-    Handle<Self::Foreign>: foreign,
-    Handle<Self::Federated>: federated,
-    Handle<Self::Notification>: notification
-)]
-pub trait SupervisorActor: Actor {
-
-    /// The foreign message type
-    #[cfg(foreign)]
-    type Foreign: Message;
-
-    /// The federated message type
-    #[cfg(federated)]
-    type Federated: Message;
-    
-    /// The notification type
-    #[cfg(notification)]
-    type Notification: Message;
-
-    /// If serde is enabled, this is the struct in charge of serializing messages
-    #[cfg(serde)]
-    type Serializer: MessageSerializer;
-}
