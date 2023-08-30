@@ -37,10 +37,6 @@ pub trait SupervisorGenerics {
     #[cfg(foreign)]
     type Foreign: Message;
 
-    /// If federated messages are enabled, this is the message type fo the federated messages
-    #[cfg(federated)]
-    type Federated: Message;
-
     /// If notifications are enabled, this is the message type of the notification
     #[cfg(notification)]
     type Notification: Message;
