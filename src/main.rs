@@ -1,6 +1,6 @@
 #![cfg_attr(feature="nightly", feature(async_fn_in_trait))]
 
-use fluxion::{message::Message, actor::{Actor, Handle, ActorContext, wrapper::ActorWrapper, supervisor::{ActorSupervisor, Supervisor}}, error::FluxionError};
+use fluxion::{message::Message, actor::{Actor, Handle, ActorContext}, error::FluxionError};
 
 struct TestMessage2;
 
@@ -40,10 +40,10 @@ impl Handle<TestMessage2> for TestActor {
 
 #[tokio::main]
 async fn main() {
-    let actor = TestActor;
+    //let actor = TestActor;
 
 
-    let (supervisor, actorref) = ActorSupervisor::new(actor);
+    //let (supervisor, actorref) = ActorSupervisor::new(actor);
 
 
 }

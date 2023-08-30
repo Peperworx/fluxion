@@ -1,15 +1,19 @@
 //! # Message
 //! The [`Message`] trait encapsulates all Messages that can be sent between actors, including Notifications and Federated Messages.
 
-use crate::actor::{Handle, ActorContext, Actor, wrapper::ActorWrapper};
+use crate::actor::{Handle, Actor, wrapper::ActorWrapper};
 
 
+
+use crate::error::FluxionError;
+
+// Only used by async_trait
+#[cfg(async_trait)]
 use alloc::boxed::Box;
 
 #[cfg(serde)]
 use {
     serde::{Serialize, Deserialize},
-    crate::error::FluxionError,
     alloc::vec::Vec
 };
 

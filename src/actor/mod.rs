@@ -6,6 +6,7 @@
 use crate::{message::Message, error::FluxionError};
 
 // Use alloc's version of box to enable async traits
+#[cfg(async_trait)]
 use alloc::boxed::Box;
 
 

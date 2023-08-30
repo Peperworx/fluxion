@@ -10,27 +10,23 @@ use crate::message::{Message, Handler};
 use crate::error::FluxionError;
 
 #[cfg(serde)]
-use {
-    crate::message::MessageSerializer,
-    alloc::vec::Vec
-};
+use crate::message::MessageSerializer;
+
+#[cfg(foreign)]
+use alloc::vec::Vec;
 
 use super::{wrapper::ActorWrapper, Actor, Handle};
 
 
-pub struct ActorSupervisor<A: Actor> {
-    /// The wrapped actor wrapper
-    actor: ActorWrapper<A>,
-    /// The message channel
-    messages: flume::Receiver<Box<dyn Handler<A>>>,
-}
 
-/// # Supervisor
-/// This trait is implemented by [`ActorSupervisor`] as a way to get around the mess of generics and feature flags by using associated types.
-#[cfg_attr(async_trait, async_trait::async_trait)]
-pub trait Supervisor {
 
-    /// The actor this supervisor wraps
+/// # SupervisorGenerics
+/// An absolutely insane method to allow generics passed to an actor supervisor to be controlled by type flags.
+/// A single generic is passed, containing a type of [`SupervisorGenerics`]. Then, individually controllable
+/// associated types are provided by this trait depending on feature flags.
+pub trait SupervisorGenerics {
+
+    /// The actor wrapped by this supervisor
     type Actor: Actor;
 
     /// If serde is enabled, this is the struct in charge of serializing messages
@@ -48,59 +44,20 @@ pub trait Supervisor {
     /// If notifications are enabled, this is the message type of the notification
     #[cfg(notification)]
     type Notification: Message;
-
-    /// Create a new Supervisor
-    fn new(actor: Self::Actor) -> (Self, ActorRef<Self::Actor>)
-    where
-        Self: Sized;
-
-    /// Pass a serialized foreign message to the actor, and recieve a serialized response.
-    #[cfg(foreign)]
-    async fn dispatch_foreign(&mut self, message: Vec<u8>) -> Result<Vec<u8>, FluxionError<<Self::Actor as Actor>::Error>>
-    where
-        Self::Actor: Handle<Self::Foreign>,
-        Self::Foreign: for<'a> serde::Deserialize<'a>,
-        <Self::Foreign as Message>::Response: serde::Serialize;
-    
-    /// Dispatch a regular message
-    /// Here we do some fun generic magic to allow actors to implement multiple messages by using an enum that implements From<M>
-    /// for different message types, and a response which implementes TryInto for different message types.
-    async fn dispatch<R, M, T>(&mut self, message: &T) -> Result<T::Response, FluxionError<<Self::Actor as Actor>::Error>>
-    where
-        Self::Actor: Handle<M>,
-        R: TryInto<T::Response>,
-        M: Message<Response = R> + for <'a> From<&'a T>,
-        T: Message;
-
-    /// Run the supervisor
-    async fn run(&mut self) -> Result<(), FluxionError<<Self::Actor as Actor>::Error>>;
 }
 
 
-#[cfg_attr(async_trait, async_trait::async_trait)]
-impl<
-    #[cfg(serde)]       S: MessageSerializer,
-    #[cfg(serde)]       A: SupervisorActor<Serializer = S>,
-    #[cfg(not(serde))]  A: SupervisorActor
-> Supervisor for ActorSupervisor<A>
-{
-    type Actor = A;
 
-    #[cfg(serde)]
-    type Serializer = S;
 
-    #[cfg(foreign)]
-    type Foreign = A::Foreign;
+pub struct ActorSupervisor<G: SupervisorGenerics> {
+    /// The wrapped actor wrapper
+    actor: ActorWrapper<G::Actor>,
+    /// The message channel
+    messages: flume::Receiver<Box<dyn Handler<G::Actor>>>,
+}
 
-    /// If federated messages are enabled, this is the message type fo the federated messages
-    #[cfg(federated)]
-    type Federated = A::Federated;
-
-    /// If notifications are enabled, this is the message type of the notification
-    #[cfg(notification)]
-    type Notification = A::Notification;
-
-    fn new(actor: Self::Actor) -> (Self, ActorRef<Self::Actor>) {
+impl<G: SupervisorGenerics> ActorSupervisor<G> {
+    pub fn new(actor: G::Actor) -> (Self, ActorRef<G::Actor>) {
 
         // Create the message channel
         let (message_sender, messages) = flume::unbounded();
@@ -120,27 +77,27 @@ impl<
     }
 
     #[cfg(foreign)]
-    async fn dispatch_foreign(&mut self, message: Vec<u8>) -> Result<Vec<u8>, FluxionError<<Self::Actor as Actor>::Error>>
+    pub async fn dispatch_foreign(&mut self, message: Vec<u8>) -> Result<Vec<u8>, FluxionError<<G::Actor as Actor>::Error>>
     where
-        Self::Actor: Handle<Self::Foreign>,
-        Self::Foreign: for<'a> serde::Deserialize<'a>,
-        <Self::Foreign as Message>::Response: serde::Serialize
+        G::Actor: Handle<G::Foreign>,
+        G::Foreign: for<'a> serde::Deserialize<'a>,
+        <G::Foreign as Message>::Response: serde::Serialize
     {
         
         // Deserialize the message into Foreign
-        let message: Self::Foreign = Self::Serializer::deserialize(message)?;
+        let message: G::Foreign = G::Serializer::deserialize(message)?;
 
         // Handle it
         let res = self.actor.dispatch(&message).await?;
 
         // Reserialize the response and return
-        Self::Serializer::serialize(res)
+        G::Serializer::serialize(res)
     }
 
 
-    async fn dispatch<R, M, T>(&mut self, message: &T) -> Result<T::Response, FluxionError<<Self::Actor as Actor>::Error>>
+    pub async fn dispatch<R, M, T>(&mut self, message: &T) -> Result<T::Response, FluxionError<<G::Actor as Actor>::Error>>
     where
-        Self::Actor: Handle<M>,
+        G::Actor: Handle<M>,
         R: TryInto<T::Response>,
         M: Message<Response = R> + for <'a> From<&'a T>,
         T: Message
@@ -156,7 +113,7 @@ impl<
     }
 
 
-    async fn run(&mut self) -> Result<(), FluxionError<<Self::Actor as Actor>::Error>> {
+    pub async fn run(&mut self) -> Result<(), FluxionError<<G::Actor as Actor>::Error>> {
         loop {
             // Receive the message
             let mut message = self.messages.recv_async().await.unwrap();
@@ -168,7 +125,6 @@ impl<
             message.handle(&mut self.actor).await?;
         }
 
-        Ok(())
+        
     }
 }
-
