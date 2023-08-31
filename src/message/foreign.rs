@@ -1,13 +1,14 @@
 //! Contains the implementation of foreign messages
 
-use super::Message;
+use crate::{actor::{Actor, wrapper::ActorWrapper, supervisor::{ActorSupervisor, SupervisorGenerics}}, error::FluxionError};
+
+use super::{Message, Handler};
 
 use alloc::vec::Vec;
 
-/// Contains a Vec<u8>, and implements Message, with a response of Vec<u8>.
-/// This can be deserialized to another message type, depending on the 
-pub struct ForeignMessage(Vec<u8>);
+#[cfg(async_trait)]
+use alloc::boxed::Box;
 
-impl Message for ForeignMessage {
-    type Response = Vec<u8>;
-}
+/// # `ForeignHandler`
+/// An implementor of Handler which handles foreign messages via deserialization.
+pub struct ForeignHandler;

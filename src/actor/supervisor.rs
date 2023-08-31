@@ -12,6 +12,7 @@ use crate::error::FluxionError;
 #[cfg(serde)]
 use crate::message::MessageSerializer;
 
+
 #[cfg(foreign)]
 use alloc::vec::Vec;
 
@@ -44,7 +45,13 @@ pub trait SupervisorGenerics {
 
 
 
-
+/// # `ActorSupervisor`
+/// The struct and task responsible for managing the entire lifecycle of an actor.
+/// 
+/// # Limitations
+/// Starting in fluxion 0.8.0, the actor supervisor has been completely reworked (along with the rest of fluxion) to allow
+/// much greater flexibility. Locally on a single system, the actor may send and receive as many message types as there are Handlers implemented.
+/// However, the foreign message problem still stands. Currently, each actor may only 
 pub struct ActorSupervisor<G: SupervisorGenerics> {
     /// The wrapped actor wrapper
     actor: ActorWrapper<G::Actor>,
@@ -139,7 +146,5 @@ impl<G: SupervisorGenerics> ActorSupervisor<G> {
             // Run the handler
             message.handle(&mut self.actor).await?;
         }
-
-        
     }
 }

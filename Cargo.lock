@@ -129,7 +129,7 @@ dependencies = [
 
 [[package]]
 name = "fluxion"
-version = "0.6.4"
+version = "0.8.0"
 dependencies = [
  "async-oneshot",
  "async-trait",

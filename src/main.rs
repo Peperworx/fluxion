@@ -3,6 +3,7 @@
 use std::marker::PhantomData;
 
 use fluxion::{message::{Message, MessageSerializer}, actor::{Actor, Handle, ActorContext, supervisor::{SupervisorGenerics, ActorSupervisor}}, error::FluxionError};
+use serde::{Serialize, Deserialize};
 
 struct TestNotification;
 
@@ -10,6 +11,7 @@ impl Message for TestNotification {
     type Response = ();
 }
 
+#[derive(Serialize, Deserialize)]
 struct TestMessage;
 
 impl Message for TestMessage {
@@ -56,7 +58,7 @@ impl MessageSerializer for BincodeSerializer {
 
 struct FluxionParams<A, M, N>(PhantomData<A>, PhantomData<M>, PhantomData<N>);
 
-impl<M: Message, A: Actor + Handle<M>, N: Message> SupervisorGenerics for FluxionParams<A, M, N> {
+impl<M: Message + Serialize + for<'a> Deserialize<'a>, A: Actor + Handle<M>, N: Message> SupervisorGenerics for FluxionParams<A, M, N> {
     type Actor = A;
 
     type Serializer = BincodeSerializer;
