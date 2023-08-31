@@ -76,10 +76,11 @@ async fn main() {
     let (mut supervisor, actorref) = ActorSupervisor::<FluxionParams<TestActor, TestMessage, TestNotification>>::new(actor);
 
     let jh = tokio::spawn(async move {
-        supervisor.run().await;
+        supervisor.run().await.unwrap();
     });
 
-    actorref.request(TestMessage).await;
-    actorref.request(TestNotification).await;
+    actorref.request(TestMessage).await.unwrap();
+    actorref.request(TestNotification).await.unwrap();
     
+    jh.await.unwrap();
 }
