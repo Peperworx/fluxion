@@ -8,6 +8,9 @@ use crate::error::FluxionError;
 use alloc::boxed::Box;
 
 #[cfg(serde)]
+use serde::{Deserialize, Serialize};
+
+#[cfg(serde)]
 pub mod serializer;
 
 #[cfg(foreign)]
@@ -16,9 +19,18 @@ pub mod foreign;
 /// # Message
 /// This trait is used to mark Messages. Notifications are just Messages with a response type of `()`.
 /// By default, all Messages and their responses must be [`Send`] + [`Sync`] + [`'static`].
+#[cfg(not(serde))]
 pub trait Message: Send + Sync + 'static {
     /// The message's response
     type Response: Send + Sync + 'static;
+
+    /// The custom error type that might be returned by the message
+    type Error: Send + Sync + 'static;
+}
+#[cfg(serde)]
+pub trait Message: Serialize + for<'a> Deserialize<'a> + Send + Sync + 'static {
+    /// The message's response
+    type Response: Serialize + for<'a> Deserialize<'a> + Send + Sync + 'static;
 
     /// The custom error type that might be returned by the message
     type Error: Send + Sync + 'static;
@@ -48,6 +60,11 @@ impl<M: Message> MessageHandler<M> {
         self.responder
             .send(response)
             .or(Err(FluxionError::ResponseFailed))
+    }
+
+    /// Returns the contained message
+    pub fn message(&self) -> &M {
+        &self.message
     }
 }
 

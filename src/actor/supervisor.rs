@@ -76,14 +76,12 @@ impl<G: SupervisorGenerics<M>, M: MessageGenerics> ActorSupervisor<G, M> {
         let foreign_channel = Channel::unbounded();
 
         // Create the supervisor
-        let supervisor = Self {
+        Self {
             actor: ActorWrapper::new(actor),
             message_channel,
             notification_channel,
             foreign_channel,
-        };
-
-        supervisor
+        }
     }
 
     pub fn get_ref(&self) -> ActorRef<M> {
@@ -93,7 +91,120 @@ impl<G: SupervisorGenerics<M>, M: MessageGenerics> ActorSupervisor<G, M> {
     }
 
     /// Executes the actor's main loop
-    pub async fn run(&self) {
-        todo!()
+    pub async fn run(&mut self) {
+        // Convert the receivers to futures that are easily awaitable
+        let mut notifications = self.notification_channel.1.clone().into_recv_async();
+        let mut messages = self.message_channel.1.clone().into_recv_async();
+        let mut foreign_messages = self.foreign_channel.1.clone().into_recv_async();
+
+        loop {
+            futures::select! {
+                notification = notifications => {
+                    // If there is an error, ignore it for nor
+                    let Ok(notification) = notification else {
+                        continue;
+                    };
+
+                    // Dispatch the notification as a message
+                    let _ = self.actor.dispatch(&notification).await;
+                },
+                message = messages => {
+                    // If there is an error, ignore it for nor
+                    let Ok(message) = message else {
+                        continue;
+                    };
+
+                    // Match on the message, and dispatch depending on if it is a regular or federated message
+                    match message {
+                        SupervisorMessage::Message(mut m) => {
+                            // Dispatch
+                            let res = self.actor.dispatch(m.message()).await;
+
+                            // If error, continue
+                            let Ok(res) = res else {
+                                continue;
+                            };
+
+                            // Respond
+                            let _ = m.respond(res);
+                            // Ignore error for now
+                        },
+                        #[cfg(federated)]
+                        SupervisorMessage::Federated(mut m) => {
+                            // Dispatch
+                            let res = self.actor.dispatch(m.message()).await;
+
+                            // If error, continue
+                            let Ok(res) = res else {
+                                continue;
+                            };
+
+                            // Respond
+                            let _ = m.respond(res);
+                            // Ignore error for now
+                        },
+                    };
+                },
+                foreign = foreign_messages => {
+                    // If there is an error, ignore it for nor
+                    let Ok(mut message) = foreign else {
+                        continue;
+                    };
+
+                    // Decode it
+                    let decoded = message.decode::<M, G::Serializer, <G::Actor as Actor>::Error>();
+
+                    // If there is an error, ignore it for nor
+                    let Ok(decoded) = decoded else {
+                        continue;
+                    };
+
+                    // match on the type, dispatch, serialize response, and respond
+                    match decoded {
+                        crate::message::foreign::ForeignType::Message(m) => {
+                            // Dispatch
+                            let res = self.actor.dispatch(&m).await;
+
+                            // If error, continue
+                            let Ok(res) = res else {
+                                continue;
+                            };
+
+                            // Serialize the response
+                            let res = G::Serializer::serialize::<_, <G::Actor as Actor>::Error>(res);
+
+                            // If error, continue
+                            let Ok(res) = res else {
+                                continue;
+                            };
+
+                            // Respond
+                            let _ = message.respond::<<G::Actor as Actor>::Error>(res);
+                        },
+                        #[cfg(federated)]
+                        crate::message::foreign::ForeignType::Federated(m) => {
+                            // Dispatch
+                            let res = self.actor.dispatch(&m).await;
+
+                            // If error, continue
+                            let Ok(res) = res else {
+                                continue;
+                            };
+
+                            // Serialize the response
+                            let res = G::Serializer::serialize::<_, <G::Actor as Actor>::Error>(res);
+
+                            // If error, continue
+                            let Ok(res) = res else {
+                                continue;
+                            };
+
+                            // Respond
+                            let _ = message.respond::<<G::Actor as Actor>::Error>(res);
+                        },
+                    }
+                }
+            }
+        }
     }
 }
