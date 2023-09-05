@@ -23,7 +23,7 @@ impl SomeTrait for Test2 {
 }
 
 fn some_downcasted(value: &dyn Any) {
-    let downcasted: &Box<dyn SomeTrait> = value.downcast_ref().unwrap();
+    let downcasted = value.downcast_ref::<Box<dyn SomeTrait>>().unwrap();
 
     downcasted.some_fn();
 }
