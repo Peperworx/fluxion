@@ -1,9 +1,6 @@
 //! # Message
 //! The [`Message`] trait encapsulates all Messages that can be sent between actors, including Notifications and Federated Messages.
 
-use crate::actor::actor_ref::ActorRef;
-use crate::actor::{wrapper::ActorWrapper, Actor, Handle};
-
 use crate::error::FluxionError;
 
 // Only used by async_trait
@@ -11,10 +8,7 @@ use crate::error::FluxionError;
 use alloc::boxed::Box;
 
 #[cfg(serde)]
-use {
-    alloc::vec::Vec,
-    serde::{Deserialize, Serialize},
-};
+pub mod serializer;
 
 /// # Message
 /// This trait is used to mark Messages. Notifications are just Messages with a response type of `()`.
@@ -22,23 +16,9 @@ use {
 pub trait Message: Send + Sync + 'static {
     /// The message's response
     type Response: Send + Sync + 'static;
-}
 
-/// # `MessageSerializer`
-/// This trait is used to simplify the serialization and deserialization of messages and their responses
-#[cfg(serde)]
-pub trait MessageSerializer {
-    /// Deserialize a message
-    ///
-    /// # Errors
-    /// This function should only ever error with a [`FluxionError::DeserializeError`].
-    fn deserialize<T: for<'a> Deserialize<'a>, E>(message: Vec<u8>) -> Result<T, FluxionError<E>>;
-
-    /// Serialize a message
-    ///
-    /// # Errors
-    /// This function should only ever error with a [`FluxionError::SerializeError`].
-    fn serialize<T: Serialize, E>(message: T) -> Result<Vec<u8>, FluxionError<E>>;
+    /// The custom error type that might be returned by the message
+    type Error: Send + Sync + 'static;
 }
 
 /// # `MessageHandler`
@@ -56,21 +36,11 @@ impl<M: Message> MessageHandler<M> {
     pub fn new(message: M, responder: async_oneshot::Sender<M::Response>) -> Self {
         Self { message, responder }
     }
-}
 
-/// # Dispatcher
-/// Enables an actor to receive many different message types over the same channel.
-pub trait Dispatcher {
-    /// This function is called whenever a message is to be dispatched to an [`ActorRef`] which implements [`Dispatch`]
-    fn dispatch<M: Message>(&self, message: M)
-    where
-        Self: Sized;
-}
-impl<A: Actor + Handle<BaseMessage>, BaseMessage: Message> Dispatcher for ActorRef<A> {
-    fn dispatch<M: Message + Into<BaseMessage>>(&self, message: M)
-    where
-        Self: Sized,
-    {
-        todo!()
+    /// Respond to the message
+    pub fn respond(&mut self, response: M::Response) -> Result<(), FluxionError<M::Error>> {
+        self.responder
+            .send(response)
+            .or(Err(FluxionError::ResponseFailed))
     }
 }

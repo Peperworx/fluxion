@@ -5,16 +5,15 @@ use crate::{
     error::FluxionError,
     message::{Message, MessageHandler},
 };
-use alloc::boxed::Box;
 
 /// # `ActorRef`
 /// The primary clonable method of communication with an actor.
-pub struct ActorRef<M: Message, E> {
+pub struct ActorRef<M: Message> {
     /// The message sender for sending messages to the actor
     pub(crate) message_sender: flume::Sender<MessageHandler<M>>,
 }
 
-impl<M: Message, E> ActorRef<M, E> {
+impl<M: Message> ActorRef<M> {
     /// Send a message to the actor and wait for a response
     ///
     /// # Errors
@@ -24,7 +23,7 @@ impl<M: Message, E> ActorRef<M, E> {
     /// * [`FluxionError::ResponseFailed`] is returned when the response receiver fails to receive a response.
     /// This only ever happens when the actor drops the response sender, which may be caused by an error in the actor's handling of the message.
     ///
-    pub async fn request(&self, message: M) -> Result<M::Response, FluxionError<E>> {
+    pub async fn request(&self, message: M) -> Result<M::Response, FluxionError<M::Error>> {
         // Create a oneshot for the message
         let (responder, response) = async_oneshot::oneshot();
 
@@ -33,7 +32,7 @@ impl<M: Message, E> ActorRef<M, E> {
 
         // Send the handler
         self.message_sender
-            .send_async(Box::new(handler))
+            .send_async(handler)
             .await
             .or(Err(FluxionError::SendError))?;
 

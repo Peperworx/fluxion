@@ -1,40 +1,34 @@
 #![cfg_attr(feature = "nightly", feature(async_fn_in_trait))]
 
-use std::any::Any;
+use fluxion::{
+    actor::{Actor, Handle},
+    message::Message,
+};
 
-trait SomeTrait: Any {
-    fn some_fn(&self);
+struct TestActor;
+
+impl Actor for TestActor {
+    type Error = ();
 }
 
-struct Test;
+struct TestMessage;
 
-impl SomeTrait for Test {
-    fn some_fn(&self) {
-        println!("hello test");
+impl Message for TestMessage {
+    type Response = ();
+
+    type Error = ();
+}
+
+#[cfg_attr(async_trait, async_trait::async_trait)]
+impl Handle<TestMessage> for Actor {
+    async fn message(
+        &mut self,
+        message: &M,
+        _context: &mut ActorContext,
+    ) -> Result<M::Response, FluxionError<Self::Error>> {
+        todo!()
     }
-}
-
-struct Test2;
-
-impl SomeTrait for Test2 {
-    fn some_fn(&self) {
-        println!("hello test");
-    }
-}
-
-fn some_downcasted(value: &dyn Any) {
-    let downcasted = value.downcast_ref::<Box<dyn SomeTrait>>().unwrap();
-
-    downcasted.some_fn();
 }
 
 #[tokio::main]
-async fn main() {
-    let test = Test2;
-
-    let test: Box<dyn SomeTrait + 'static> = Box::new(test);
-
-    let test_any: &dyn Any = &test;
-
-    some_downcasted(test_any);
-}
+async fn main() {}

@@ -15,6 +15,7 @@ When designing Fluxion, an issue was encountered: to establish communication bet
 
 The winner seems obvious at first: share the type of the Actor, not the Message. However, this removes an important abstraction and now requires that an Actor's type be known. For example: No longer can an actor be treated as a sender/receiver of `DatabaseMessages`, now it must be known as `ThisSpecificDatabaseActor`. To abstract that away, generics are needed, and generics can get very messy, very quickly.
 
+An additional issue is determining which type foreign messages should deserialize to. This can also get very messy with multiply message types, so Fluxion constrains each actor to handling a single message type.
 
 
 
