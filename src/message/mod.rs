@@ -3,10 +3,6 @@
 
 use crate::error::FluxionError;
 
-// Only used by async_trait
-#[cfg(async_trait)]
-use alloc::boxed::Box;
-
 #[cfg(serde)]
 use serde::{Deserialize, Serialize};
 

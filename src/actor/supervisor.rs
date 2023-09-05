@@ -10,9 +10,6 @@ use crate::{actor::actor_ref::ActorRef, message::MessageHandler};
 use crate::message::serializer::MessageSerializer;
 
 #[cfg(foreign)]
-use alloc::vec::Vec;
-
-#[cfg(foreign)]
 use crate::message::foreign::ForeignMessage;
 
 use super::{wrapper::ActorWrapper, Actor, Handle};
