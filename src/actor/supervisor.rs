@@ -2,11 +2,7 @@
 //! The actor supervisor is responsible for handling the actor's entire lifecycle, including dispatching messages
 //! and handling shutdowns.
 
-use alloc::boxed::Box;
-
-use crate::error::FluxionError;
-
-use crate::message::{Message, MessageGenerics};
+use crate::message::MessageGenerics;
 use crate::Channel;
 use crate::{actor::actor_ref::ActorRef, message::MessageHandler};
 

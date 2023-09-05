@@ -16,6 +16,7 @@ pub struct Channel<T>(pub flume::Sender<T>, pub flume::Receiver<T>);
 
 impl<T> Channel<T> {
     /// Creates a new unbounded channel
+    #[must_use]
     pub fn unbounded() -> Self {
         let c = flume::unbounded();
         Self(c.0, c.1)

@@ -41,6 +41,9 @@ impl<M: Message> MessageHandler<M> {
     }
 
     /// Respond to the message
+    ///
+    /// # Errors
+    /// This function may return an error due to a closed channel. This error is unrecoverable.
     pub fn respond(&mut self, response: M::Response) -> Result<(), FluxionError<M::Error>> {
         self.responder
             .send(response)

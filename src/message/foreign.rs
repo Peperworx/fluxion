@@ -2,7 +2,7 @@
 
 use alloc::vec::Vec;
 
-use crate::{actor::supervisor::SupervisorMessage, error::FluxionError};
+use crate::error::FluxionError;
 
 use super::{serializer::MessageSerializer, MessageGenerics};
 
@@ -18,11 +18,15 @@ pub struct ForeignMessage {
 }
 
 impl ForeignMessage {
+    #[must_use]
     pub fn new(message: Vec<u8>, responder: async_oneshot::Sender<Vec<u8>>) -> Self {
         Self { message, responder }
     }
 
     /// Respond to the message
+    ///
+    /// # Errors
+    /// This function may return an error due to a closed channel. This error is unrecoverable.
     pub fn respond<E>(&mut self, response: Vec<u8>) -> Result<(), FluxionError<E>> {
         self.responder
             .send(response)
@@ -30,6 +34,9 @@ impl ForeignMessage {
     }
 
     /// Decode the contents of the message
+    ///
+    /// # Errors
+    /// May return an error when deserialization fails.
     pub fn decode<M: MessageGenerics, S: MessageSerializer, E>(
         &self,
     ) -> Result<ForeignType<M>, FluxionError<E>>
