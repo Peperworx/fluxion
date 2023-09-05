@@ -7,6 +7,8 @@ use crate::error::FluxionError;
 use crate::message::Message;
 
 pub mod actor_ref;
+pub mod supervisor;
+pub mod wrapper;
 
 // Use alloc's version of box to enable async traits
 #[cfg(async_trait)]
@@ -68,7 +70,7 @@ pub trait Actor: Send + Sync + 'static {
 /// # Handle
 /// Actors MAY implement this trait to handle messages or notifications.
 #[cfg_attr(async_trait, async_trait::async_trait)]
-pub trait Handle<M: Message<Error = E>, E: Into<Self::Error>>: Actor {
+pub trait Handle<M: Message>: Actor {
     async fn message(
         &mut self,
         message: &M,

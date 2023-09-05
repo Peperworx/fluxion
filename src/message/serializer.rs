@@ -14,7 +14,7 @@ pub trait MessageSerializer {
     ///
     /// # Errors
     /// This function should only ever error with a [`FluxionError::DeserializeError`].
-    fn deserialize<T: for<'a> Deserialize<'a>, E>(message: Vec<u8>) -> Result<T, FluxionError<E>>;
+    fn deserialize<T: for<'a> Deserialize<'a>, E>(message: &[u8]) -> Result<T, FluxionError<E>>;
 
     /// Serialize a message
     ///

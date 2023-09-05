@@ -10,6 +10,9 @@ use alloc::boxed::Box;
 #[cfg(serde)]
 pub mod serializer;
 
+#[cfg(foreign)]
+pub mod foreign;
+
 /// # Message
 /// This trait is used to mark Messages. Notifications are just Messages with a response type of `()`.
 /// By default, all Messages and their responses must be [`Send`] + [`Sync`] + [`'static`].
@@ -43,4 +46,21 @@ impl<M: Message> MessageHandler<M> {
             .send(response)
             .or(Err(FluxionError::ResponseFailed))
     }
+}
+
+/// # `MessageGenerics`
+/// This trait uses a really weird abstraction to fit multiply types in the same generic.
+/// It is used as an extension of [`SupervisorGenerics`]
+/// This is used by both the [`ActorSupervisor`] and the [`ActorRef`], and is an extension
+pub trait MessageGenerics {
+    /// The primary message type of this actor
+    type Message: Message;
+
+    /// If notifications are enabled, this is the message type of the notification
+    #[cfg(notification)]
+    type Notification: Message;
+
+    /// If federated messages are enabled, this is the message type of the federated messages
+    #[cfg(federated)]
+    type Federated: Message;
 }

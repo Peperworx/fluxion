@@ -10,3 +10,14 @@ pub mod actor;
 pub mod error;
 
 pub mod message;
+
+/// A utility used to store a two-way channel concisely
+pub struct Channel<T>(pub flume::Sender<T>, pub flume::Receiver<T>);
+
+impl<T> Channel<T> {
+    /// Creates a new unbounded channel
+    pub fn unbounded() -> Self {
+        let c = flume::unbounded();
+        Self(c.0, c.1)
+    }
+}
