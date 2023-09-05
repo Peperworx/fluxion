@@ -5,6 +5,8 @@ use crate::message::Message;
 
 pub mod params;
 
+pub mod generic_abstractions;
+
 /// A utility used to store a two-way channel concisely
 pub struct Channel<T>(pub flume::Sender<T>, pub flume::Receiver<T>);
 

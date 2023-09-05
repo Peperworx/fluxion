@@ -80,6 +80,5 @@ async fn main() {
     tokio::spawn(async move {
         supervisor.run().await;
     });
-
     a.request(TestMessage).await;
 }
