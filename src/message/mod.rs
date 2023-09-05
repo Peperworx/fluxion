@@ -1,9 +1,8 @@
 //! # Message
 //! The [`Message`] trait encapsulates all Messages that can be sent between actors, including Notifications and Federated Messages.
 
-use crate::actor::{Handle, Actor, wrapper::ActorWrapper};
-
-
+use crate::actor::actor_ref::ActorRef;
+use crate::actor::{wrapper::ActorWrapper, Actor, Handle};
 
 use crate::error::FluxionError;
 
@@ -13,13 +12,9 @@ use alloc::boxed::Box;
 
 #[cfg(serde)]
 use {
-    serde::{Serialize, Deserialize},
-    alloc::vec::Vec
+    alloc::vec::Vec,
+    serde::{Deserialize, Serialize},
 };
-
-
-#[cfg(foreign)]
-pub mod foreign;
 
 /// # Message
 /// This trait is used to mark Messages. Notifications are just Messages with a response type of `()`.
@@ -29,30 +24,26 @@ pub trait Message: Send + Sync + 'static {
     type Response: Send + Sync + 'static;
 }
 
-
-
 /// # `MessageSerializer`
 /// This trait is used to simplify the serialization and deserialization of messages and their responses
 #[cfg(serde)]
 pub trait MessageSerializer {
-
     /// Deserialize a message
-    /// 
+    ///
     /// # Errors
     /// This function should only ever error with a [`FluxionError::DeserializeError`].
     fn deserialize<T: for<'a> Deserialize<'a>, E>(message: Vec<u8>) -> Result<T, FluxionError<E>>;
 
     /// Serialize a message
-    /// 
+    ///
     /// # Errors
     /// This function should only ever error with a [`FluxionError::SerializeError`].
     fn serialize<T: Serialize, E>(message: T) -> Result<Vec<u8>, FluxionError<E>>;
 }
 
-
 /// # `MessageHandler`
 /// This is the struct that is actually sent over the channel to an actor and stores both a message and its responder.
-/// This is used in combination with the [`Handler`] trait to allow an actor to receive many different message types locally.
+/// This is primarilly to reduce repetitive code.
 pub struct MessageHandler<M: Message> {
     /// The message
     message: M,
@@ -67,26 +58,19 @@ impl<M: Message> MessageHandler<M> {
     }
 }
 
-
-/// # Handler
-/// This trait is implemented for [`MessageHandler`], allowing Fluxion to get rid of the `M` generic. This allows sending many different types of messages
-/// to an Actor.
-#[cfg_attr(async_trait, async_trait::async_trait)]
-pub trait Handler<A: Actor>: Send + Sync + 'static {
-    /// Handle the message
-    async fn handle(&mut self, actor: &mut ActorWrapper<A>) -> Result<(), FluxionError<A::Error>>;
+/// # Dispatcher
+/// Enables an actor to receive many different message types over the same channel.
+pub trait Dispatcher {
+    /// This function is called whenever a message is to be dispatched to an [`ActorRef`] which implements [`Dispatch`]
+    fn dispatch<M: Message>(&self, message: M)
+    where
+        Self: Sized;
 }
-
-#[cfg_attr(async_trait, async_trait::async_trait)]
-impl<A: Handle<M>, M: Message> Handler<A> for MessageHandler<M> {
-    async fn handle(&mut self, actor: &mut ActorWrapper<A>) -> Result<(), FluxionError<A::Error>> {
-
-        // Call the handler.
-        let res = actor.dispatch(&self.message).await?;
-
-        // Send the response
-        self.responder.send(res).or(Err(FluxionError::ResponseFailed))?;
-
-        Ok(())
+impl<A: Actor + Handle<BaseMessage>, BaseMessage: Message> Dispatcher for ActorRef<A> {
+    fn dispatch<M: Message + Into<BaseMessage>>(&self, message: M)
+    where
+        Self: Sized,
+    {
+        todo!()
     }
 }
