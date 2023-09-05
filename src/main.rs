@@ -1,14 +1,9 @@
 #![cfg_attr(feature = "nightly", feature(async_fn_in_trait))]
 
-use std::marker::PhantomData;
-
 use fluxion::{
-    actor::{
-        supervisor::{ActorSupervisor, SupervisorGenerics},
-        Actor, ActorContext, Handle,
-    },
+    actor::{supervisor::ActorSupervisor, Actor, ActorContext, Handle},
     error::FluxionError,
-    message::{serializer::MessageSerializer, Message, MessageGenerics},
+    message::{serializer::MessageSerializer, Message},
     Channel, MessageParams, SupervisorParams,
 };
 
