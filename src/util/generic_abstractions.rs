@@ -6,8 +6,13 @@
 //! ## [`MessageParams`]
 //! This is the basic generic abstraction. It does not depend on any other generic abstractions, and it contains
 //! only two associated types: `Federated` and `Notification`, which only exist if their respective feature flags are enabled.
+//!
+//! ## [`ActorParams`]
+//! This contains both the contents of [`MessageParams`], a [`Message`] type, and the type of the actor that this parameter stores info for.
+//! This is used to provide generics for the actor's supervisor.
 
-use crate::message::Message;
+
+use crate::{message::Message, actor::{Actor, Handle}};
 
 /// # [`MessageParams`]
 /// The simplest generic abstraction, containing the federated message and notification types.
@@ -23,7 +28,7 @@ pub trait MessageParams {
 
 /// # [`ActorParams`]
 /// Parameters that are specific to a single actor. This includes the [`MessageParams`], the actor's [`Message`],
-/// and the error type that the actor can return.
+/// and of course the actor's specific type.
 pub trait ActorParams {
 
     /// The message that the actor can handle
@@ -34,7 +39,21 @@ pub trait ActorParams {
     /// across the entire system
     type SystemMessages: MessageParams;
 
-    /// The error type that this actor may return
     
+    cfg_if::cfg_if! {
+        if #[cfg(all(notification, federated))] {
+            /// The type of the actor itself.
+            type Actor: Actor + Handle<Self::Message> + Handle<<Self::SystemMessages as MessageParams>::Notification> + Handle<<Self::SystemMessages as MessageParams>::Federated>;
+        } else if #[cfg(notification)] {
+            /// The type of the actor itself.
+            type Actor: Actor + Handle<Self::Message> + Handle<<Self::SystemMessages as MessageParams>::Notification>;
+        } else if #[cfg(federated)] {
+            /// The type of the actor itself.
+            type Actor: Actor + Handle<Self::Message> + Handle<<Self::SystemMessages as MessageParams>::Federated>;
+        } else {
+            /// The type of the actor itself.
+            type Actor: Actor + Handle<<Self::Messages as MessageParams>::Message>;
+        }
+    }
 }
 
