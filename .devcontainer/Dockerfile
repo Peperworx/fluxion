@@ -1,9 +1,11 @@
-FROM ubuntu:18.04
+FROM ubuntu:lunar
 
 WORKDIR /home/
 
 COPY . .
 
-RUN bash ./setup.sh
+ADD setup.sh /
+
+RUN /setup.sh
 
 ENV PATH="/root/.cargo/bin:$PATH"
