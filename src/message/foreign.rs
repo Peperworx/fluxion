@@ -2,9 +2,12 @@
 
 use alloc::vec::Vec;
 
-use crate::error::FluxionError;
+use crate::{
+    error::FluxionError,
+    util::generic_abstractions::{ActorParams, MessageParams, SystemParams},
+};
 
-use super::{serializer::MessageSerializer, MessageGenerics};
+use super::serializer::MessageSerializer;
 
 use serde::{Deserialize, Serialize};
 
@@ -37,24 +40,24 @@ impl ForeignMessage {
     ///
     /// # Errors
     /// May return an error when deserialization fails.
-    pub fn decode<M: MessageGenerics, S: MessageSerializer, E>(
+    pub fn decode<AP: ActorParams<S>, S: SystemParams, SD: MessageSerializer, E>(
         &self,
-    ) -> Result<ForeignType<M>, FluxionError<E>>
+    ) -> Result<ForeignType<AP, S>, FluxionError<E>>
     where
-        M::Message: for<'a> Deserialize<'a>,
-        M::Federated: for<'a> Deserialize<'a>,
+        AP::Message: for<'a> Deserialize<'a>,
+        <S::SystemMessages as MessageParams>::Federated: for<'a> Deserialize<'a>,
     {
-        S::deserialize(&self.message)
+        SD::deserialize(&self.message)
     }
 }
 
 /// # `ForeignType`
 /// Marks the type of the foreign message's contents.
 #[derive(Serialize, Deserialize)]
-pub enum ForeignType<M: MessageGenerics> {
+pub enum ForeignType<AP: ActorParams<S>, S: SystemParams> {
     /// A regular message
-    Message(M::Message),
+    Message(AP::Message),
     /// A federated message
     #[cfg(federated)]
-    Federated(M::Federated),
+    Federated(<S::SystemMessages as MessageParams>::Federated),
 }

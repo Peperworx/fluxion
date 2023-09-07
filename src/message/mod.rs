@@ -63,20 +63,3 @@ impl<M: Message> MessageHandler<M> {
         &self.message
     }
 }
-
-/// # `MessageGenerics`
-/// This trait uses a really weird abstraction to fit multiply types in the same generic.
-/// It is used as an extension of [`crate::actor::supervisor::SupervisorGenerics`]
-/// This is used by both the [`crate::actor::supervisor::ActorSupervisor`] and the [`crate::actor::actor_ref::ActorRef`], and is an extension
-pub trait MessageGenerics {
-    /// The primary message type of this actor
-    type Message: Message;
-
-    /// If notifications are enabled, this is the message type of the notification
-    #[cfg(notification)]
-    type Notification: Message;
-
-    /// If federated messages are enabled, this is the message type of the federated messages
-    #[cfg(federated)]
-    type Federated: Message;
-}

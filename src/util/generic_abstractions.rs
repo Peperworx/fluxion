@@ -11,8 +11,10 @@
 //! This contains both the contents of [`MessageParams`], a [`Message`] type, and the type of the actor that this parameter stores info for.
 //! This is used to provide generics for the actor's supervisor.
 
-
-use crate::{message::Message, actor::{Actor, Handle}};
+use crate::{
+    actor::{Actor, Handle},
+    message::{serializer::MessageSerializer, Message},
+};
 
 /// # [`MessageParams`]
 /// The simplest generic abstraction, containing the federated message and notification types.
@@ -26,34 +28,47 @@ pub trait MessageParams {
     type Notification: Message;
 }
 
-/// # [`ActorParams`]
-/// Parameters that are specific to a single actor. This includes the [`MessageParams`], the actor's [`Message`],
-/// and of course the actor's specific type.
-pub trait ActorParams {
+/// # [`SystemParams`]
+/// Parameters specific to an entire system, including the [`MessageParams`], and the [`MessageSerializer`]
+pub trait SystemParams {
+    /// The [`MessageParams`] associated with this system.
+    /// This is named [`SystemMessages`] because it contains message types uniform
+    /// across the entire system
+    #[cfg(any(federated, notification))]
+    type SystemMessages: MessageParams;
 
+    /// The [`MessageSerializer`] used for foreign messages across the system
+    #[cfg(serde)]
+    type Serializer: MessageSerializer;
+}
+
+/// # [`ActorParams`]
+/// Parameters that are specific to a single actor. This includes the [`MessageParams`], and the actor's [`Message`] type.
+/// The [`SystemParams`] are provided as a generic to reduce long and complex associated type clairifications.
+pub trait ActorParams<S: SystemParams> {
     /// The message that the actor can handle
     type Message: Message;
 
-    /// The [`MessageParams`] that this actor needs to support.
-    /// This is named [`SystemMessages`] because it contains message types uniform
-    /// across the entire system
-    type SystemMessages: MessageParams;
-
-    
     cfg_if::cfg_if! {
         if #[cfg(all(notification, federated))] {
             /// The type of the actor itself.
-            type Actor: Actor + Handle<Self::Message> + Handle<<Self::SystemMessages as MessageParams>::Notification> + Handle<<Self::SystemMessages as MessageParams>::Federated>;
+            type Actor: Actor
+                + Handle<Self::Message>
+                + Handle<<S::SystemMessages as MessageParams>::Notification>
+                + Handle<<S::SystemMessages as MessageParams>::Federated>;
         } else if #[cfg(notification)] {
             /// The type of the actor itself.
-            type Actor: Actor + Handle<Self::Message> + Handle<<Self::SystemMessages as MessageParams>::Notification>;
+            type Actor: Actor
+                + Handle<Self::Message>
+                + Handle<<S::SystemMessages as MessageParams>::Notification>;
         } else if #[cfg(federated)] {
             /// The type of the actor itself.
-            type Actor: Actor + Handle<Self::Message> + Handle<<Self::SystemMessages as MessageParams>::Federated>;
+            type Actor: Actor
+                + Handle<Self::Message>
+                + Handle<<S::SystemMessages as MessageParams>::Federated>;
         } else {
             /// The type of the actor itself.
             type Actor: Actor + Handle<<Self::Messages as MessageParams>::Message>;
         }
     }
 }
-

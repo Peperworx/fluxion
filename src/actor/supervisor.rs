@@ -2,7 +2,7 @@
 //! The actor supervisor is responsible for handling the actor's entire lifecycle, including dispatching messages
 //! and handling shutdowns.
 
-use crate::message::MessageGenerics;
+use crate::util::generic_abstractions::{ActorParams, MessageParams, SystemParams};
 use crate::Channel;
 use crate::{actor::actor_ref::ActorRef, message::MessageHandler};
 
@@ -14,58 +14,35 @@ use crate::message::foreign::ForeignMessage;
 
 use super::{wrapper::ActorWrapper, Actor, Handle};
 
-/// # `SupervisorGenerics`
-/// An absolutely insane method to allow generics passed to an actor supervisor to be controlled by type flags.
-/// A single generic is passed, containing a type of [`SupervisorGenerics`]. Then, individually controllable
-/// associated types are provided by this trait depending on feature flags.
-pub trait SupervisorGenerics<M: MessageGenerics> {
-    cfg_if::cfg_if! {
-        if #[cfg(all(notification, federated))] {
-            /// The actor wrapped by this supervisor
-            type Actor: Actor + Handle<M::Message> + Handle<M::Notification> + Handle<M::Federated>;
-        } else if #[cfg(notification)] {
-            /// The actor wrapped by this supervisor
-            type Actor: Actor + Handle<M::Message> + Handle<M::Notification>;
-        } else if #[cfg(federated)] {
-            /// The actor wrapped by this supervisor
-            type Actor: Actor + Handle<M::Message> + Handle<M::Federated>;
-        } else {
-            /// The actor wrapped by this supervisor
-            type Actor: Actor + Handle<<Self::Messages as MessageGenerics>::Message>;
-        }
-    }
-
-    /// If serde is enabled, this is the struct in charge of serializing messages
-    #[cfg(serde)]
-    type Serializer: MessageSerializer;
-}
-
 /// # `SupervisorMessage`
 /// An enum that contains different message types depending on feature flags. This is an easy way
 /// to send several different types of messages over the same channel.
-pub enum SupervisorMessage<T: MessageGenerics> {
+pub enum SupervisorMessage<AP: ActorParams<S>, S: SystemParams> {
     /// A regular message
-    Message(MessageHandler<T::Message>),
+    Message(MessageHandler<AP::Message>),
     /// A federated message
-    Federated(MessageHandler<T::Federated>),
+    Federated(MessageHandler<<S::SystemMessages as MessageParams>::Federated>),
 }
 
 /// # `ActorSupervisor`
 /// The struct and task responsible for managing the entire lifecycle of an actor.
-pub struct ActorSupervisor<G: SupervisorGenerics<M>, M: MessageGenerics> {
+pub struct ActorSupervisor<AP: ActorParams<S>, S: SystemParams> {
     /// The wrapped actor wrapper
-    actor: ActorWrapper<G::Actor>,
+    actor: ActorWrapper<AP::Actor>,
     /// The message channel responsible for receiving regular messages.
-    message_channel: Channel<SupervisorMessage<M>>,
+    message_channel: Channel<SupervisorMessage<AP, S>>,
     /// The channel responsible for receiving notifications
-    notification_channel: Channel<M::Notification>,
+    notification_channel: Channel<<S::SystemMessages as MessageParams>::Notification>,
     /// The channel that receives foreign messages
     foreign_channel: Channel<ForeignMessage>,
 }
 
-impl<G: SupervisorGenerics<M>, M: MessageGenerics> ActorSupervisor<G, M> {
+impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
     /// Creates a new actor supervisor
-    pub fn new(actor: G::Actor, notification_channel: Channel<M::Notification>) -> Self {
+    pub fn new(
+        actor: AP::Actor,
+        notification_channel: Channel<<S::SystemMessages as MessageParams>::Notification>,
+    ) -> Self {
         // Create the message channel
         let message_channel = Channel::unbounded();
 
@@ -81,7 +58,7 @@ impl<G: SupervisorGenerics<M>, M: MessageGenerics> ActorSupervisor<G, M> {
         }
     }
 
-    pub fn get_ref(&self) -> ActorRef<M> {
+    pub fn get_ref(&self) -> ActorRef<AP, S> {
         ActorRef {
             message_sender: self.message_channel.0.clone(),
         }
@@ -149,7 +126,7 @@ impl<G: SupervisorGenerics<M>, M: MessageGenerics> ActorSupervisor<G, M> {
                     };
 
                     // Decode it
-                    let decoded = message.decode::<M, G::Serializer, <G::Actor as Actor>::Error>();
+                    let decoded = message.decode::<AP, S, S::Serializer, <AP::Actor as Actor>::Error>();
 
                     // If there is an error, ignore it for nor
                     let Ok(decoded) = decoded else {
@@ -168,7 +145,7 @@ impl<G: SupervisorGenerics<M>, M: MessageGenerics> ActorSupervisor<G, M> {
                             };
 
                             // Serialize the response
-                            let res = G::Serializer::serialize::<_, <G::Actor as Actor>::Error>(res);
+                            let res = S::Serializer::serialize::<_, <AP::Actor as Actor>::Error>(res);
 
                             // If error, continue
                             let Ok(res) = res else {
@@ -176,7 +153,7 @@ impl<G: SupervisorGenerics<M>, M: MessageGenerics> ActorSupervisor<G, M> {
                             };
 
                             // Respond
-                            let _ = message.respond::<<G::Actor as Actor>::Error>(res);
+                            let _ = message.respond::<<AP::Actor as Actor>::Error>(res);
                         },
                         #[cfg(federated)]
                         crate::message::foreign::ForeignType::Federated(m) => {
@@ -189,7 +166,7 @@ impl<G: SupervisorGenerics<M>, M: MessageGenerics> ActorSupervisor<G, M> {
                             };
 
                             // Serialize the response
-                            let res = G::Serializer::serialize::<_, <G::Actor as Actor>::Error>(res);
+                            let res = S::Serializer::serialize::<_, <AP::Actor as Actor>::Error>(res);
 
                             // If error, continue
                             let Ok(res) = res else {
@@ -197,7 +174,7 @@ impl<G: SupervisorGenerics<M>, M: MessageGenerics> ActorSupervisor<G, M> {
                             };
 
                             // Respond
-                            let _ = message.respond::<<G::Actor as Actor>::Error>(res);
+                            let _ = message.respond::<<AP::Actor as Actor>::Error>(res);
                         },
                     }
                 }

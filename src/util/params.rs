@@ -4,22 +4,26 @@
 
 use core::marker::PhantomData;
 
-use crate::actor::{supervisor::SupervisorGenerics, Actor, Handle};
-use crate::message::{Message, MessageGenerics};
+use serde::Serializer;
+
+use crate::actor::{Actor, Handle};
+use crate::message::Message;
 
 use crate::message::serializer::MessageSerializer;
 
-/// # `SupervisorParams`
-/// A simply way to convert [`SupervisorGenerics`]' associated types to generics.
-pub struct SupervisorParams<A, S>(PhantomData<(A, S)>);
+use super::generic_abstractions::{ActorParams, MessageParams, SystemParams};
+
+/// # `ActorGenerics`
+/// A simple way to convert [`ActorParams`]' associated types to generics.
+pub struct ActorGenerics<A: Actor, M: Message>(PhantomData<(A, M)>);
 
 /// # `ParamActor`
 /// Used by [`SupervisorParams`] in conjunction with the [`cfg_matrix`] crate to simplify `#[cfg]`s
 #[cfg_matrix::cfg_matrix {
-    Handle<M::Federated> : federated,
-    Handle<M::Notification>: notification
+    Handle<<S::SystemMessages as MessageParams>::Federated> : federated,
+    Handle<<S::SystemMessages as MessageParams>::Notification>: notification
 }]
-pub trait ParamActor<M: MessageGenerics>: Actor + Handle<M::Message> {}
+pub trait ParamActor<M: Message, S: SystemParams>: Actor + Handle<M> {}
 
 // Implementing [`ParamActor`] for every type that matches its constraints.
 // I am woring on an extention to [`cfg_matrix`] to do this automagically, and will
@@ -27,56 +31,74 @@ pub trait ParamActor<M: MessageGenerics>: Actor + Handle<M::Message> {}
 
 cfg_if::cfg_if! {
     if #[cfg(all(federated, notification))] {
-        impl<T: Actor + Handle<M::Message> + Handle<M::Federated> + Handle<M::Notification>, M>
-            ParamActor<M> for T
+        impl<T, M, S> ParamActor<M, S> for T
         where
-            M: MessageGenerics,
+            T: Actor
+                + Handle<M>
+                + Handle<<S::SystemMessages as MessageParams>::Federated>
+                + Handle<<S::SystemMessages as MessageParams>::Notification>,
+            M: Message,
+            S: SystemParams,
         {
         }
     } else if #[cfg(federated)] {
-        impl<T: Actor + Handle<M::Message> + Handle<M::Federated>, M>
-            ParamActor<M> for T
+        impl<T, M, S> ParamActor<M, S> for T
         where
-            M: MessageGenerics,
+            T: Actor
+                + Handle<M>
+                + Handle<<S::SystemMessages as MessageParams>::Federated>,
+            M: Message,
+            S: SystemParams,
         {
         }
     } else if #[cfg(notification)] {
-        impl<T: Actor + Handle<M::Message> + Handle<M::Notification>, M>
-            ParamActor<M> for T
+        impl<T, M, S> ParamActor<M, S> for T
         where
-            M: MessageGenerics,
+            T: Actor
+                + Handle<M>
+                + Handle<<S::SystemMessages as MessageParams>::Notification>,
+            M: Message,
+            S: SystemParams,
         {
         }
     } else {
-        impl<T: Actor + Handle<M::Message>, M>
-            ParamActor<M> for T
+        impl<T, M, S> ParamActor<M, S> for T
         where
-            M: MessageGenerics,
+            T: Actor
+                + Handle<M>,
+            M: Message,
+            S: SystemParams,
         {
         }
     }
 }
 
-impl<A: ParamActor<M>, #[cfg(serde)] S: MessageSerializer, M: MessageGenerics> SupervisorGenerics<M>
-    for SupervisorParams<A, S>
-{
-    type Actor = A;
-    #[cfg(serde)]
-    type Serializer = S;
-}
-
-/// # `MessageParams`
-/// A simply way to convert [`MessageGenerics`]' associated types to generics.
-pub struct MessageParams<M, N, F>(PhantomData<(M, N, F)>);
-
-impl<M: Message, #[cfg(notification)] N: Message, #[cfg(federated)] F: Message> MessageGenerics
-    for MessageParams<M, N, F>
-{
+impl<A: ParamActor<M, S>, M: Message, S: SystemParams> ActorParams<S> for ActorGenerics<A, M> {
     type Message = M;
 
-    #[cfg(notification)]
-    type Notification = N;
-
-    #[cfg(federated)]
-    type Federated = F;
+    type Actor = A;
 }
+
+/// # [`SystemGenerics`]
+/// A simple way to convert [`SystemParams`]' associated types to generics.
+pub struct SystemGenerics<M: MessageParams, #[cfg(serde)] SD: MessageSerializer>(
+    PhantomData<M>,
+    #[cfg(serde)] PhantomData<SD>,
+);
+
+#[cfg(serde)]
+impl<M: MessageParams, SD: MessageSerializer> SystemParams for SystemGenerics<M, SD> {
+    #[cfg(any(federated, notification))]
+    type SystemMessages = M;
+
+    #[cfg(serde)]
+    type Serializer = SD;
+}
+
+#[cfg(not(serde))]
+impl<M: MessageParams> SystemParams for SystemGenerics<M> {
+    type SystemMessages = M;
+}
+
+/// A simple way to convert [`MessageParams`]' associated types to generics
+pub struct MessageGenerics();
