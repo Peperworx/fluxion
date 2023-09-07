@@ -56,8 +56,6 @@ impl<'a, S: SystemParams> System<'a, S> {
         // Get the supervisor's reference
         let actor_ref = supervisor.get_ref();
 
-        
-
         todo!()
     }
 }

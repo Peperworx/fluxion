@@ -14,10 +14,10 @@ use super::supervisor::SupervisorMessage;
 /// The primary clonable method of communication with an actor.
 pub struct ActorRef<AP: ActorParams<S>, S: SystemParams> {
     /// The message channel
-    pub(crate) messages: Channel<SupervisorMessage<AP, S>>,
+    pub(crate) messages: flume::Sender<SupervisorMessage<AP, S>>,
     /// The foreign message channel
     #[cfg(foreign)]
-    pub(crate) foreign: Channel<ForeignMessage>,
+    pub(crate) foreign: flume::Sender<ForeignMessage>,
 }
 
 impl<AP: ActorParams<S>, S: SystemParams> ActorRef<AP, S> {

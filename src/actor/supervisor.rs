@@ -2,6 +2,7 @@
 //! The actor supervisor is responsible for handling the actor's entire lifecycle, including dispatching messages
 //! and handling shutdowns.
 
+use crate::message::foreign;
 use crate::util::generic_abstractions::{ActorParams, SystemParams};
 use crate::Channel;
 use crate::{actor::actor_ref::ActorRef, message::MessageHandler};
@@ -19,11 +20,20 @@ use super::wrapper::ActorWrapper;
 
 #[cfg(foreign)]
 use super::Actor;
+/// # [`ReceivedOverChannel`]
+/// This enum is used to combine every channel's response into a single variable, allowing us to select on them
+/// without relying on `std` features.
+enum ReceivedOverChannel<AP: ActorParams<S>, S: SystemParams> {
+    Message(SupervisorMessage<AP, S>),
+    #[cfg(notification)]
+    Notification(<S::SystemMessages as MessageParams>::Notification),
+    #[cfg(foreign)]
+    Foreign(ForeignMessage),
+}
 
 /// # `SupervisorMessage`
 /// An enum that contains different message types depending on feature flags. This is an easy way
 /// to send several different types of messages over the same channel.
-#[derive(Clone)]
 pub enum SupervisorMessage<AP: ActorParams<S>, S: SystemParams> {
     /// A regular message
     Message(MessageHandler<AP::Message>),
@@ -75,134 +85,144 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
 
     pub fn get_ref(&self) -> ActorRef<AP, S> {
         ActorRef {
-            messages: self.message_channel.clone(),
+            messages: self.message_channel.0.clone(),
             #[cfg(foreign)]
-            foreign: self.foreign_channel.clone(),
+            foreign: self.foreign_channel.0.clone(),
         }
     }
 
     /// Executes the actor's main loop
     pub async fn run(&mut self) {
         // Convert the receivers to futures that are easily awaitable
-        let mut messages = self.message_channel.1.clone().into_recv_async();
+        let mut messages = &self.message_channel.1;
 
         #[cfg(notification)]
-        let mut notifications = self.notification_channel.1.clone().into_recv_async();
-        #[cfg(not(notification))]
-        let mut notifications = futures::future::pending::<()>();
+        let mut notifications = &self.notification_channel.1;
 
         #[cfg(foreign)]
-        let mut foreign_messages = self.foreign_channel.1.clone().into_recv_async();
-        #[cfg(not(foreign))]
-        let mut foreign_messages = futures::future::pending::<()>();
+        let mut foreign_messages = &self.foreign_channel.1;
 
         loop {
-            futures::select! {
-                notification = notifications => { #[cfg(notification)] {
-                    // If there is an error, ignore it for nor
-                    let Ok(notification) = notification else {
-                        continue;
-                    };
+            // Try to poll messages
+            let message = messages.try_recv();
 
-                    // Dispatch the notification as a message
-                    let _ = self.actor.dispatch(&notification).await;
-                } #[cfg_attr(not(notification), allow(unused_variables))]{} }, // Suppress unused `notification`
-                message = messages => {
-                    // If there is an error, ignore it for nor
-                    let Ok(message) = message else {
-                        continue;
-                    };
+            // If it succeeded, handle the message
+        }
+    }
 
-                    // Match on the message, and dispatch depending on if it is a regular or federated message
-                    match message {
-                        SupervisorMessage::Message(mut m) => {
-                            // Dispatch
-                            let res = self.actor.dispatch(m.message()).await;
+    /// Handles a message
+    async fn handle_message(
+        &mut self,
+        message: Result<SupervisorMessage<AP, S>, flume::RecvError>,
+    ) {
+        // If there is an error, ignore it for nor
+        let Ok(message) = message else {
+            return;
+        };
 
-                            // If error, continue
-                            let Ok(res) = res else {
-                                continue;
-                            };
+        // Match on the message, and dispatch depending on if it is a regular or federated message
+        match message {
+            SupervisorMessage::Message(mut m) => {
+                // Dispatch
+                let res = self.actor.dispatch(m.message()).await;
 
-                            // Respond
-                            let _ = m.respond(res);
-                            // Ignore error for now
-                        },
-                        #[cfg(federated)]
-                        SupervisorMessage::Federated(mut m) => {
-                            // Dispatch
-                            let res = self.actor.dispatch(m.message()).await;
+                // If error, continue
+                let Ok(res) = res else {
+                    return;
+                };
 
-                            // If error, continue
-                            let Ok(res) = res else {
-                                continue;
-                            };
+                // Respond
+                let _ = m.respond(res);
+                // Ignore error for now
+            }
+            #[cfg(federated)]
+            SupervisorMessage::Federated(mut m) => {
+                // Dispatch
+                let res = self.actor.dispatch(m.message()).await;
 
-                            // Respond
-                            let _ = m.respond(res);
-                            // Ignore error for now
-                        },
-                    };
-                },
-                foreign = foreign_messages => { #[cfg(foreign)] {
-                    // If there is an error, ignore it for now
-                    let Ok(mut message) = foreign else {
-                        continue;
-                    };
+                // If error, continue
+                let Ok(res) = res else {
+                    return;
+                };
 
-                    // Decode it
-                    let decoded = message.decode::<AP, S, S::Serializer, <AP::Actor as Actor>::Error>();
+                // Respond
+                let _ = m.respond(res);
+                // Ignore error for now
+            }
+        }
+    }
 
-                    // If there is an error, ignore it for nor
-                    let Ok(decoded) = decoded else {
-                        continue;
-                    };
+    /// Handles a notification received over the channel
+    async fn handle_notification(
+        &mut self,
+        notification: Result<<S::SystemMessages as MessageParams>::Notification, flume::RecvError>,
+    ) {
+        // If there is an error, ignore it for nor
+        let Ok(notification) = notification else {
+            return;
+        };
 
-                    // match on the type, dispatch, serialize response, and respond
-                    match decoded {
-                        crate::message::foreign::ForeignType::Message(m) => {
-                            // Dispatch
-                            let res = self.actor.dispatch(&m).await;
+        // Dispatch the notification as a message
+        let _ = self.actor.dispatch(&notification).await;
+    }
 
-                            // If error, continue
-                            let Ok(res) = res else {
-                                continue;
-                            };
+    /// Handles a foreign message
+    async fn handle_foreign(&mut self, foreign: Result<ForeignMessage, flume::RecvError>) {
+        // If there is an error, ignore it for now
+        let Ok(mut message) = foreign else {
+            return;
+        };
 
-                            // Serialize the response
-                            let res = S::Serializer::serialize::<_, <AP::Actor as Actor>::Error>(res);
+        // Decode it
+        let decoded = message.decode::<AP, S, S::Serializer, <AP::Actor as Actor>::Error>();
 
-                            // If error, continue
-                            let Ok(res) = res else {
-                                continue;
-                            };
+        // If there is an error, ignore it for nor
+        let Ok(decoded) = decoded else {
+            return;
+        };
 
-                            // Respond
-                            let _ = message.respond::<<AP::Actor as Actor>::Error>(res);
-                        },
-                        #[cfg(federated)]
-                        crate::message::foreign::ForeignType::Federated(m) => {
-                            // Dispatch
-                            let res = self.actor.dispatch(&m).await;
+        // match on the type, dispatch, serialize response, and respond
+        match decoded {
+            crate::message::foreign::ForeignType::Message(m) => {
+                // Dispatch
+                let res = self.actor.dispatch(&m).await;
 
-                            // If error, continue
-                            let Ok(res) = res else {
-                                continue;
-                            };
+                // If error, continue
+                let Ok(res) = res else {
+                    return;
+                };
 
-                            // Serialize the response
-                            let res = S::Serializer::serialize::<_, <AP::Actor as Actor>::Error>(res);
+                // Serialize the response
+                let res = S::Serializer::serialize::<_, <AP::Actor as Actor>::Error>(res);
 
-                            // If error, continue
-                            let Ok(res) = res else {
-                                continue;
-                            };
+                // If error, continue
+                let Ok(res) = res else {
+                    return;
+                };
 
-                            // Respond
-                            let _ = message.respond::<<AP::Actor as Actor>::Error>(res);
-                        },
-                    } #[cfg_attr(not(notification), allow(unused_variables))]{} } // Suppress unused `foreign`
-                }
+                // Respond
+                let _ = message.respond::<<AP::Actor as Actor>::Error>(res);
+            }
+            #[cfg(federated)]
+            crate::message::foreign::ForeignType::Federated(m) => {
+                // Dispatch
+                let res = self.actor.dispatch(&m).await;
+
+                // If error, continue
+                let Ok(res) = res else {
+                    return;
+                };
+
+                // Serialize the response
+                let res = S::Serializer::serialize::<_, <AP::Actor as Actor>::Error>(res);
+
+                // If error, continue
+                let Ok(res) = res else {
+                    return;
+                };
+
+                // Respond
+                let _ = message.respond::<<AP::Actor as Actor>::Error>(res);
             }
         }
     }
