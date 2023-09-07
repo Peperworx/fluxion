@@ -18,6 +18,5 @@ The winner seems obvious at first: share the type of the Actor, not the Message.
 An additional issue is determining which type foreign messages should deserialize to. This can also get very messy with multiply message types, so Fluxion constrains each actor to handling a single message type.
 
 
-
 ## License
 Fluxion is Dual-Licensed under Apache 2.0 and MIT.
