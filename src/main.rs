@@ -70,8 +70,8 @@ async fn main() {
 
     let mut supervisor = ActorSupervisor::<
         ActorGenerics<TestActor, TestMessage>,
-        SystemGenerics<MessageGenerics<(), ()>, BincodeSerializer>,
-    >::new(actor, notification_channel);
+        SystemGenerics<(), BincodeSerializer>,
+    >::new(actor, notification_channel.clone());
 
     // Get the ref
     let a = supervisor.get_ref();
@@ -81,4 +81,6 @@ async fn main() {
         supervisor.run().await;
     });
     a.request(TestMessage).await;
+
+    notification_channel.0.send_async(()).await;
 }

@@ -8,6 +8,7 @@ pub mod params;
 pub mod generic_abstractions;
 
 /// A utility used to store a two-way channel concisely
+#[derive(Clone, Debug)]
 pub struct Channel<T>(pub flume::Sender<T>, pub flume::Receiver<T>);
 
 impl<T> Channel<T> {

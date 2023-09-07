@@ -135,5 +135,10 @@ impl<F: Message, N: Message> MessageParams for MessageGenerics<F, N> {
     type Notification = N;
 }
 
-#[cfg(not(any(federated, notification)))]
-impl MessageParams for () {}
+impl MessageParams for () {
+    #[cfg(federated)]
+    type Federated = ();
+
+    #[cfg(notification)]
+    type Notification = ();
+}
