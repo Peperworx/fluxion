@@ -101,4 +101,31 @@ impl<M: MessageParams> SystemParams for SystemGenerics<M> {
 }
 
 /// A simple way to convert [`MessageParams`]' associated types to generics
-pub struct MessageGenerics();
+pub struct MessageGenerics<#[cfg(federated)] F: Message, #[cfg(notification)] N: Message>(
+    #[cfg(federated)] PhantomData<F>,
+    #[cfg(notification)] PhantomData<N>,
+);
+
+cfg_if::cfg_if! {
+    if #[cfg(all(federated, notification))] {
+        impl<F: Message, N: Message> MessageParams for MessageGenerics<F, N> {
+            type Federated = F;
+
+            type Notification = N;
+        }
+    } else if #[cfg(federated)] {
+        impl<F: Message> MessageParams for MessageGenerics<F> {
+            type Federated = F;
+        }
+    } else if #[cfg(notification)] {
+        impl<N: Message> MessageParams for MessageGenerics<N> {
+            type Notification = N;
+        }
+    } else {
+        impl MessageParams for MessageGenerics {
+        }
+        impl MessageParams for () {
+
+        }
+    }
+}

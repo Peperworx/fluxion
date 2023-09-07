@@ -4,8 +4,6 @@ WORKDIR /home/
 
 COPY . .
 
-ADD setup.sh /
-
-RUN /setup.sh
+RUN bash ./setup.sh
 
 ENV PATH="/root/.cargo/bin:$PATH"
