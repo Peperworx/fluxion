@@ -3,8 +3,9 @@
 
 use crate::{
     error::FluxionError,
-    message::{Message, MessageHandler},
+    message::{foreign::ForeignMessage, Message, MessageHandler},
     util::generic_abstractions::{ActorParams, SystemParams},
+    Channel,
 };
 
 use super::supervisor::SupervisorMessage;
@@ -12,8 +13,11 @@ use super::supervisor::SupervisorMessage;
 /// # `ActorRef`
 /// The primary clonable method of communication with an actor.
 pub struct ActorRef<AP: ActorParams<S>, S: SystemParams> {
-    /// The message sender for sending messages to the actor
-    pub(crate) message_sender: flume::Sender<SupervisorMessage<AP, S>>,
+    /// The message channel
+    pub(crate) messages: Channel<SupervisorMessage<AP, S>>,
+    /// The foreign message channel
+    #[cfg(foreign)]
+    pub(crate) foreign: Channel<ForeignMessage>,
 }
 
 impl<AP: ActorParams<S>, S: SystemParams> ActorRef<AP, S> {

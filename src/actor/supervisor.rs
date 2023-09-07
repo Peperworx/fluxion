@@ -23,6 +23,7 @@ use super::Actor;
 /// # `SupervisorMessage`
 /// An enum that contains different message types depending on feature flags. This is an easy way
 /// to send several different types of messages over the same channel.
+#[derive(Clone)]
 pub enum SupervisorMessage<AP: ActorParams<S>, S: SystemParams> {
     /// A regular message
     Message(MessageHandler<AP::Message>),
@@ -74,7 +75,9 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
 
     pub fn get_ref(&self) -> ActorRef<AP, S> {
         ActorRef {
-            message_sender: self.message_channel.0.clone(),
+            messages: self.message_channel.clone(),
+            #[cfg(foreign)]
+            foreign: self.foreign_channel.clone(),
         }
     }
 
@@ -95,15 +98,15 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
 
         loop {
             futures::select! {
-                _notification = notifications => #[cfg(notification)] {
+                notification = notifications => { #[cfg(notification)] {
                     // If there is an error, ignore it for nor
-                    let Ok(notification) = _notification else {
+                    let Ok(notification) = notification else {
                         continue;
                     };
 
                     // Dispatch the notification as a message
                     let _ = self.actor.dispatch(&notification).await;
-                },
+                } #[cfg_attr(not(notification), allow(unused_variables))]{} }, // Suppress unused `notification`
                 message = messages => {
                     // If there is an error, ignore it for nor
                     let Ok(message) = message else {
@@ -141,9 +144,9 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
                         },
                     };
                 },
-                _foreign = foreign_messages => #[cfg(foreign)] {
-                    // If there is an error, ignore it for nor
-                    let Ok(mut message) = _foreign else {
+                foreign = foreign_messages => { #[cfg(foreign)] {
+                    // If there is an error, ignore it for now
+                    let Ok(mut message) = foreign else {
                         continue;
                     };
 
@@ -198,7 +201,7 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
                             // Respond
                             let _ = message.respond::<<AP::Actor as Actor>::Error>(res);
                         },
-                    }
+                    } #[cfg_attr(not(notification), allow(unused_variables))]{} } // Suppress unused `foreign`
                 }
             }
         }
