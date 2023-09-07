@@ -4,7 +4,7 @@ use fluxion::{
     actor::{supervisor::ActorSupervisor, Actor, ActorContext, Handle},
     error::FluxionError,
     message::{serializer::MessageSerializer, Message},
-    Channel, MessageParams, SupervisorParams,
+    ActorGenerics, Channel, MessageGenerics, SystemGenerics,
 };
 
 use serde::{Deserialize, Serialize};
@@ -69,8 +69,8 @@ async fn main() {
     let notification_channel = Channel::unbounded();
 
     let mut supervisor = ActorSupervisor::<
-        SupervisorParams<TestActor, BincodeSerializer>,
-        MessageParams<TestMessage, (), ()>,
+        ActorGenerics<TestActor, TestMessage>,
+        SystemGenerics<MessageGenerics<(), ()>, BincodeSerializer>,
     >::new(actor, notification_channel);
 
     // Get the ref

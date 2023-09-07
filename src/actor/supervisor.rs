@@ -2,9 +2,12 @@
 //! The actor supervisor is responsible for handling the actor's entire lifecycle, including dispatching messages
 //! and handling shutdowns.
 
-use crate::util::generic_abstractions::{ActorParams, MessageParams, SystemParams};
+use crate::util::generic_abstractions::{ActorParams, SystemParams};
 use crate::Channel;
 use crate::{actor::actor_ref::ActorRef, message::MessageHandler};
+
+#[cfg(any(federated, notification))]
+use crate::util::generic_abstractions::MessageParams;
 
 #[cfg(serde)]
 use crate::message::serializer::MessageSerializer;
@@ -12,7 +15,10 @@ use crate::message::serializer::MessageSerializer;
 #[cfg(foreign)]
 use crate::message::foreign::ForeignMessage;
 
-use super::{wrapper::ActorWrapper, Actor, Handle};
+use super::wrapper::ActorWrapper;
+
+#[cfg(foreign)]
+use super::Actor;
 
 /// # `SupervisorMessage`
 /// An enum that contains different message types depending on feature flags. This is an easy way
@@ -21,6 +27,7 @@ pub enum SupervisorMessage<AP: ActorParams<S>, S: SystemParams> {
     /// A regular message
     Message(MessageHandler<AP::Message>),
     /// A federated message
+    #[cfg(federated)]
     Federated(MessageHandler<<S::SystemMessages as MessageParams>::Federated>),
 }
 
@@ -32,8 +39,10 @@ pub struct ActorSupervisor<AP: ActorParams<S>, S: SystemParams> {
     /// The message channel responsible for receiving regular messages.
     message_channel: Channel<SupervisorMessage<AP, S>>,
     /// The channel responsible for receiving notifications
+    #[cfg(notification)]
     notification_channel: Channel<<S::SystemMessages as MessageParams>::Notification>,
     /// The channel that receives foreign messages
+    #[cfg(foreign)]
     foreign_channel: Channel<ForeignMessage>,
 }
 
@@ -41,19 +50,24 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
     /// Creates a new actor supervisor
     pub fn new(
         actor: AP::Actor,
-        notification_channel: Channel<<S::SystemMessages as MessageParams>::Notification>,
+        #[cfg(notification)] notification_channel: Channel<
+            <S::SystemMessages as MessageParams>::Notification,
+        >,
     ) -> Self {
         // Create the message channel
         let message_channel = Channel::unbounded();
 
         // Create the foreign channel
+        #[cfg(foreign)]
         let foreign_channel = Channel::unbounded();
 
         // Create the supervisor
         Self {
             actor: ActorWrapper::new(actor),
             message_channel,
+            #[cfg(notification)]
             notification_channel,
+            #[cfg(foreign)]
             foreign_channel,
         }
     }
@@ -67,15 +81,23 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
     /// Executes the actor's main loop
     pub async fn run(&mut self) {
         // Convert the receivers to futures that are easily awaitable
-        let mut notifications = self.notification_channel.1.clone().into_recv_async();
         let mut messages = self.message_channel.1.clone().into_recv_async();
+
+        #[cfg(notification)]
+        let mut notifications = self.notification_channel.1.clone().into_recv_async();
+        #[cfg(not(notification))]
+        let mut notifications = futures::future::pending::<()>();
+
+        #[cfg(foreign)]
         let mut foreign_messages = self.foreign_channel.1.clone().into_recv_async();
+        #[cfg(not(foreign))]
+        let mut foreign_messages = futures::future::pending::<()>();
 
         loop {
             futures::select! {
-                notification = notifications => {
+                _notification = notifications => #[cfg(notification)] {
                     // If there is an error, ignore it for nor
-                    let Ok(notification) = notification else {
+                    let Ok(notification) = _notification else {
                         continue;
                     };
 
@@ -119,9 +141,9 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
                         },
                     };
                 },
-                foreign = foreign_messages => {
+                _foreign = foreign_messages => #[cfg(foreign)] {
                     // If there is an error, ignore it for nor
-                    let Ok(mut message) = foreign else {
+                    let Ok(mut message) = _foreign else {
                         continue;
                     };
 

@@ -4,8 +4,6 @@
 use alloc::{collections::BTreeMap, string::String, sync::Arc};
 use async_rwlock::RwLock;
 
-use crate::message::Message;
-
 pub struct System {
     /// The map which contains every actor.
     /// This is wrapped in an [`Arc`] and [`RwLock`] to allow it to be accessed from many different tasks.

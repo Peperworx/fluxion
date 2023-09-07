@@ -16,6 +16,6 @@ pub mod system;
 pub mod util;
 
 pub use util::{
-    params::{MessageParams, ParamActor, SupervisorParams},
+    params::{ActorGenerics, MessageGenerics, ParamActor, SystemGenerics},
     Channel,
 };

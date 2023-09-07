@@ -13,8 +13,11 @@
 
 use crate::{
     actor::{Actor, Handle},
-    message::{serializer::MessageSerializer, Message},
+    message::Message,
 };
+
+#[cfg(serde)]
+use crate::message::serializer::MessageSerializer;
 
 /// # [`MessageParams`]
 /// The simplest generic abstraction, containing the federated message and notification types.
@@ -68,7 +71,7 @@ pub trait ActorParams<S: SystemParams> {
                 + Handle<<S::SystemMessages as MessageParams>::Federated>;
         } else {
             /// The type of the actor itself.
-            type Actor: Actor + Handle<<Self::Messages as MessageParams>::Message>;
+            type Actor: Actor + Handle<Self::Message>;
         }
     }
 }
