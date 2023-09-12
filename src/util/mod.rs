@@ -24,6 +24,4 @@ impl<T> Channel<T> {
 /// This can be used for testing purposes, and is done because other crates can't implement [`Message`] on [`()`] anyways.
 impl Message for () {
     type Response = ();
-
-    type Error = ();
 }

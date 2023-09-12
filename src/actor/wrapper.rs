@@ -1,8 +1,7 @@
 //! # `ActorWrapper`
 //! Wraps an implementor of [`Actor`], enabling the dispatch of messages, as well as handling actor context.
 
-use crate::error::FluxionError;
-use crate::message::Message;
+use crate::{error::ActorError, message::Message};
 
 use super::{Actor, ActorContext, Handle};
 
@@ -34,7 +33,7 @@ impl<A: Actor> ActorWrapper<A> {
     pub async fn dispatch<M: Message>(
         &mut self,
         message: &M,
-    ) -> Result<M::Response, FluxionError<A::Error>>
+    ) -> Result<M::Response, ActorError<A::Error>>
     where
         A: Handle<M>,
     {
@@ -45,7 +44,7 @@ impl<A: Actor> ActorWrapper<A> {
     ///
     /// # Errors
     /// Returns any error returned by the actor's initialization logic.
-    pub async fn initialize(&mut self) -> Result<(), FluxionError<A::Error>> {
+    pub async fn initialize(&mut self) -> Result<(), ActorError<A::Error>> {
         self.actor.initialize(&mut self.context).await
     }
 
@@ -53,7 +52,7 @@ impl<A: Actor> ActorWrapper<A> {
     ///
     /// # Errors
     /// Returns any error returned by the actor's deinitialization logic.
-    pub async fn deinitialize(&mut self) -> Result<(), FluxionError<A::Error>> {
+    pub async fn deinitialize(&mut self) -> Result<(), ActorError<A::Error>> {
         self.actor.deinitialize(&mut self.context).await
     }
 
@@ -63,8 +62,8 @@ impl<A: Actor> ActorWrapper<A> {
     /// Returns any error returned by the actor's cleanup logic.
     pub async fn cleanup(
         &mut self,
-        error: Option<FluxionError<A::Error>>,
-    ) -> Result<(), FluxionError<A::Error>> {
+        error: Option<ActorError<A::Error>>,
+    ) -> Result<(), ActorError<A::Error>> {
         self.actor.cleanup(error).await
     }
 }

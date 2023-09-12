@@ -1,7 +1,8 @@
 //! This module contains the [`MessageSerializer`] trait, which simplifies the serialization and deserialization of messages,
 //! and enables different serialization systems to be implemented with very simple glue code.
 
-use crate::error::FluxionError;
+use crate::error::MessageError;
+
 use {
     alloc::vec::Vec,
     serde::{Deserialize, Serialize},
@@ -14,11 +15,11 @@ pub trait MessageSerializer: 'static {
     ///
     /// # Errors
     /// This function should only ever error with a [`FluxionError::DeserializeError`].
-    fn deserialize<T: for<'a> Deserialize<'a>, E>(message: &[u8]) -> Result<T, FluxionError<E>>;
+    fn deserialize<T: for<'a> Deserialize<'a>>(message: &[u8]) -> Result<T, MessageError>;
 
     /// Serialize a message
     ///
     /// # Errors
     /// This function should only ever error with a [`FluxionError::SerializeError`].
-    fn serialize<T: Serialize, E>(message: T) -> Result<Vec<u8>, FluxionError<E>>;
+    fn serialize<T: Serialize>(message: T) -> Result<Vec<u8>, MessageError>;
 }

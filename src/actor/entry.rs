@@ -2,7 +2,7 @@
 
 use core::any::Any;
 
-use crate::{error::FluxionError, message::foreign::ForeignMessage};
+use crate::{error::MessageError, message::foreign::ForeignMessage};
 
 #[cfg(async_trait)]
 use alloc::boxed::Box;
@@ -21,5 +21,5 @@ pub trait ActorEntry: Any {
     /// # Errors
     /// This function may error whenever handling the foreign message fails.
     /// This varies depending on implementation.
-    async fn handle_foreign<E>(&self, message: ForeignMessage) -> Result<(), FluxionError<E>>;
+    async fn handle_foreign(&self, message: ForeignMessage) -> Result<(), MessageError>;
 }

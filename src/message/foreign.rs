@@ -3,7 +3,7 @@
 use alloc::vec::Vec;
 
 use crate::{
-    error::FluxionError,
+    error::MessageError,
     util::generic_abstractions::{ActorParams, MessageParams, SystemParams},
 };
 
@@ -30,24 +30,24 @@ impl ForeignMessage {
     ///
     /// # Errors
     /// This function may return an error due to a closed channel. This error is unrecoverable.
-    pub fn respond<E>(&mut self, response: Vec<u8>) -> Result<(), FluxionError<E>> {
+    pub fn respond(&mut self, response: Vec<u8>) -> Result<(), MessageError> {
         self.responder
             .send(response)
-            .or(Err(FluxionError::ResponseFailed))
+            .or(Err(MessageError::ResponseFailed))
     }
 
     /// Decode the contents of the message
     ///
     /// # Errors
     /// May return an error when deserialization fails.
-    pub fn decode<AP: ActorParams<S>, S: SystemParams, SD: MessageSerializer, E>(
+    pub fn decode<AP: ActorParams<S>, S: SystemParams>(
         &self,
-    ) -> Result<ForeignType<AP, S>, FluxionError<E>>
+    ) -> Result<ForeignType<AP, S>, MessageError>
     where
         AP::Message: for<'a> Deserialize<'a>,
         <S::SystemMessages as MessageParams>::Federated: for<'a> Deserialize<'a>,
     {
-        SD::deserialize(&self.message)
+        S::Serializer::deserialize(&self.message)
     }
 }
 

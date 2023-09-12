@@ -3,7 +3,7 @@
 //! If federated messages are enabled, the actor MUST implement a trait to handle federated messages.
 //! If notifications are enabled, the actor MAY implement a trait to handle notifications.
 
-use crate::error::FluxionError;
+use crate::error::ActorError;
 use crate::message::Message;
 
 pub mod actor_ref;
@@ -48,7 +48,7 @@ pub trait Actor: Send + Sync + 'static {
     async fn initialize(
         &mut self,
         _context: &mut ActorContext,
-    ) -> Result<(), FluxionError<Self::Error>> {
+    ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
     }
 
@@ -56,15 +56,15 @@ pub trait Actor: Send + Sync + 'static {
     async fn deinitialize(
         &mut self,
         _context: &mut ActorContext,
-    ) -> Result<(), FluxionError<Self::Error>> {
+    ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
     }
 
     /// The function run upon actor cleanup
     async fn cleanup(
         &mut self,
-        _error: Option<FluxionError<Self::Error>>,
-    ) -> Result<(), FluxionError<Self::Error>> {
+        _error: Option<ActorError<Self::Error>>,
+    ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
     }
 }
@@ -77,5 +77,5 @@ pub trait Handle<M: Message>: Actor {
         &mut self,
         message: &M,
         _context: &mut ActorContext,
-    ) -> Result<M::Response, FluxionError<Self::Error>>;
+    ) -> Result<M::Response, ActorError<Self::Error>>;
 }

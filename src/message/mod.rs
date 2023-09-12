@@ -1,10 +1,10 @@
 //! # Message
 //! The [`Message`] trait encapsulates all Messages that can be sent between actors, including Notifications and Federated Messages.
 
-use crate::error::FluxionError;
-
 #[cfg(serde)]
 use serde::{Deserialize, Serialize};
+
+use crate::error::MessageError;
 
 #[cfg(serde)]
 pub mod serializer;
@@ -19,17 +19,11 @@ pub mod foreign;
 pub trait Message: Send + Sync + 'static {
     /// The message's response
     type Response: Send + Sync + 'static;
-
-    /// The custom error type that might be returned by the message
-    type Error: Send + Sync + 'static;
 }
 #[cfg(serde)]
 pub trait Message: Serialize + for<'a> Deserialize<'a> + Send + Sync + 'static {
     /// The message's response
     type Response: Serialize + for<'a> Deserialize<'a> + Send + Sync + 'static;
-
-    /// The custom error type that might be returned by the message
-    type Error: Send + Sync + 'static;
 }
 
 /// # `MessageHandler`
@@ -52,10 +46,10 @@ impl<M: Message> MessageHandler<M> {
     ///
     /// # Errors
     /// This function may return an error due to a closed channel. This error is unrecoverable.
-    pub fn respond(&mut self, response: M::Response) -> Result<(), FluxionError<M::Error>> {
+    pub fn respond(&mut self, response: M::Response) -> Result<(), MessageError> {
         self.responder
             .send(response)
-            .or(Err(FluxionError::ResponseFailed))
+            .or(Err(MessageError::ResponseFailed))
     }
 
     /// Returns the contained message

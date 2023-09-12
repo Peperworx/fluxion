@@ -4,7 +4,7 @@
 use core::any::Any;
 
 use crate::{
-    error::FluxionError,
+    error::MessageError,
     message::{foreign::ForeignMessage, Message, MessageHandler},
     util::generic_abstractions::{ActorParams, SystemParams},
     Channel,
@@ -40,16 +40,15 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorRef<AP, S> {
     ///
     /// # Errors
     /// This function may generate two possible errors:
-    /// * [`FluxionError::SendError`] is returned if the underlying mpmc channel fails transmission.
+    /// * [`MessageError::SendError`] is returned if the underlying mpmc channel fails transmission.
     /// This happens when there are no longer any receivers, meaning that the actor supervisor has been stopped or has crashed.
-    /// * [`FluxionError::ResponseFailed`] is returned when the response receiver fails to receive a response.
+    /// * [`MessageError::ResponseFailed`] is returned when the response receiver fails to receive a response.
     /// This only ever happens when the actor drops the response sender, which may be caused by an error in the actor's handling of the message.
     ///
     pub async fn request(
         &self,
         message: AP::Message,
-    ) -> Result<<AP::Message as Message>::Response, FluxionError<<AP::Message as Message>::Error>>
-    {
+    ) -> Result<<AP::Message as Message>::Response, MessageError> {
         // Create a oneshot for the message
         let (responder, response) = async_oneshot::oneshot();
 
@@ -60,10 +59,10 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorRef<AP, S> {
         self.messages
             .send_async(handler)
             .await
-            .or(Err(FluxionError::SendError))?;
+            .or(Err(MessageError::SendError))?;
 
         // Wait for a response
-        let res = response.await.or(Err(FluxionError::ResponseFailed))?;
+        let res = response.await.or(Err(MessageError::ResponseFailed))?;
 
         Ok(res)
     }
@@ -75,10 +74,10 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorEntry for ActorRef<AP, S> {
         self
     }
 
-    async fn handle_foreign<E>(&self, message: ForeignMessage) -> Result<(), FluxionError<E>> {
+    async fn handle_foreign(&self, message: ForeignMessage) -> Result<(), MessageError> {
         self.foreign
             .send_async(message)
             .await
-            .or(Err(FluxionError::SendError))
+            .or(Err(MessageError::SendError))
     }
 }

@@ -189,7 +189,7 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
         };
 
         // Decode it
-        let decoded = message.decode::<AP, S, S::Serializer, <AP::Actor as Actor>::Error>();
+        let decoded = message.decode::<AP, S>();
 
         // If there is an error, ignore it for nor
         let Ok(decoded) = decoded else {
@@ -208,7 +208,7 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
                 };
 
                 // Serialize the response
-                let res = S::Serializer::serialize::<_, <AP::Actor as Actor>::Error>(res);
+                let res = S::Serializer::serialize(res);
 
                 // If error, continue
                 let Ok(res) = res else {
@@ -216,7 +216,7 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
                 };
 
                 // Respond
-                let _ = message.respond::<<AP::Actor as Actor>::Error>(res);
+                let _ = message.respond(res);
             }
             #[cfg(federated)]
             crate::message::foreign::ForeignType::Federated(m) => {
@@ -229,7 +229,7 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
                 };
 
                 // Serialize the response
-                let res = S::Serializer::serialize::<_, <AP::Actor as Actor>::Error>(res);
+                let res = S::Serializer::serialize(res);
 
                 // If error, continue
                 let Ok(res) = res else {
@@ -237,7 +237,7 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
                 };
 
                 // Respond
-                let _ = message.respond::<<AP::Actor as Actor>::Error>(res);
+                let _ = message.respond(res);
             }
         }
     }

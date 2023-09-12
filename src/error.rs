@@ -1,7 +1,19 @@
 use thiserror_no_std::Error;
 
+/// # [`ActorError`]
+/// The error type returned by [`Actor`]s, which allows for a custom error type via generics.
 #[derive(Error, Debug)]
-pub enum FluxionError<E> {
+pub enum ActorError<E> {
+    #[error("custom error from actor")]
+    CustomError(E),
+    #[error("a message error was received")]
+    MessageError(#[from] MessageError),
+}
+
+/// # [`MessageError`]
+/// An error that arises from a message failing to send.
+#[derive(Error, Debug)]
+pub enum MessageError {
     #[cfg(serde)]
     #[error("error deserializing a foreign message")]
     DeserializeError,
@@ -12,10 +24,12 @@ pub enum FluxionError<E> {
     ResponseFailed,
     #[error("message failed to send")]
     SendError,
-    #[error("error converting between message response types")]
-    ResponseConversionError,
-    #[error("error from actor")]
-    ActorError(E),
-    #[error("actor exists")]
+}
+
+/// # [`SystemError`]
+/// An operation performed on the system failed
+#[derive(Error, Debug)]
+pub enum SystemError {
+    #[error("the added actor already exists")]
     ActorExists,
 }

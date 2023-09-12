@@ -10,7 +10,7 @@ use hashbrown::HashMap;
 
 use crate::{
     actor::{entry::ActorEntry, id::ActorId, supervisor::ActorSupervisor, Actor},
-    error::FluxionError,
+    error::SystemError,
     message::Message,
     util::generic_abstractions::{MessageParams, SystemParams},
     ActorGenerics, Channel, ParamActor,
@@ -55,11 +55,11 @@ impl<'a, S: SystemParams> System<'a, S> {
     ///
     /// # Errors
     /// Returns an error if the actor already exists in the system.
-    pub async fn add<E, A: ParamActor<M, S>, M: Message>(
+    pub async fn add<A: ParamActor<M, S>, M: Message>(
         &self,
         id: ActorId,
         actor: A,
-    ) -> Result<(), FluxionError<E>> {
+    ) -> Result<(), SystemError> {
         // Initialize the supervisor
         let mut supervisor = ActorSupervisor::<ActorGenerics<_, _>, S>::new(
             actor,
@@ -68,16 +68,16 @@ impl<'a, S: SystemParams> System<'a, S> {
         );
 
         // Get the supervisor's reference
-        let actor_ref = supervisor.get_ref();
+        let actor_ref = Arc::new(supervisor.get_ref());
 
         // Lock the hashmap as write.
         // We do this here so that the actor's initialization
         // can't ever lock it first.
-        let actors = self.actors.write().await;
+        let mut actors = self.actors.write().await;
 
         // If the actor exists, error
         if actors.contains_key(&id) {
-            return Err(FluxionError::ActorExists);
+            return Err(SystemError::ActorExists);
         }
 
         // Start the supervisor
