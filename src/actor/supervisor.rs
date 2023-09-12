@@ -9,7 +9,7 @@ use crate::{actor::actor_ref::ActorRef, message::MessageHandler};
 #[cfg(any(federated, notification))]
 use crate::util::generic_abstractions::MessageParams;
 
-#[cfg(serde)]
+#[cfg(all(serde, foreign))]
 use crate::message::serializer::MessageSerializer;
 
 #[cfg(foreign)]
@@ -94,13 +94,15 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
 
         loop {
             futures::select_biased! {
-                notification = notifications => {
+                _notification = notifications => {
+                    #[allow(clippy::used_underscore_binding)]
                     #[cfg(notification)]
-                    let _ = self.handle_notification(notification).await;
+                    let _ = self.handle_notification(_notification).await;
                 },
-                foreign = foreign_messages => {
+                _foreign = foreign_messages => {
+                    #[allow(clippy::used_underscore_binding)]
                     #[cfg(foreign)]
-                    let _ = self.handle_foreign(foreign).await;
+                    let _ = self.handle_foreign(_foreign).await;
                 },
                 message = messages => {
                     let _ = self.handle_message(message).await;

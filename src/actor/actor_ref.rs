@@ -5,11 +5,14 @@ use core::any::Any;
 
 use crate::{
     error::MessageError,
-    message::{foreign::ForeignMessage, Message, MessageHandler},
+    message::{Message, MessageHandler},
     util::generic_abstractions::{ActorParams, SystemParams},
 };
 
-#[cfg(async_trait)]
+#[cfg(foreign)]
+use crate::message::foreign::ForeignMessage;
+
+#[cfg(all(async_trait, foreign))]
 use alloc::boxed::Box;
 
 use super::{entry::ActorEntry, supervisor::SupervisorMessage};
@@ -29,6 +32,7 @@ impl<AP: ActorParams<S>, S: SystemParams> Clone for ActorRef<AP, S> {
     fn clone(&self) -> Self {
         Self {
             messages: self.messages.clone(),
+            #[cfg(foreign)]
             foreign: self.foreign.clone(),
         }
     }
@@ -73,6 +77,7 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorEntry for ActorRef<AP, S> {
         self
     }
 
+    #[cfg(foreign)]
     async fn handle_foreign(&self, message: ForeignMessage) -> Result<(), MessageError> {
         self.foreign
             .send_async(message)

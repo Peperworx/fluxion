@@ -12,9 +12,15 @@ use crate::{
     actor::{actor_ref::ActorRef, entry::ActorEntry, id::ActorId, supervisor::ActorSupervisor},
     error::SystemError,
     message::Message,
-    util::generic_abstractions::{ActorParams, MessageParams, SystemParams},
-    ActorGenerics, Channel, ParamActor,
+    util::generic_abstractions::{ActorParams, SystemParams},
+    ActorGenerics, ParamActor,
 };
+
+#[cfg(notification)]
+use crate::util::generic_abstractions::MessageParams;
+
+#[cfg(notification)]
+use crate::Channel;
 
 #[derive(Clone)]
 pub struct System<'a, S: SystemParams> {

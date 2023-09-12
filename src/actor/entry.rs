@@ -2,9 +2,10 @@
 
 use core::any::Any;
 
+#[cfg(foreign)]
 use crate::{error::MessageError, message::foreign::ForeignMessage};
 
-#[cfg(async_trait)]
+#[cfg(all(async_trait, foreign))]
 use alloc::boxed::Box;
 
 /// # [`ActorEntry`]
@@ -21,5 +22,6 @@ pub trait ActorEntry: Any {
     /// # Errors
     /// This function may error whenever handling the foreign message fails.
     /// This varies depending on implementation.
+    #[cfg(foreign)]
     async fn handle_foreign(&self, message: ForeignMessage) -> Result<(), MessageError>;
 }

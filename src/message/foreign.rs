@@ -4,12 +4,15 @@ use alloc::vec::Vec;
 
 use crate::{
     error::MessageError,
-    util::generic_abstractions::{ActorParams, MessageParams, SystemParams},
+    util::generic_abstractions::{ActorParams, SystemParams},
 };
 
 use super::serializer::MessageSerializer;
 
 use serde::{Deserialize, Serialize};
+
+#[cfg(federated)]
+use crate::util::generic_abstractions::MessageParams;
 
 /// # `ForeignMessage`
 /// This struct is similar to a message handler, except it contains a `Vec<u8>` instead of a message.
@@ -45,7 +48,6 @@ impl ForeignMessage {
     ) -> Result<ForeignType<AP, S>, MessageError>
     where
         AP::Message: for<'a> Deserialize<'a>,
-        <S::SystemMessages as MessageParams>::Federated: for<'a> Deserialize<'a>,
     {
         S::Serializer::deserialize(&self.message)
     }
