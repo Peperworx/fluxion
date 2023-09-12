@@ -1,8 +1,12 @@
 //! # System
 //! The system forms the core of Fluxion. It is responsible for the storage, creation, and management of actors.
 
-use alloc::{collections::BTreeMap, string::String, sync::Arc};
+use core::marker::PhantomData;
+
+use alloc::{string::String, sync::Arc};
 use async_rwlock::RwLock;
+
+use hashbrown::HashMap;
 
 use crate::{
     actor::{supervisor::ActorSupervisor, Actor},
@@ -15,12 +19,13 @@ use crate::{
 pub struct System<'a, S: SystemParams> {
     /// The map which contains every actor.
     /// This is wrapped in an [`Arc`] and [`RwLock`] to allow it to be accessed from many different tasks.
-    actors: Arc<RwLock<BTreeMap<String, ()>>>,
+    actors: Arc<RwLock<HashMap<String, ()>>>,
     /// The notification channel
     #[cfg(notification)]
     notifications: Channel<<S::SystemMessages as MessageParams>::Notification>,
     /// The id of this sytem
     id: &'a str,
+    _phantom: PhantomData<S>,
 }
 
 impl<'a, S: SystemParams> System<'a, S> {
@@ -35,6 +40,7 @@ impl<'a, S: SystemParams> System<'a, S> {
             #[cfg(notification)]
             notifications,
             id,
+            _phantom: PhantomData::default(),
         }
     }
 

@@ -127,7 +127,7 @@ impl<M: MessageParams> SystemParams for SystemGenerics<M> {
 /// For instances in which neither federated messages nor notifications are enabled, [`MessageParams`] will be implemented for `()`.
 pub struct MessageGenerics<F: Message, N: Message>(PhantomData<F>, PhantomData<N>);
 
-impl<F: Message, N: Message> MessageParams for MessageGenerics<F, N> {
+impl<F: Message, N: Message + Clone> MessageParams for MessageGenerics<F, N> {
     #[cfg(federated)]
     type Federated = F;
 

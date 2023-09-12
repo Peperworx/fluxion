@@ -39,7 +39,7 @@ pub struct ActorContext;
 /// This trait uses [`async_trait`] when on stable. Once async functions in traits are stablized, this dependency will be removed.
 /// On nightly, the `nightly` feature may be enabled, which uses `#![feature(async_fn_in_trait)]`
 #[cfg_attr(async_trait, async_trait::async_trait)]
-pub trait Actor: Clone + Send + Sync + 'static {
+pub trait Actor: Send + Sync + 'static {
     /// The error type returned by the actor
     type Error: Send + Sync + 'static;
 

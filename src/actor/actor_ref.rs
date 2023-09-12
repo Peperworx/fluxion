@@ -42,7 +42,7 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorRef<AP, S> {
         let handler = SupervisorMessage::Message(MessageHandler::new(message, responder));
 
         // Send the handler
-        self.message_sender
+        self.messages
             .send_async(handler)
             .await
             .or(Err(FluxionError::SendError))?;

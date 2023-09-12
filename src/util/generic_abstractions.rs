@@ -28,7 +28,7 @@ pub trait MessageParams {
 
     /// The notification associated with the system
     #[cfg(notification)]
-    type Notification: Message;
+    type Notification: Message + Clone;
 }
 
 /// # [`SystemParams`]

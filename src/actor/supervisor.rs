@@ -94,19 +94,32 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
     /// Executes the actor's main loop
     pub async fn run(&mut self) {
         // Convert the receivers to futures that are easily awaitable
-        let mut messages = &self.message_channel.1;
+        let mut messages = self.message_channel.1.clone().into_recv_async();
 
         #[cfg(notification)]
-        let mut notifications = &self.notification_channel.1;
+        let mut notifications = self.notification_channel.1.clone().into_recv_async();
+        #[cfg(not(notification))]
+        let mut notifications = futures::future::pending::<()>();
 
         #[cfg(foreign)]
-        let mut foreign_messages = &self.foreign_channel.1;
+        let mut foreign_messages = self.foreign_channel.1.clone().into_recv_async();
+        #[cfg(not(foreign))]
+        let mut foreign_messages = futures::future::pending::<()>();
 
         loop {
-            // Try to poll messages
-            let message = messages.try_recv();
-
-            // If it succeeded, handle the message
+            futures::select_biased! {
+                notification = notifications => {
+                    #[cfg(notification)]
+                    let _ = self.handle_notification(notification).await;
+                },
+                foreign = foreign_messages => {
+                    #[cfg(foreign)]
+                    let _ = self.handle_foreign(foreign).await;
+                },
+                message = messages => {
+                    let _ = self.handle_message(message).await;
+                }
+            }
         }
     }
 
@@ -153,6 +166,7 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
     }
 
     /// Handles a notification received over the channel
+    #[cfg(notification)]
     async fn handle_notification(
         &mut self,
         notification: Result<<S::SystemMessages as MessageParams>::Notification, flume::RecvError>,
@@ -167,6 +181,7 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorSupervisor<AP, S> {
     }
 
     /// Handles a foreign message
+    #[cfg(foreign)]
     async fn handle_foreign(&mut self, foreign: Result<ForeignMessage, flume::RecvError>) {
         // If there is an error, ignore it for now
         let Ok(mut message) = foreign else {
