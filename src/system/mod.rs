@@ -61,7 +61,7 @@ impl<'a, S: SystemParams> System<'a, S> {
     ///
     /// # Errors
     /// Returns an error if the actor already exists in the system.
-    pub async fn add<A: ParamActor<M, S>, M: Message, AP: ActorParams<S>>(
+    pub async fn add<M: Message, A: ParamActor<M, S>>(
         &self,
         id: ActorId,
         actor: A,

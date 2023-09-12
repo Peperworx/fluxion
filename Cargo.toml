@@ -28,7 +28,7 @@ tokio = { version = "1.31.0", features = ["full"] }
 
 
 [features]
-default = ["async-trait", "foreign", "federated", "notification"]
+default = ["async-trait", "foreign", "federated", "notification", "tokio"]
 # Enables async-trait for async functions in traits. If disabled, requires nightly.
 async-trait = ["dep:async-trait"]
 # Enables foreign message support.
@@ -39,6 +39,10 @@ serde = ["dep:serde"]
 federated = []
 # Enables notification support
 notification = []
+# Uses tokio as the default executor for async-spawner
+tokio = ["async-spawner/tokio"]
+# Uses async_std as the default executor for async-spawner
+async-std = ["async-spawner/async-std"]
 
 [build-dependencies]
 cfg_aliases = "0.1.1"
