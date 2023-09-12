@@ -87,17 +87,14 @@ impl<'a, S: SystemParams> System<'a, S> {
         }
 
         // Start the supervisor
-        async_spawner::spawn(async move {
-            let _ = supervisor.run().await;
+        agnostik::spawn(async move {
+            supervisor.run().await;
             // TODO: Cleanup here.
         });
 
         // Insert the actor
         // We can do this unchecked, because we already checked if it existed.
         actors.insert_unique_unchecked(id, actor_ref.clone());
-
-        // Drop the rwlock guard
-        drop(actors);
 
         // Return the actor reference
         Ok(actor_ref)

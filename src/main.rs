@@ -61,10 +61,11 @@ impl MessageSerializer for BincodeSerializer {
     }
 }
 
-#[tokio::main]
-async fn main() {
-    async_spawner::tokio::register_executor();
+fn main() {
+    agnostik::block_on(async move { main_async().await });
+}
 
+async fn main_async() {
     // Create the system
     let system = System::<SystemGenerics<MessageGenerics<(), ()>, BincodeSerializer>>::new("host");
 
@@ -73,7 +74,7 @@ async fn main() {
         .add::<TestMessage, TestActor>("test".into(), TestActor)
         .await
         .unwrap();
-
+    tokio::time::sleep(Duration::from_millis(1000)).await;
     // The actor is now running. Send a message to the actor.
-    ar.request(TestMessage).await.unwrap();
+    ar.request(TestMessage).await;
 }

@@ -59,10 +59,8 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorRef<AP, S> {
         let handler = SupervisorMessage::Message(MessageHandler::new(message, responder));
 
         // Send the handler
-        self.messages
-            .send_async(handler)
-            .await
-            .or(Err(MessageError::SendError))?;
+        let res = self.messages.send_async(handler).await;
+        res.or(Err(MessageError::SendError))?;
 
         // Wait for a response
         let res = response.await.or(Err(MessageError::ResponseFailed))?;
