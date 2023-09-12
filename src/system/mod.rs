@@ -9,7 +9,8 @@ use async_rwlock::RwLock;
 use hashbrown::HashMap;
 
 use crate::{
-    actor::{supervisor::ActorSupervisor, Actor},
+    actor::{entry::ActorEntry, id::ActorId, supervisor::ActorSupervisor, Actor},
+    error::FluxionError,
     message::Message,
     util::generic_abstractions::{MessageParams, SystemParams},
     ActorGenerics, Channel, ParamActor,
@@ -19,7 +20,7 @@ use crate::{
 pub struct System<'a, S: SystemParams> {
     /// The map which contains every actor.
     /// This is wrapped in an [`Arc`] and [`RwLock`] to allow it to be accessed from many different tasks.
-    actors: Arc<RwLock<HashMap<String, ()>>>,
+    actors: Arc<RwLock<HashMap<ActorId, Arc<dyn ActorEntry>>>>,
     /// The notification channel
     #[cfg(notification)]
     notifications: Channel<<S::SystemMessages as MessageParams>::Notification>,
@@ -51,9 +52,16 @@ impl<'a, S: SystemParams> System<'a, S> {
     }
 
     /// Adds a new actor to the system and begins running the supervisor
-    pub fn add<A: ParamActor<M, S>, M: Message>(&self, id: &str, actor: A) {
+    ///
+    /// # Errors
+    /// Returns an error if the actor already exists in the system.
+    pub async fn add<E, A: ParamActor<M, S>, M: Message>(
+        &self,
+        id: ActorId,
+        actor: A,
+    ) -> Result<(), FluxionError<E>> {
         // Initialize the supervisor
-        let supervisor = ActorSupervisor::<ActorGenerics<_, _>, S>::new(
+        let mut supervisor = ActorSupervisor::<ActorGenerics<_, _>, S>::new(
             actor,
             #[cfg(notification)]
             self.notifications.clone(),
@@ -61,6 +69,26 @@ impl<'a, S: SystemParams> System<'a, S> {
 
         // Get the supervisor's reference
         let actor_ref = supervisor.get_ref();
+
+        // Lock the hashmap as write.
+        // We do this here so that the actor's initialization
+        // can't ever lock it first.
+        let actors = self.actors.write().await;
+
+        // If the actor exists, error
+        if actors.contains_key(&id) {
+            return Err(FluxionError::ActorExists);
+        }
+
+        // Start the supervisor
+        async_spawner::spawn(async move {
+            let _ = supervisor.run().await;
+            // TODO: Cleanup here.
+        });
+
+        // Insert the actor
+        // We can do this unchecked, because we already checked if it existed.
+        actors.insert_unique_unchecked(id, actor_ref.clone());
 
         todo!()
     }

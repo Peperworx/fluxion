@@ -21,7 +21,7 @@ use crate::message::serializer::MessageSerializer;
 
 /// # [`MessageParams`]
 /// The simplest generic abstraction, containing the federated message and notification types.
-pub trait MessageParams {
+pub trait MessageParams: 'static {
     /// The federated message associated with the system
     #[cfg(federated)]
     type Federated: Message;
@@ -33,7 +33,7 @@ pub trait MessageParams {
 
 /// # [`SystemParams`]
 /// Parameters specific to an entire system, including the [`MessageParams`], and the [`MessageSerializer`]
-pub trait SystemParams {
+pub trait SystemParams: 'static {
     /// The [`MessageParams`] associated with this system.
     /// This is named [`SystemMessages`] because it contains message types uniform
     /// across the entire system
@@ -48,7 +48,7 @@ pub trait SystemParams {
 /// # [`ActorParams`]
 /// Parameters that are specific to a single actor. This includes the [`MessageParams`], and the actor's [`Message`] type.
 /// The [`SystemParams`] are provided as a generic to reduce long and complex associated type clairifications.
-pub trait ActorParams<S: SystemParams> {
+pub trait ActorParams<S: SystemParams>: 'static {
     /// The message that the actor can handle
     type Message: Message;
 

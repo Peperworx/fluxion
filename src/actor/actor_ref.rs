@@ -1,6 +1,8 @@
 //! # `ActorRef`
 //! Contains [`ActorRef`], which wraps the communication channel with an actor, exposing a public interface.
 
+use core::any::Any;
+
 use crate::{
     error::FluxionError,
     message::{foreign::ForeignMessage, Message, MessageHandler},
@@ -8,7 +10,10 @@ use crate::{
     Channel,
 };
 
-use super::supervisor::SupervisorMessage;
+#[cfg(async_trait)]
+use alloc::boxed::Box;
+
+use super::{entry::ActorEntry, supervisor::SupervisorMessage};
 
 /// # `ActorRef`
 /// The primary clonable method of communication with an actor.
@@ -18,6 +23,16 @@ pub struct ActorRef<AP: ActorParams<S>, S: SystemParams> {
     /// The foreign message channel
     #[cfg(foreign)]
     pub(crate) foreign: flume::Sender<ForeignMessage>,
+}
+
+// Manual clone impl because of generics.
+impl<AP: ActorParams<S>, S: SystemParams> Clone for ActorRef<AP, S> {
+    fn clone(&self) -> Self {
+        Self {
+            messages: self.messages.clone(),
+            foreign: self.foreign.clone(),
+        }
+    }
 }
 
 impl<AP: ActorParams<S>, S: SystemParams> ActorRef<AP, S> {
@@ -51,5 +66,19 @@ impl<AP: ActorParams<S>, S: SystemParams> ActorRef<AP, S> {
         let res = response.await.or(Err(FluxionError::ResponseFailed))?;
 
         Ok(res)
+    }
+}
+
+#[cfg_attr(async_trait, async_trait::async_trait)]
+impl<AP: ActorParams<S>, S: SystemParams> ActorEntry for ActorRef<AP, S> {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    async fn handle_foreign<E>(&self, message: ForeignMessage) -> Result<(), FluxionError<E>> {
+        self.foreign
+            .send_async(message)
+            .await
+            .or(Err(FluxionError::SendError))
     }
 }

@@ -9,7 +9,7 @@ use {
 
 /// # `MessageSerializer`
 /// This trait is used to simplify the serialization and deserialization of messages and their responses
-pub trait MessageSerializer {
+pub trait MessageSerializer: 'static {
     /// Deserialize a message
     ///
     /// # Errors

@@ -1,7 +1,7 @@
 #![cfg_attr(feature = "nightly", feature(async_fn_in_trait))]
 
 use fluxion::{
-    actor::{supervisor::ActorSupervisor, Actor, ActorContext, Handle},
+    actor::{id::ActorId, supervisor::ActorSupervisor, Actor, ActorContext, Handle},
     error::FluxionError,
     message::{serializer::MessageSerializer, Message},
     ActorGenerics, Channel, MessageGenerics, SystemGenerics,

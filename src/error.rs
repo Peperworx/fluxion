@@ -16,4 +16,6 @@ pub enum FluxionError<E> {
     ResponseConversionError,
     #[error("error from actor")]
     ActorError(E),
+    #[error("actor exists")]
+    ActorExists,
 }

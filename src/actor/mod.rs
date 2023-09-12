@@ -8,6 +8,7 @@ use crate::message::Message;
 
 pub mod actor_ref;
 pub mod entry;
+pub mod id;
 pub mod supervisor;
 pub mod wrapper;
 
