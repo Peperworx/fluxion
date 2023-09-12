@@ -3,16 +3,16 @@
 
 use core::marker::PhantomData;
 
-use alloc::{string::String, sync::Arc};
+use alloc::sync::Arc;
 use async_rwlock::RwLock;
 
 use hashbrown::HashMap;
 
 use crate::{
-    actor::{entry::ActorEntry, id::ActorId, supervisor::ActorSupervisor, Actor},
+    actor::{actor_ref::ActorRef, entry::ActorEntry, id::ActorId, supervisor::ActorSupervisor},
     error::SystemError,
     message::Message,
-    util::generic_abstractions::{MessageParams, SystemParams},
+    util::generic_abstractions::{ActorParams, MessageParams, SystemParams},
     ActorGenerics, Channel, ParamActor,
 };
 
@@ -41,7 +41,7 @@ impl<'a, S: SystemParams> System<'a, S> {
             #[cfg(notification)]
             notifications,
             id,
-            _phantom: PhantomData::default(),
+            _phantom: PhantomData,
         }
     }
 
@@ -55,11 +55,11 @@ impl<'a, S: SystemParams> System<'a, S> {
     ///
     /// # Errors
     /// Returns an error if the actor already exists in the system.
-    pub async fn add<A: ParamActor<M, S>, M: Message>(
+    pub async fn add<A: ParamActor<M, S>, M: Message, AP: ActorParams<S>>(
         &self,
         id: ActorId,
         actor: A,
-    ) -> Result<(), SystemError> {
+    ) -> Result<Arc<ActorRef<ActorGenerics<A, M>, S>>, SystemError> {
         // Initialize the supervisor
         let mut supervisor = ActorSupervisor::<ActorGenerics<_, _>, S>::new(
             actor,
@@ -90,6 +90,10 @@ impl<'a, S: SystemParams> System<'a, S> {
         // We can do this unchecked, because we already checked if it existed.
         actors.insert_unique_unchecked(id, actor_ref.clone());
 
-        todo!()
+        // Drop the rwlock guard
+        drop(actors);
+
+        // Return the actor reference
+        Ok(actor_ref)
     }
 }

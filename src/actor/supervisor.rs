@@ -2,7 +2,6 @@
 //! The actor supervisor is responsible for handling the actor's entire lifecycle, including dispatching messages
 //! and handling shutdowns.
 
-use crate::message::foreign;
 use crate::util::generic_abstractions::{ActorParams, SystemParams};
 use crate::Channel;
 use crate::{actor::actor_ref::ActorRef, message::MessageHandler};
@@ -17,19 +16,6 @@ use crate::message::serializer::MessageSerializer;
 use crate::message::foreign::ForeignMessage;
 
 use super::wrapper::ActorWrapper;
-
-#[cfg(foreign)]
-use super::Actor;
-/// # [`ReceivedOverChannel`]
-/// This enum is used to combine every channel's response into a single variable, allowing us to select on them
-/// without relying on `std` features.
-enum ReceivedOverChannel<AP: ActorParams<S>, S: SystemParams> {
-    Message(SupervisorMessage<AP, S>),
-    #[cfg(notification)]
-    Notification(<S::SystemMessages as MessageParams>::Notification),
-    #[cfg(foreign)]
-    Foreign(ForeignMessage),
-}
 
 /// # `SupervisorMessage`
 /// An enum that contains different message types depending on feature flags. This is an easy way

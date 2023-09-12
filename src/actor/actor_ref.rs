@@ -7,7 +7,6 @@ use crate::{
     error::MessageError,
     message::{foreign::ForeignMessage, Message, MessageHandler},
     util::generic_abstractions::{ActorParams, SystemParams},
-    Channel,
 };
 
 #[cfg(async_trait)]

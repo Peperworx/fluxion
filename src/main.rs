@@ -1,10 +1,10 @@
 #![cfg_attr(feature = "nightly", feature(async_fn_in_trait))]
 
 use fluxion::{
-    actor::{id::ActorId, supervisor::ActorSupervisor, Actor, ActorContext, Handle},
-    error::FluxionError,
+    actor::{supervisor::ActorSupervisor, Actor, ActorContext, Handle},
+    error::{ActorError, MessageError},
     message::{serializer::MessageSerializer, Message},
-    ActorGenerics, Channel, MessageGenerics, SystemGenerics,
+    ActorGenerics, Channel, SystemGenerics,
 };
 
 use serde::{Deserialize, Serialize};
@@ -20,17 +20,15 @@ struct TestMessage;
 
 impl Message for TestMessage {
     type Response = ();
-
-    type Error = ();
 }
 
 #[async_trait::async_trait]
 impl Handle<TestMessage> for TestActor {
     async fn message(
         &mut self,
-        message: &TestMessage,
+        _message: &TestMessage,
         _context: &mut ActorContext,
-    ) -> Result<(), FluxionError<Self::Error>> {
+    ) -> Result<(), ActorError<Self::Error>> {
         println!("test");
         Ok(())
     }
@@ -40,9 +38,9 @@ impl Handle<TestMessage> for TestActor {
 impl Handle<()> for TestActor {
     async fn message(
         &mut self,
-        message: &(),
+        _message: &(),
         _context: &mut ActorContext,
-    ) -> Result<(), FluxionError<Self::Error>> {
+    ) -> Result<(), ActorError<Self::Error>> {
         println!("()");
         Ok(())
     }
@@ -51,14 +49,12 @@ impl Handle<()> for TestActor {
 struct BincodeSerializer;
 
 impl MessageSerializer for BincodeSerializer {
-    fn deserialize<T: for<'a> serde::Deserialize<'a>, E>(
-        message: &[u8],
-    ) -> Result<T, FluxionError<E>> {
-        bincode::deserialize(message).or(Err(FluxionError::DeserializeError))
+    fn deserialize<T: for<'a> serde::Deserialize<'a>>(message: &[u8]) -> Result<T, MessageError> {
+        bincode::deserialize(message).or(Err(MessageError::DeserializeError))
     }
 
-    fn serialize<T: serde::Serialize, E>(message: T) -> Result<Vec<u8>, FluxionError<E>> {
-        bincode::serialize(&message).or(Err(FluxionError::SerializeError))
+    fn serialize<T: serde::Serialize>(message: T) -> Result<Vec<u8>, MessageError> {
+        bincode::serialize(&message).or(Err(MessageError::SerializeError))
     }
 }
 
@@ -80,7 +76,7 @@ async fn main() {
     tokio::spawn(async move {
         supervisor.run().await;
     });
-    a.request(TestMessage).await;
+    a.request(TestMessage).await.unwrap();
 
-    notification_channel.0.send_async(()).await;
+    notification_channel.0.send_async(()).await.unwrap();
 }
