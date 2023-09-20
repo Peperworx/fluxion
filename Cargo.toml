@@ -3,5 +3,8 @@
 resolver =  "2"
 
 members = [
-    "fluxion"
+    "fluxion",
+    "fluxion_message",
+    "fluxion_types",
+    "fluxion_error"
 ]
