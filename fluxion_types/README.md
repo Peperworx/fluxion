@@ -1,6 +1,6 @@
 # Fluxion Types
 
-Core types and traits used by every part of Fluxion.
+Core types and traits used by every part of Fluxion, including the Actor trait.
 
 ## Associated Types as Generics
 

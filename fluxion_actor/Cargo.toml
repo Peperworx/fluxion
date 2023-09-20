@@ -8,7 +8,3 @@ edition = "2021"
 [dependencies]
 
 [features]
-default = ["async-trait"
-]
-# Enables async-trait for async functions in traits. If disabled, requires nightly.
-async-trait = ["dep:async-trait"]

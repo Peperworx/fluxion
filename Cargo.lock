@@ -68,7 +68,10 @@ dependencies = [
 name = "fluxion_types"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "cfg-if",
+ "cfg_aliases",
+ "fluxion_error",
  "fluxion_message",
 ]
 

@@ -9,6 +9,19 @@ edition = "2021"
 
 # Fluxion internal crates
 fluxion_message = { path = "../fluxion_message" }
+fluxion_error = { path = "../fluxion_error" }
 
 # Cfg macro crates.
 cfg-if = "1.0.0"
+
+# Used by the Actor trait.
+async-trait = { version = "0.1.68", optional = true }
+
+[build-dependencies]
+cfg_aliases = "0.1.1"
+
+
+[features]
+default = ["async-trait"]
+# Enables async-trait for async functions in traits. If disabled, requires nightly.
+async-trait = ["dep:async-trait"]
