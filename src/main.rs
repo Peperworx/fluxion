@@ -7,7 +7,7 @@ use fluxion::{
     error::{ActorError, MessageError},
     message::{serializer::MessageSerializer, Message},
     system::System,
-    ActorGenerics, Channel, MessageGenerics, SystemGenerics,
+    ActorGenerics, Channel, MessageGenerics, SystemGenerics, async_executors::{Executor, JoinHandle},
 };
 
 use serde::{Deserialize, Serialize};
@@ -61,20 +61,35 @@ impl MessageSerializer for BincodeSerializer {
     }
 }
 
-fn main() {
-    agnostik::block_on(async move { main_async().await });
+struct TokioExecutor;
+
+impl Executor for TokioExecutor {
+    fn spawn<T>(future: T) -> fluxion::async_executors::JoinHandle<T::Output>
+    where
+        T: futures::Future + Send + 'static,
+        T::Output: Send + 'static {
+        
+        let handle = tokio::spawn(future);
+        JoinHandle { handle: Box::pin(async {
+            handle.await.unwrap()
+        }) }
+    }
 }
 
-async fn main_async() {
+
+#[tokio::main]
+async fn main() {
     // Create the system
-    let system = System::<SystemGenerics<MessageGenerics<(), ()>, BincodeSerializer>>::new("host");
+    let system = System::<SystemGenerics<TokioExecutor, MessageGenerics<(), ()>, BincodeSerializer>>::new("host");
 
     // Add an actor to the system
     let ar = system
         .add::<TestMessage, TestActor>("test".into(), TestActor)
         .await
         .unwrap();
-    tokio::time::sleep(Duration::from_millis(1000)).await;
     // The actor is now running. Send a message to the actor.
-    ar.request(TestMessage).await;
+    ar.request(TestMessage).await.unwrap();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    // The actor is now running. Send a message to the actor.
+    ar.request(TestMessage).await.unwrap();
 }

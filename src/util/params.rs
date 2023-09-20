@@ -5,6 +5,7 @@
 use core::marker::PhantomData;
 
 use crate::actor::{Actor, Handle};
+use crate::async_executors::Executor;
 use crate::message::Message;
 
 #[cfg(serde)]
@@ -82,34 +83,43 @@ impl<A: ParamActor<M, S>, M: Message, S: SystemParams> ActorParams<S> for ActorG
 /// # [`SystemGenerics`]
 /// A simple way to convert [`SystemParams`]' associated types to generics.
 pub struct SystemGenerics<
+    E: Executor,
     #[cfg(any(federated, notification))] M: MessageParams,
     #[cfg(serde)] SD: MessageSerializer,
 >(
     #[cfg(any(federated, notification))] PhantomData<M>,
     #[cfg(serde)] PhantomData<SD>,
+    PhantomData<E>,
 );
 
 cfg_if::cfg_if! {
     if #[cfg(all(serde, any(federated, notification)))] {
-        impl<M: MessageParams, SD: MessageSerializer> SystemParams for SystemGenerics<M, SD> {
+        impl<E: Executor, M: MessageParams, SD: MessageSerializer> SystemParams for SystemGenerics<E, M, SD> {
             #[cfg(any(federated, notification))]
             type SystemMessages = M;
 
             #[cfg(serde)]
             type Serializer = SD;
+
+            type Executor = E;
         }
     } else if #[cfg(serde)] {
-        impl<SD: MessageSerializer> SystemParams for SystemGenerics<SD> {
+        impl<E: Executor, SD: MessageSerializer> SystemParams for SystemGenerics<E,SD> {
             #[cfg(serde)]
             type Serializer = SD;
+
+            type Executor = E;
         }
     } else if #[cfg(any(federated, notification))] {
-        impl<M: MessageParams> SystemParams for SystemGenerics<M> {
+        impl<E: Executor, M: MessageParams> SystemParams for SystemGenerics<E,M> {
             #[cfg(any(federated, notification))]
             type SystemMessages = M;
+
+            type Executor = E;
         }
     } else {
-        impl SystemParams for SystemGenerics {
+        impl<E: Executor> SystemParams for SystemGenerics<E> {
+            type Executor = E;
         }
         impl SystemParams for () {}
     }

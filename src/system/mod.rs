@@ -13,7 +13,7 @@ use crate::{
     error::SystemError,
     message::Message,
     util::generic_abstractions::{ActorParams, SystemParams},
-    ActorGenerics, ParamActor,
+    ActorGenerics, ParamActor, async_executors::Executor,
 };
 
 #[cfg(notification)]
@@ -87,7 +87,7 @@ impl<'a, S: SystemParams> System<'a, S> {
         }
 
         // Start the supervisor
-        agnostik::spawn(async move {
+        <S::Executor as Executor>::spawn(async move {
             supervisor.run().await;
             // TODO: Cleanup here.
         });

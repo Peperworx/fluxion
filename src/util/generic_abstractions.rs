@@ -13,7 +13,7 @@
 
 use crate::{
     actor::{Actor, Handle},
-    message::Message,
+    message::Message, async_executors::Executor,
 };
 
 #[cfg(serde)]
@@ -43,6 +43,9 @@ pub trait SystemParams: 'static {
     /// The [`MessageSerializer`] used for foreign messages across the system
     #[cfg(serde)]
     type Serializer: MessageSerializer;
+
+    /// The [`Executor`] that tasks are spawned on.
+    type Executor: Executor;
 }
 
 /// # [`ActorParams`]
