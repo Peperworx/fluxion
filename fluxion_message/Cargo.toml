@@ -26,3 +26,6 @@ federated = []
 
 [build-dependencies]
 cfg_aliases = "0.1.1"
+
+[package.metadata.cargo-feature-combinations]
+denylist = ["default"]

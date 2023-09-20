@@ -6,5 +6,35 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# Internal fluxion dependencies
+fluxion_error = { path = "../fluxion_error", default-features = false }
+fluxion_message = { path = "../fluxion_message", default-features = false }
+fluxion_types = { path = "../fluxion_types", default-features = false }
+
+# Used by the Actor trait.
+async-trait = { version = "0.1.68", optional = true }
+
+# The message channel.
+flume = "0.11.0"
+
+futures = { version = "0.3.28", default-features = false, features = ["alloc", "async-await"] }
+
+
+[build-dependencies]
+cfg_aliases = "0.1.1"
 
 [features]
+default = ["async-trait", "foreign", "federated"]
+# Enables async-trait for async functions in traits. If disabled, requires nightly.
+async-trait = ["dep:async-trait", "fluxion_types/async-trait"]
+# Enables foreign message support.
+foreign = ["serde", "fluxion_message/foreign"]
+# Enables serde support
+serde = ["fluxion_message/serde", "fluxion_types/serde"]
+# Enables federated message support
+federated = ["fluxion_message/federated", "fluxion_types/federated"]
+# Enables notification support
+notification = ["fluxion_types/notification"]
+
+[package.metadata.cargo-feature-combinations]
+denylist = ["default"]

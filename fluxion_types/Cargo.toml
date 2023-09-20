@@ -13,15 +13,28 @@ fluxion_error = { path = "../fluxion_error" }
 
 # Cfg macro crates.
 cfg-if = "1.0.0"
+cfg_matrix = "0.1.1"
 
 # Used by the Actor trait.
 async-trait = { version = "0.1.68", optional = true }
+
+serde = { version = "1.0.183", features = ["derive"], optional = true }
+
 
 [build-dependencies]
 cfg_aliases = "0.1.1"
 
 
 [features]
-default = ["async-trait"]
+default = ["async-trait", "serde", "federated", "notification"]
 # Enables async-trait for async functions in traits. If disabled, requires nightly.
 async-trait = ["dep:async-trait"]
+# Enables serde support
+serde = ["dep:serde"]
+# Enables federated message support
+federated = []
+# Enables notification support
+notification = []
+
+[package.metadata.cargo-feature-combinations]
+denylist = ["default"]

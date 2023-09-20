@@ -16,7 +16,7 @@ use fluxion_message::Message;
 
 use crate::{executor::Executor, Actor, Handle};
 #[cfg(serde)]
-use crate::message::serializer::MessageSerializer;
+use fluxion_message::serializer::MessageSerializer;
 
 /// # [`MessageParams`]
 /// The simplest generic abstraction, containing the federated message and notification types.

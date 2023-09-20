@@ -10,7 +10,7 @@ use crate::executor::Executor;
 use fluxion_message::Message;
 
 #[cfg(serde)]
-use crate::message::serializer::MessageSerializer;
+use fluxion_message::serializer::MessageSerializer;
 
 use crate::atg::{ActorParams, MessageParams, SystemParams};
 

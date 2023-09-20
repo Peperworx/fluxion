@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 thiserror-no-std = "2.0.2"
+
+[package.metadata.cargo-feature-combinations]
+denylist = ["default"]

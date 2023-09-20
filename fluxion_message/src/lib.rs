@@ -40,3 +40,7 @@ pub trait Message: Serialize + for<'a> Deserialize<'a> + Send + Sync + 'static {
     /// The message's response
     type Response: Serialize + for<'a> Deserialize<'a> + Send + Sync + 'static;
 }
+
+impl Message for () {
+    type Response = ();
+}
