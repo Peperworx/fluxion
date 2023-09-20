@@ -12,7 +12,7 @@ use crate::{
     actor::{actor_ref::ActorRef, entry::ActorEntry, id::ActorId, supervisor::ActorSupervisor},
     error::SystemError,
     message::Message,
-    util::generic_abstractions::{ActorParams, SystemParams},
+    util::generic_abstractions::SystemParams,
     ActorGenerics, ParamActor, async_executors::Executor,
 };
 
