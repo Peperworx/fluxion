@@ -28,7 +28,7 @@ impl Message for TestMessage {
 #[async_trait::async_trait]
 impl Handle<TestMessage> for TestActor {
     async fn message(
-        &mut self,
+        &self,
         message: &TestMessage,
         _context: &mut ActorContext,
     ) -> Result<(), ActorError<Self::Error>> {
@@ -40,7 +40,7 @@ impl Handle<TestMessage> for TestActor {
 #[async_trait::async_trait]
 impl Handle<()> for TestActor {
     async fn message(
-        &mut self,
+        &self,
         message: &(),
         _context: &mut ActorContext,
     ) -> Result<(), ActorError<Self::Error>> {

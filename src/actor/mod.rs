@@ -74,7 +74,7 @@ pub trait Actor: Send + Sync + 'static {
 #[cfg_attr(async_trait, async_trait::async_trait)]
 pub trait Handle<M: Message>: Actor {
     async fn message(
-        &mut self,
+        &self,
         message: &M,
         _context: &mut ActorContext,
     ) -> Result<M::Response, ActorError<Self::Error>>;
