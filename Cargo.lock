@@ -23,6 +23,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "cfg-if"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
 name = "cfg_aliases"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -36,6 +42,10 @@ dependencies = [
  "cfg_aliases",
  "serde",
 ]
+
+[[package]]
+name = "fluxion_actor"
+version = "0.1.0"
 
 [[package]]
 name = "fluxion_error"
@@ -57,6 +67,10 @@ dependencies = [
 [[package]]
 name = "fluxion_types"
 version = "0.1.0"
+dependencies = [
+ "cfg-if",
+ "fluxion_message",
+]
 
 [[package]]
 name = "futures-micro"
