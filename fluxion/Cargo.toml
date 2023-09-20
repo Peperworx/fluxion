@@ -1,0 +1,49 @@
+[package]
+name = "fluxion"
+license = "MIT OR Apache-2.0"
+description = "Fluxion is an actor framework written in rust and designed for distributed systems."
+repository = "https://github.com/peperworx/fluxion"
+categories = ["concurrency"]
+keywords = ["actor", "distributed", "async", "fluxion"]
+readme = "README.md"
+version = "0.8.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+async-trait = { version = "0.1.68", optional = true }
+serde = { version = "1.0.183", features = ["derive"], optional = true }
+
+
+[features]
+default = ["async-trait", "foreign", "federated", "notification"]
+# Enables async-trait for async functions in traits. If disabled, requires nightly.
+async-trait = ["dep:async-trait"]
+# Enables foreign message support.
+foreign = ["serde"]
+# Enables serde support
+serde = ["dep:serde"]
+# Enables federated message support
+federated = []
+# Enables notification support
+notification = []
+
+
+[build-dependencies]
+cfg_aliases = "0.1.1"
+
+[package.metadata.cargo-feature-combinations]
+denylist = ["default"]
+
+[package.metadata.cargo-all-features]
+
+skip_feature_sets = [
+    [],
+]
+
+
+denylist = ["default"]
+
+always_include_features = ["async_trait"]
