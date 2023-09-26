@@ -4,8 +4,4 @@ resolver =  "2"
 
 members = [
     "fluxion",
-    "fluxion_message",
-    "fluxion_types",
-    "fluxion_error",
-    "fluxion_actor"
 ]
