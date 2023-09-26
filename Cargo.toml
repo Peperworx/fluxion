@@ -15,18 +15,17 @@ edition = "2021"
 
 async-trait = { version = "0.1.68", optional = true }
 serde = { version = "1.0.183", features = ["derive"], optional = true }
+thiserror-no-std = "2.0.2"
 
 
 [features]
-default = ["async-trait", "foreign", "federated", "notification"]
+default = ["async-trait", "foreign", "notification"]
 # Enables async-trait for async functions in traits. If disabled, requires nightly.
 async-trait = ["dep:async-trait"]
 # Enables foreign message support.
 foreign = ["serde"]
 # Enables serde support
 serde = ["dep:serde"]
-# Enables federated message support
-federated = []
 # Enables notification support
 notification = []
 
