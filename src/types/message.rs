@@ -8,7 +8,7 @@ use alloc::boxed::Box;
 #[cfg(serde)]
 use serde::{Deserialize, Serialize};
 
-use super::{actor::Actor, Handle, errors::ActorError};
+use super::{actor::Actor, errors::ActorError, Handle};
 
 
 /// # Message
@@ -25,21 +25,46 @@ pub trait Message: Serialize + for<'a> Deserialize<'a> + Send + Sync + 'static {
     type Response: Serialize + for<'a> Deserialize<'a> + Send + Sync + 'static;
 }
 
+impl Message for () {
+    type Response = ();
+}
 
-/// # Handled
-/// Not to be confused with [`Handle`], this is a trait implemented for every message for which an [`Actor`] implements [`Handle`].
+/// # MessageHandler
+/// This trait is used to wrap a struct, erasing the generic for a message type.
+/// This allows actors to respond to a message without knowing which message type was used.
 #[cfg_attr(async_trait, async_trait::async_trait)]
-pub trait Handled<A: Actor>: Message {
-    async fn handle(&self, actor: &A) -> Result<Self::Response, ActorError<A::Error>>;
+pub trait MessageHandler<A: Actor> {
+    async fn handle(&mut self, actor: &A) -> Result<(), ActorError<A::Error>>;
+}
+
+/// # [`MessageWrapper`]
+/// This struct wraps a message, and implements [`MessageHandler`]
+pub struct MessageWrapper<M: Message> {
+    /// The actual message
+    message: M,
+    /// The response channel
+    responder: async_oneshot::Sender<M::Response>,
+}
+
+impl<M: Message> MessageWrapper<M> {
+    pub fn new(message: M) -> (Self, async_oneshot::Receiver<M::Response>) {
+        let (responder, rx) = async_oneshot::oneshot();
+
+        (Self {
+            message, responder
+        }, rx)
+    }
 }
 
 #[cfg_attr(async_trait, async_trait::async_trait)]
-impl<T, A> Handled<A> for T
-where
-    T: Message,
-    A: Actor + Handle<T> {
+impl<A: Actor + Handle<M>, M: Message> MessageHandler<A> for MessageWrapper<M> {
+    async fn handle(&mut self, actor: &A) -> Result<(), ActorError<A::Error>> {
+        // Handle the message
+        let res = actor.message(&self.message).await?;
 
-    async fn handle(&self, actor: &A) -> Result<Self::Response, ActorError<<A as Actor>::Error>> {
-        actor.message(self).await
+        // Send the response
+        self.responder.send(res).or(Err(ActorError::ResponseFailed))?;
+
+        Ok(())
     }
 }

@@ -8,4 +8,8 @@ use thiserror_no_std::Error;
 pub enum ActorError<E> {
     #[error("custom error from actor")]
     CustomError(E),
+    #[error("actor supervisor failed to receive a message")]
+    MessageReceiveError,
+    #[error("message handler failed to send the response")]
+    ResponseFailed,
 }
