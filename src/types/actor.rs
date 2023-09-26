@@ -4,6 +4,7 @@
 // Needed by async_trait.
 #[cfg(async_trait)]
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 
 use super::errors::ActorError;
 
@@ -60,5 +61,37 @@ pub trait Actor: Send + Sync + 'static {
         _error: Option<ActorError<Self::Error>>,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
+    }
+}
+
+
+/// # [`ActorId`]
+/// An actor's id contains two parts: the system the actor is running on, and the actual name of the actor.
+/// 
+/// This struct represents and provides operations to act on an actor id.
+pub struct ActorId(Arc<str>);
+
+impl ActorId {
+    /// Get the actor refered to by the [`ActorId`]
+    #[must_use]
+    pub fn get_actor(&self) -> &str {
+        // Find the index of the first ':', or just the last element
+        let index = self.0.find(':').unwrap_or(self.0.len() - 1);
+        &self.0[index+1..]
+    }
+
+    /// Get the system refered to by the [`ActorId`]
+    #[must_use]
+    pub fn get_system(&self) -> &str {
+        self.0.split(':').next().unwrap_or_default()
+    }
+}
+
+impl<T> From<T> for ActorId
+where
+    Arc<str>: From<T>
+{
+    fn from(value: T) -> Self {
+        ActorId(value.into())
     }
 }
