@@ -42,7 +42,7 @@ pub trait Actor: Send + Sync + 'static {
     /// The function run upon actor initialization
     async fn initialize(
         &mut self,
-        _context: &mut ActorContext,
+        _context: ActorContext,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
     }
