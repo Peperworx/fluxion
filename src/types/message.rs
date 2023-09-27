@@ -33,7 +33,7 @@ impl Message for () {
 /// This trait is used to wrap a struct, erasing the generic for a message type.
 /// This allows actors to respond to a message without knowing which message type was used.
 #[cfg_attr(async_trait, async_trait::async_trait)]
-pub trait MessageHandler<A: Actor> {
+pub trait MessageHandler<A: Actor>: Send + Sync {
     async fn handle(&mut self, actor: &A) -> Result<(), ActorError<A::Error>>;
 }
 

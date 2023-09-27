@@ -1,6 +1,8 @@
+#![no_std]
 use fluxion::{types::{actor::Actor, Handle, errors::ActorError, message::{MessageHandler, MessageWrapper}}, supervisor::Supervisor};
 
-
+extern crate alloc;
+use alloc::boxed::Box;
 
 struct TestActor;
 
@@ -14,12 +16,12 @@ impl Handle<()> for TestActor {
         &self,
         _message: &(),
     ) -> Result<(), ActorError<Self::Error>> {
-        println!("message");
+        //println!("message");
         Ok(())
     }
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
     let a = TestActor;
 
