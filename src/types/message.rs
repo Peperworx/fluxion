@@ -29,24 +29,27 @@ impl Message for () {
     type Response = ();
 }
 
-/// # MessageHandler
-/// This trait is used to wrap a struct, erasing the generic for a message type.
-/// This allows actors to respond to a message without knowing which message type was used.
+/// # [`Handler`]
+/// Not to be confused with `Handle`. This trait is implemented for [`MessageHandler`],
+/// allowing Fluxion to get rid of the `M` generic, allowing many different types
+/// of messages to be sent.
 #[cfg_attr(async_trait, async_trait::async_trait)]
-pub trait MessageHandler<A: Actor>: Send + Sync {
+pub trait Handler<A: Actor>: Send + Sync {
     async fn handle(&mut self, actor: &A) -> Result<(), ActorError<A::Error>>;
 }
 
-/// # [`MessageWrapper`]
-/// This struct wraps a message, and implements [`MessageHandler`]
-pub struct MessageWrapper<M: Message> {
-    /// The actual message
+/// # [`MessageHandler`]
+/// This struct is sent over the channel to an actor. This is used in combination with the [`Handler`]
+/// trait to allow an actor to receive many different message types.
+pub struct MessageHandler<M: Message> {
+    /// The message being sent
     message: M,
     /// The response channel
     responder: async_oneshot::Sender<M::Response>,
 }
 
-impl<M: Message> MessageWrapper<M> {
+impl<M: Message> MessageHandler<M> {
+    /// Creates a new [`MessageHandler`] and oneshot response receiver channel.
     pub fn new(message: M) -> (Self, async_oneshot::Receiver<M::Response>) {
         let (responder, rx) = async_oneshot::oneshot();
 
@@ -57,7 +60,7 @@ impl<M: Message> MessageWrapper<M> {
 }
 
 #[cfg_attr(async_trait, async_trait::async_trait)]
-impl<A: Actor + Handle<M>, M: Message> MessageHandler<A> for MessageWrapper<M> {
+impl<A: Actor + Handle<M>, M: Message> Handler<A> for MessageHandler<M> {
     async fn handle(&mut self, actor: &A) -> Result<(), ActorError<A::Error>> {
         // Handle the message
         let res = actor.message(&self.message).await?;

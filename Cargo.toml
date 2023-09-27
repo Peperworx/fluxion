@@ -12,12 +12,20 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-oneshot = "0.5.0"
 
 async-trait = { version = "0.1.68", optional = true }
+
 serde = { version = "1.0.183", default-features = false, features = ["derive", "alloc"], optional = true }
 thiserror-no-std = "2.0.2"
 
+# This provides the pubsub channel used by notifications
+embassy-sync = { version = "0.3.0", optional = true }
+
+# This is used for message responses
+async-oneshot = "0.5.0"
+
+# And this is for the mpsc channel primarily used by actors.
+thingbuf = { version = "0.1.4", default-features = false, features = ["alloc"] }
 
 [features]
 default = ["async-trait", "foreign", "notification"]
@@ -28,7 +36,7 @@ foreign = ["serde"]
 # Enables serde support
 serde = ["dep:serde"]
 # Enables notification support
-notification = []
+notification = ["dep:embassy-sync"]
 
 
 [build-dependencies]
