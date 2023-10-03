@@ -150,11 +150,16 @@ pub struct Receiver<T: Clone> {
     recv_fut: Option<Pin<Box<dyn Future<Output = Option<T>>>>>
 }
 
-impl<T: Clone> Receiver<T> {
+impl<T: Clone + 'static> Receiver<T> {
 
     /// Returns Some(message) if a message is ready, and None if not
     pub async fn try_recv(&self) -> Option<T> {
         self.inner.clone().try_recv().await
+    }
+
+    pub async fn recv(&mut self) -> T {
+        let pinned = Pin::new(self);
+        pinned.await
     }
 }
 
@@ -212,10 +217,26 @@ impl<T: Clone> PinnedDrop for Receiver<T> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
 
+    #[tokio::test]
+    async fn test_receive_one() {
+        let (tx, mut rx) = channel::<i32>();
 
-    #[test]
-    fn test_receive_one() {
-        //let (tx, rx) = channel();
+        // Make sure that a single value can be sent and received over the channel.
+        tx.send(1).await;
+
+        assert_eq!(rx.recv().await, 1);
+
+        // Assert that several arrive in order
+        tx.send(2).await;
+        tx.send(3).await;
+        tx.send(4).await;
+
+        assert_eq!(rx.recv().await, 2);
+        assert_eq!(rx.recv().await, 3);
+        assert_eq!(rx.recv().await, 4);
     }
+
+
 }
