@@ -60,6 +60,8 @@ impl<T: Clone> Inner<T> {
 
     /// Create a new [`Receiver`] from an [`Arc<inner>`]
     pub fn receiver(self: &Arc<Self>) -> Receiver<T> {
+        self.receivers.fetch_add(1, Ordering::Relaxed);
+
         Receiver {
             waker: None,
             inner: self.clone(),
@@ -158,8 +160,7 @@ impl<T: Clone + 'static> Receiver<T> {
     }
 
     pub async fn recv(&mut self) -> T {
-        let pinned = Pin::new(self);
-        pinned.await
+        self.await
     }
 }
 
@@ -185,6 +186,7 @@ impl<T: Clone + 'static> Future for Receiver<T> {
 
         // If a message is ready, return it
         if let Some(m) = message {
+            self.waker = None;
             Poll::Ready(m)
         } else {
             // Otherwise, lock wakers as write and push the waker
