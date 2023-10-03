@@ -12,16 +12,26 @@ pub struct Supervisor<Params: SupervisorParams> {
     /// The supervised actor
     actor: Params::Actor,
     /// The message channel
-    messages: thingbuf::mpsc::Receiver<Option<Box<dyn Handler<Params::Actor>>>>,
+    messages: whisk::Channel<Box<dyn Handler<Params::Actor>>>,
 }
 
 impl<Params: SupervisorParams> Supervisor<Params> {
 
-    /// Creates a new supervisor and message channel, returning both
-    pub fn new(actor: Params::Actor)  {
-        
+    /// Creates a new supervisor
+    pub fn new(actor: Params::Actor) -> Self {
+        // Create a new whisk channel
+        let messages = whisk::Channel::new();
 
-        todo!()
+        // Create the supervisor
+        Self {
+            actor,
+            messages
+        }
+    }
+
+    /// Returns a channel which can send to the supervisor
+    pub fn channel(&self) -> whisk::Channel<Box<dyn Handler<Params::Actor>>> {
+        self.messages.clone()
     }
 
     /// Ticks the supervisor once
@@ -33,19 +43,7 @@ impl<Params: SupervisorParams> Supervisor<Params> {
     pub async fn tick(&self) -> Result<(), ActorError<<Params::Actor as Actor>::Error>> {
 
         // Receive the next message from the receiver
-        let next = self.messages.recv().await;
-
-        // If it failed, then error
-        let Some(next) = next else {
-            return Err(ActorError::MessageReceiveError)
-        };
-
-        // Properly sent messages will always be Some, as the Option is just to
-        // satisfy thingbuf's default requirement.
-        let Some(mut next) = next else {
-            // But we don't want this to crash the actor
-            return Ok(());
-        };
+        let mut next = self.messages.recv().await;
 
         // Handle the message
         next.handle(&self.actor).await?;
