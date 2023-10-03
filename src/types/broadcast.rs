@@ -21,95 +21,6 @@ pub fn channel<T: Clone>() -> (Sender<T>, Receiver<T>) {
     )
 }
 
-enum Offset {
-    Offset(usize),
-    Free(usize),
-}
-
-/// This allocates and retrieves offset for identifiers, and allows every offset to be quickly decremented.
-/// or incremented.
-struct OffsetAllocator {
-    /// The actual offsets
-    offsets: Vec<Offset>,
-    /// A global offset which is *subtracted* from every other offset
-    global_offset: usize,
-    /// The next offset that is free
-    next_free: usize,
-}
-
-impl OffsetAllocator {
-    pub fn new() -> Self {
-        Self {
-            offsets: Vec::new(),
-            global_offset: 0,
-            next_free: 0,
-        }
-    }
-
-    /// Allocates a new identifier with the given offset
-    pub fn alloc(&mut self, offset: usize) -> usize {
-        // The new id is going to be the current value of next_free
-        let id = self.next_free;
-
-        // Get the value of the current id, and if it is Some, update next_free and store accordingly
-        if let Some(v) = self.offsets.get_mut(id) {
-            // If it is free, retrive the next free space and update it.
-            // if it is not free, something has gone terribly wrong.
-            if let Offset::Free(next_free) = v {
-                self.next_free = *next_free;
-            } else {
-                // In this case, just push the element onto the vector and update next_free to be the
-                // vector's length
-                self.offsets.push(Offset::Offset(offset));
-                self.next_free = self.offsets.len();
-                return self.offsets.len() - 1;
-            }
-            // Update the offset and return id
-            *v = Offset::Offset(offset);
-            id
-        } else {
-            // In this case, we just push and increment offset
-            self.offsets.push(Offset::Offset(offset));
-            self.next_free = self.offsets.len();
-            self.offsets.len() - 1
-        }
-    }
-
-    /// Deletes an offset
-    pub fn free(&mut self, id: usize) {
-        // If the offset exists
-        if let Some(v) = self.offsets.get_mut(id) {
-            // And it is allocated
-            if let Offset::Free(_) = v {
-                return;
-            }
-
-            // Then replace it with a free value containing the next free value
-            *v = Offset::Free(self.next_free);
-
-            // And update next_free accordingly
-            self.next_free = id;
-        }
-    }
-
-    /// Gets an offset
-    pub fn get(&self, id: usize) -> Option {
-        self.offsets.get(id).and_then(|v| match v {
-            Offset::Free(_) => None,
-            Offset::Offset(v) => Some(v)
-        })
-    }
-
-    /// Add to an offset
-    pub fn add(&self, id: usize, num: usize) {
-        self.offsets.get_mut(id).and_then(|v| {
-            if let Offset::Offset(v) = v {
-                *v += num;
-            }
-            Some(())
-        });
-    }
-}
 
 
 /// The internal representation of a message on the broadcast channel
@@ -130,8 +41,6 @@ struct Inner<T: Clone> {
     receivers: AtomicUsize,
     /// The wakers currently registered
     wakers: RwLock<Vec<Waker>>,
-    /// The offsets of each receiver
-    offsets: RwLock<OffsetAllocator>,
 }
 
 
@@ -141,8 +50,7 @@ impl<T: Clone> Inner<T> {
         Self {
             queue: RwLock::new(VecDeque::new()),
             receivers: AtomicUsize::new(0),
-            wakers: RwLock::new(Vec::new()),
-            offsets: RwLock::new(OffsetAllocator::new())
+            wakers: RwLock::new(Vec::new())
         }
     }
 
