@@ -11,6 +11,8 @@ pub mod message;
 
 pub mod params;
 
+pub mod broadcast;
+
 use self::{errors::ActorError, actor::Actor, message::Message};
 
 
