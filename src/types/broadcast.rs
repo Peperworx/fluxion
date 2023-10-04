@@ -5,6 +5,14 @@ use core::{sync::atomic::{AtomicUsize, Ordering, AtomicBool}, future::Future, ta
 use alloc::{collections::VecDeque, sync::Arc, boxed::Box, vec::Vec};
 use maitake_sync::RwLock;
 
+/// An Error returned when receiving from the channel.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq)]
+pub enum TryRecvError {
+    /// Set if the current receiver is lagged, and contains how many messages the receiver has missed.
+    Lagged(usize),
+    /// The queue is empty
+    Empty
+}
 
 /// This struct is held via an `Arc` by both receivers and senders.
 #[derive(Debug)]
@@ -25,18 +33,21 @@ struct Inner<T> {
     receivers: AtomicUsize,
     /// The wakers for every receiver waiting for a value
     receive_ops: RwLock<Vec<Waker>>,
+    /// The optional bound of the queue. Values after this will be dropped.
+    bound: Option<usize>,
 }
 
 impl<T: Clone> Inner<T> {
 
-    pub fn new() -> Self {
+    pub fn new(bound: Option<usize>) -> Self {
         Self {
             queue: RwLock::new(VecDeque::new()),
             head: 0.into(),
             wrapped: true.into(),
             observed_wrap: 0.into(),
             receivers: 0.into(),
-            receive_ops: RwLock::new(Vec::new())
+            receive_ops: RwLock::new(Vec::new()),
+            bound
         }
     }
 
@@ -77,11 +88,11 @@ impl<T: Clone> Inner<T> {
     }
 
     /// Pop a message from the queue at the given position
-    pub async fn pop(&self, tail: &mut usize) -> Option<T> {
+    pub async fn pop(&self, tail: &mut usize) -> Result<T, TryRecvError> {
         // If head equals tail, then no pushes have happened yet.
         let head = self.head.load(Ordering::Relaxed);
         if  head == *tail || head == 0 {
-            return None;
+            return Err(TryRecvError::Empty);
         }
 
         // Because items are pushed at the front of the queue, the first element is index `head`.
@@ -99,12 +110,30 @@ impl<T: Clone> Inner<T> {
                 self.observed_wrap.store(0, Ordering::Relaxed);
             }
         }
+
+        
         
         
         // Now, lets get the first actual index
         // The only reason why tail would be larger than head was if we wrapped. And we already verified that this is true here.
         // Head will also always be 1 or more, so we need to subtract 1 to make it into an index.
         let index = head - 1 - *tail;
+
+        // If the index is larger than or equal to the bound, then return that we have lagged
+        if let Some(bound) = self.bound  {
+            if index >= bound {
+                // Get how much we lagged by
+                let lag = (head-*tail)-bound;
+
+                // If we lag, update tail to catch us up
+                *tail += lag;
+
+                // And truncate the queue to the bound
+                self.queue.write().await.truncate(bound);
+
+                return Err(TryRecvError::Lagged(lag));
+            }
+        }
 
         // Increment tail, if such an incrementation would not push it past head
         if *tail < head {
@@ -113,13 +142,13 @@ impl<T: Clone> Inner<T> {
 
         // Lock the queue as read
         let queue = self.queue.read().await;
-
+        
         // Get the element
         let elem = queue.get(index);
 
         // If we got None, return None
         let Some(elem) = elem else {
-            return None;
+            return Err(TryRecvError::Empty);
         };
 
         // Otherwise, fetch and increment the number of recievers that have seen this
@@ -127,21 +156,40 @@ impl<T: Clone> Inner<T> {
 
         // If we just incremented the number of actors that have seen the message past/to the number of receivers,
         // and this is the last message, then pop this message, otherwise, clone it before returning
-        if seen + 1 >= self.receivers.load(Ordering::Relaxed) && index + 1 >= queue.len() {
+        let m = if seen + 1 >= self.receivers.load(Ordering::Relaxed) && index + 1 >= queue.len() {
 
             // Relock the queue as write
             drop(queue);
             
             // Return None if this is None. It shouldn't be, though, because we didn't exit at the previous let Some.
-            self.queue.write().await.pop_back().map(|v| v.0)
+            self.queue.write().await.pop_back().map(|v| v.0).ok_or(TryRecvError::Empty)
         } else {
-            Some(elem.0.clone())
+            let m = elem.0.clone();
+
+            // Allow us to lock the queue again later
+            drop(queue);
+
+            Ok(m)
+        };
+        
+
+        // If the length of the queue exceeds the bound, pop from the back until it is within bounds
+        if let Some(bound) = self.bound {
+            if self.queue.read().await.len() > bound {
+                // Lock as write
+                let mut queue = self.queue.write().await;
+
+                // Truncate the queue to the bound
+                queue.truncate(bound);
+            }
         }
+
+        m
     }
 
     /// Tries to receive over the queue, returning a tuple containing an Optional message,
     /// which will be None if no messages are ready, and a new value for the tail of the current receiver
-    pub async fn try_recv(self: Arc<Self>, mut tail: usize) -> (Option<T>, usize) {
+    pub async fn try_recv(self: Arc<Self>, mut tail: usize) -> (Result<T, TryRecvError>, usize) {
         // Just pop from the queue and relay tail
         (self.pop(&mut tail).await, tail)
     }
@@ -156,14 +204,24 @@ pub struct Receiver<T> {
 }
 
 impl<T: Clone + 'static> Receiver<T> {
-
-    pub async fn recv(&mut self) -> T {
+    /// Receive from the channel, returns None if the receiver lags.
+    pub async fn recv(&mut self) -> Option<T> {
         let fut = ReceiveFut {
             inner: self.inner.clone(),
             tail: &mut self.tail,
             recv_fut: None,
         };
+
         fut.await
+    }
+
+    /// Try to recieve from the channel.
+    /// 
+    /// # Errors
+    /// Errors if the receiver lags behind the channel's bound, or if there are no messages left in the channel
+    pub async fn try_recv(&mut self) -> Result<T, TryRecvError> {
+        // Try recv
+        self.inner.pop(&mut self.tail).await
     }
 }
 
@@ -177,11 +235,11 @@ struct ReceiveFut<'a, T> {
     tail: &'a mut usize,
     /// The pinned future (Inner::pop) that we are currently waiting on
     #[pin]
-    recv_fut: Option<BoxedFuture<(Option<T>, usize)>>,
+    recv_fut: Option<BoxedFuture<(Result<T, TryRecvError>, usize)>>,
 }
 
 impl<'a, T: Clone + 'static> Future for ReceiveFut<'a, T> {
-    type Output = T;
+    type Output = Option<T>;
 
     fn poll(mut self: core::pin::Pin<&mut Self>, cx: &mut core::task::Context<'_>) -> Poll<Self::Output> {
         
@@ -202,9 +260,14 @@ impl<'a, T: Clone + 'static> Future for ReceiveFut<'a, T> {
         *self.tail = tail;
 
         // If a message is ready, return it
-        if let Some(m) = message {
-            Poll::Ready(m)
+        if let Ok(m) = message {
+            Poll::Ready(Some(m))
         } else {
+            if let Err(TryRecvError::Lagged(_)) = message {
+                // We lagged, so return None.
+                return Poll::Ready(None);
+            }
+
             // Otherwise, lock the wakers list as write and push out waker
             let wakers = self.inner.receive_ops.try_write();
 
@@ -230,7 +293,7 @@ mod test {
     #[tokio::test]
     pub async fn test_inner() {
         // Create a new inner
-        let mut inner = Inner::<i32>::new();
+        let mut inner = Inner::<i32>::new(Some(2));
 
         // Pushing with no receivers should return false
         // and keep the queue empty
@@ -243,8 +306,8 @@ mod test {
         inner.receivers.store(2, Ordering::Relaxed);
 
         // Popping with no elements should return None, and should not increment either position
-        assert_eq!(inner.pop(&mut r1_tail).await, None);
-        assert_eq!(inner.pop(&mut r2_tail).await, None);
+        assert_eq!(inner.pop(&mut r1_tail).await, Err(TryRecvError::Empty));
+        assert_eq!(inner.pop(&mut r2_tail).await, Err(TryRecvError::Empty));
         assert_eq!(r1_tail, 0);
         assert_eq!(r2_tail, 0);
 
@@ -255,22 +318,22 @@ mod test {
 
         // Both receivers should receive the first value
         // when called in order, and increment their counters.
-        assert_eq!(inner.pop(&mut r1_tail).await, Some(1));
+        assert_eq!(inner.pop(&mut r1_tail).await, Ok(1));
         assert_eq!(r1_tail, 1);
-        assert_eq!(inner.pop(&mut r2_tail).await, Some(1));
+        assert_eq!(inner.pop(&mut r2_tail).await, Ok(1));
         assert_eq!(r2_tail, 1);
         assert_eq!(inner.queue.read().await.len(), 1);
         
         // When executed out of order, the same should work.
-        assert_eq!(inner.pop(&mut r2_tail).await, Some(2));
+        assert_eq!(inner.pop(&mut r2_tail).await, Ok(2));
         assert_eq!(r2_tail, 2);
-        assert_eq!(inner.pop(&mut r1_tail).await, Some(2));
+        assert_eq!(inner.pop(&mut r1_tail).await, Ok(2));
         assert_eq!(r1_tail, 2);
         assert_eq!(inner.queue.read().await.len(), 0);
 
         // It should again return None, and no incrementation should happen
-        assert_eq!(inner.pop(&mut r1_tail).await, None);
-        assert_eq!(inner.pop(&mut r2_tail).await, None);
+        assert_eq!(inner.pop(&mut r1_tail).await, Err(TryRecvError::Empty));
+        assert_eq!(inner.pop(&mut r2_tail).await, Err(TryRecvError::Empty));
         assert_eq!(r1_tail, 2);
         assert_eq!(r2_tail, 2);
 
@@ -279,17 +342,17 @@ mod test {
         assert!(inner.push(4).await);
 
         // And if both are done two at a time, it should not remove either until both others are done (but should increment the counters)
-        assert_eq!(inner.pop(&mut r1_tail).await, Some(3));
-        assert_eq!(inner.pop(&mut r1_tail).await, Some(4));
+        assert_eq!(inner.pop(&mut r1_tail).await, Ok(3));
+        assert_eq!(inner.pop(&mut r1_tail).await, Ok(4));
         // Popping this one again should return None and not increment
-        assert_eq!(inner.pop(&mut r1_tail).await, None);
+        assert_eq!(inner.pop(&mut r1_tail).await, Err(TryRecvError::Empty));
         assert_eq!(r1_tail, 4);
         // And the queue should have two entries
         assert_eq!(inner.queue.read().await.len(), 2);
 
         // Same for the other receiver, except the queue should no longer have any entries
-        assert_eq!(inner.pop(&mut r2_tail).await, Some(3));
-        assert_eq!(inner.pop(&mut r2_tail).await, Some(4));
+        assert_eq!(inner.pop(&mut r2_tail).await, Ok(3));
+        assert_eq!(inner.pop(&mut r2_tail).await, Ok(4));
         assert_eq!(r2_tail, 4);
         assert_eq!(inner.queue.read().await.len(), 0);
 
@@ -302,8 +365,8 @@ mod test {
         r2_tail = usize::MAX;
 
         // Now, assert that reading both does nothing
-        assert_eq!(inner.pop(&mut r1_tail).await, None);
-        assert_eq!(inner.pop(&mut r2_tail).await, None);
+        assert_eq!(inner.pop(&mut r1_tail).await, Err(TryRecvError::Empty));
+        assert_eq!(inner.pop(&mut r2_tail).await, Err(TryRecvError::Empty));
 
         // Assert that pushing one more works
         assert!(inner.push(5).await);
@@ -314,7 +377,7 @@ mod test {
         assert!(inner.wrapped.load(Ordering::Relaxed));
 
         // Now, pop one more from one of the channels
-        assert_eq!(inner.pop(&mut r1_tail).await, Some(5));
+        assert_eq!(inner.pop(&mut r1_tail).await, Ok(5));
         // observed_wrap should have incremented, wrapped should still be true,
         // and the tail should be 1
         assert_eq!(inner.observed_wrap.load(Ordering::Relaxed), 1);
@@ -322,7 +385,7 @@ mod test {
         assert_eq!(r1_tail, 1);
 
         // Pop from the last channel
-        assert_eq!(inner.pop(&mut r2_tail).await, Some(5));
+        assert_eq!(inner.pop(&mut r2_tail).await, Ok(5));
         // And now, observed_wrap should have reset to zero, wrapped reset to false,
         // and tail should be 1
         assert_eq!(inner.observed_wrap.load(Ordering::Relaxed), 0);
@@ -331,12 +394,54 @@ mod test {
 
         // And now head should be 1
         assert_eq!(inner.head.load(Ordering::Relaxed), 1);
+
+        // Now lets test lagging.
+
+        // Push three values
+        assert!(inner.push(6).await);
+        assert!(inner.push(7).await);
+        assert!(inner.push(8).await);
+
+
+
+        // This highlights an interesting fact about the queue:
+        // Senders never wait for room in the queue. This may be changed in the future,
+        // however this works fine for now.
+        assert_eq!(inner.queue.read().await.len(), 3);
+
+        // Here, the value 6 is lagged. We will see that we lagged by 1 if we try to receive
+        assert_eq!(inner.pop(&mut r1_tail).await, Err(TryRecvError::Lagged(1)));
+        // This should reset r1_tail to the bound, so we can check that here
+        assert_eq!(r1_tail, inner.head.load(Ordering::Relaxed)-2);
+        // It should also remove any messages that are out of bounds
+        assert_eq!(inner.queue.read().await.len(), 2);
+        assert_eq!(inner.pop(&mut r1_tail).await, Ok(7));
+
+        // If we force three elements into the queue (one partially accessed by r1, and two more untouched)
+        // then the length should be back to 3
+        assert!(inner.push(9).await);
+        assert_eq!(inner.queue.read().await.len(), 3);
+
+        // And a successful read from r1 should also truncate to the bound
+        assert_eq!(inner.pop(&mut r1_tail).await, Ok(8));
+        assert_eq!(inner.queue.read().await.len(), 2);
+
+        // And now r2 should be lagged, but by two
+        assert_eq!(inner.pop(&mut r2_tail).await, Err(TryRecvError::Lagged(2)));
+        // And should recover properly
+        assert_eq!(r2_tail, inner.head.load(Ordering::Relaxed)-2);
+        assert_eq!(inner.pop(&mut r2_tail).await, Ok(8));
+
+        // And when we should be able to read normally from both
+        assert_eq!(inner.pop(&mut r1_tail).await, Ok(9));
+        assert_eq!(inner.pop(&mut r2_tail).await, Ok(9));
+
     }
 
     #[tokio::test]
     pub async fn test_receiver() {
         // Create a new inner, and store it in an Arc
-        let inner = Arc::new(Inner::<i32>::new());
+        let inner = Arc::new(Inner::<i32>::new(None));
 
         // Get a receiver from the inner
         let mut receiver = inner.receiver();
@@ -354,15 +459,15 @@ mod test {
         assert!(inner.push(0).await);
 
         // Now, the receiver should return 0
-        assert_eq!(receiver.recv().await, 0);
+        assert_eq!(receiver.recv().await, Some(0));
         // And its tail should be incremented
         assert_eq!(receiver.tail, 1);
 
         // This should also work with multiple messages
         assert!(inner.push(1).await);
         assert!(inner.push(2).await);
-        assert_eq!(receiver.recv().await, 1);
-        assert_eq!(receiver.recv().await, 2);
+        assert_eq!(receiver.recv().await, Some(1));
+        assert_eq!(receiver.recv().await, Some(2));
         assert_eq!(receiver.tail, 3);
 
         // And if we create a new receiver, it's tail should also be three
