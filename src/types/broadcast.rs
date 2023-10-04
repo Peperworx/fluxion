@@ -1,8 +1,8 @@
 //! Broadcast channel implementation used by notifications
 
-use core::sync::atomic::{AtomicUsize, Ordering, AtomicBool};
+use core::{sync::atomic::{AtomicUsize, Ordering, AtomicBool}, future::Future, task::{Poll, Waker}, pin::Pin};
 
-use alloc::{collections::VecDeque, sync::Arc};
+use alloc::{collections::VecDeque, sync::Arc, boxed::Box, vec::Vec};
 use maitake_sync::RwLock;
 
 
@@ -23,6 +23,8 @@ struct Inner<T> {
     observed_wrap: AtomicUsize,
     /// The number of receivers
     receivers: AtomicUsize,
+    /// The wakers for every receiver waiting for a value
+    receive_ops: RwLock<Vec<Waker>>,
 }
 
 impl<T: Clone> Inner<T> {
@@ -34,11 +36,25 @@ impl<T: Clone> Inner<T> {
             wrapped: true.into(),
             observed_wrap: 0.into(),
             receivers: 0.into(),
+            receive_ops: RwLock::new(Vec::new())
         }
     }
 
+    /// Creates a new reciever associated with this Inner
+    pub fn receiver(self: &Arc<Self>) -> Receiver<T> {
+        // Increment the reciever count
+        self.receivers.fetch_add(1, Ordering::Relaxed);
+
+        // Create and retrieve the receiver
+        Receiver {
+            inner: self.clone(),
+            tail: self.as_ref().head.load(Ordering::Relaxed)
+        }
+    }
+    
+
     /// Pushes a message to the queue. Returns true if message was successfully pushed, false if not.
-    pub async fn push(&mut self, message: T) -> bool {
+    pub async fn push(&self, message: T) -> bool {
         
         // If there are no receivers, return false
         if self.receivers.load(Ordering::Relaxed) == 0 {
@@ -122,6 +138,13 @@ impl<T: Clone> Inner<T> {
             Some(elem.0.clone())
         }
     }
+
+    /// Tries to receive over the queue, returning a tuple containing an Optional message,
+    /// which will be None if no messages are ready, and a new value for the tail of the current receiver
+    pub async fn try_recv(self: Arc<Self>, mut tail: usize) -> (Option<T>, usize) {
+        // Just pop from the queue and relay tail
+        (self.pop(&mut tail).await, tail)
+    }
 }
 
 /// The Receive half of the channel
@@ -132,8 +155,72 @@ pub struct Receiver<T> {
     tail: usize,
 }
 
-impl<T: Clone> Receiver<T> {
+impl<T: Clone + 'static> Receiver<T> {
 
+    pub async fn recv(&mut self) -> T {
+        let fut = ReceiveFut {
+            inner: self.inner.clone(),
+            tail: &mut self.tail,
+            recv_fut: None,
+        };
+        fut.await
+    }
+}
+
+type BoxedFuture<T> = Pin<Box<dyn Future<Output = T>>>;
+
+#[pin_project::pin_project]
+struct ReceiveFut<'a, T> {
+    /// The wrapped inner value
+    inner: Arc<Inner<T>>,
+    /// A mutable reference to the tail
+    tail: &'a mut usize,
+    /// The pinned future (Inner::pop) that we are currently waiting on
+    #[pin]
+    recv_fut: Option<BoxedFuture<(Option<T>, usize)>>,
+}
+
+impl<'a, T: Clone + 'static> Future for ReceiveFut<'a, T> {
+    type Output = T;
+
+    fn poll(mut self: core::pin::Pin<&mut Self>, cx: &mut core::task::Context<'_>) -> Poll<Self::Output> {
+        
+        // If there is currently no recv future, create it
+        if self.recv_fut.is_none() {
+            self.recv_fut = Some(Box::pin(self.inner.clone().try_recv(*self.tail)));
+        }
+
+        // Get the next message
+        let (message, tail) = match self.recv_fut.as_mut().unwrap().as_mut().poll(cx) {
+            Poll::Ready(v) => v,
+            Poll::Pending => {
+                return Poll::Pending;
+            }
+        };
+
+        // Update tail
+        *self.tail = tail;
+
+        // If a message is ready, return it
+        if let Some(m) = message {
+            Poll::Ready(m)
+        } else {
+            // Otherwise, lock the wakers list as write and push out waker
+            let wakers = self.inner.receive_ops.try_write();
+
+            // If we successfully lock it, push the waker
+            if let Some(mut wakers) = wakers {
+                wakers.push(cx.waker().clone());
+            } else {
+                // If we can't lock it right now, schedule this future to be
+                // woken again.
+                cx.waker().wake_by_ref();
+            }
+
+            // And return pending. 
+            Poll::Pending
+        }
+    }
 }
 
 #[cfg(test)]
@@ -244,5 +331,41 @@ mod test {
 
         // And now head should be 1
         assert_eq!(inner.head.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    pub async fn test_receiver() {
+        // Create a new inner, and store it in an Arc
+        let inner = Arc::new(Inner::<i32>::new());
+
+        // Get a receiver from the inner
+        let mut receiver = inner.receiver();
+
+        // And get a reference to make our life easier
+        let inner_ref = inner.as_ref();
+
+        // Receiver count should be 1, and the receiver should start with a tail of
+        // 0
+        assert_eq!(inner_ref.receivers.load(Ordering::Relaxed), 1);
+        assert_eq!(receiver.tail, 0);
+
+        // If the receiver receives now, it would block forever, so let's push a message
+        // This should return true because there is a receiver
+        assert!(inner.push(0).await);
+
+        // Now, the receiver should return 0
+        assert_eq!(receiver.recv().await, 0);
+        // And its tail should be incremented
+        assert_eq!(receiver.tail, 1);
+
+        // This should also work with multiple messages
+        assert!(inner.push(1).await);
+        assert!(inner.push(2).await);
+        assert_eq!(receiver.recv().await, 1);
+        assert_eq!(receiver.recv().await, 2);
+        assert_eq!(receiver.tail, 3);
+
+        // And if we create a new receiver, it's tail should also be three
+        assert_eq!(inner.receiver().tail, 3);
     }
 }
