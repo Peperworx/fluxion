@@ -7,12 +7,31 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
-use super::errors::ActorError;
+use crate::handle::LocalHandle;
+
+use super::{errors::ActorError, Handle, message::{Message, MessageSender}};
+
 
 
 /// # [`ActorContext`]
-/// Contains all structures needed for an actor to interact with its environment.
-pub struct ActorContext;
+/// This trait is implemented on the struct that provides an actor's context.
+/// This enables nasty generic parameters to be hidden.
+#[cfg_attr(async_trait, async_trait::async_trait)]
+pub trait ActorContext {
+    /// Adds an actor to the system, and returns a handle.
+    async fn add<A: Actor>(&self, actor: A, id: &str) -> Option<LocalHandle<A>>;
+    
+    /// Retrieves a [`LocalHandle`], which allows every message type an actor supports to be used.
+    /// This will return None if the actor does not exist.
+    async fn get_local<A: Actor>(&self, id: &str) -> Option<LocalHandle<A>>;
+
+    /// Retrieves a [`MessageSender`] for a given actor id and message. This will be a [`LocalHandle`]
+    /// if the actor is on the current system, but will be a [`ForeignHandle`] for foreign actors. [`None`] will
+    /// be returned if the target is the local system, but the actor is not found. Actors on foreign systems will
+    /// always be returned, as long as foreign messages are enabled. If they are not, then None will be returned
+    /// for all foreign actors.
+    async fn get<A: Handle<M>, M: Message>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>>;
+}
 
 
 /// # Actor
@@ -42,9 +61,9 @@ pub trait Actor: Send + Sync + 'static {
     type Error: Send + Sync + 'static;
 
     /// The function run upon actor initialization
-    async fn initialize(
+    async fn initialize<C: ActorContext>(
         &mut self,
-        _context: ActorContext,
+        _context: &C,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
     }
