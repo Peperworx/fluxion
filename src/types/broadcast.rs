@@ -51,6 +51,13 @@ impl<T: Clone> Inner<T> {
         }
     }
 
+    /// Creates a new sender associated with this Inner
+    pub fn sender(self: &Arc<Self>) -> Sender<T> {
+        Sender {
+            inner: self.clone()
+        }
+    }
+
     /// Creates a new reciever associated with this Inner
     pub async fn receiver(self: &Arc<Self>) -> Receiver<T> {
         // Increment the reciever count
@@ -74,11 +81,11 @@ impl<T: Clone> Inner<T> {
     
 
     /// Pushes a message to the queue. Returns true if message was successfully pushed, false if not.
-    pub async fn push(&self, message: T) -> bool {
+    pub async fn push(&self, message: T) -> Result<(), T> {
         
         // If there are no receivers, return false
         if self.receivers.load(Ordering::Relaxed) == 0 {
-            return false;
+            return Err(message);
         }
 
         // If this would cause head to wrap, then set the wrap flag to true and reset head to one
@@ -93,7 +100,7 @@ impl<T: Clone> Inner<T> {
         // Push the value to the front of the queue
         self.queue.write().await.push_front((message, AtomicUsize::new(0)));
 
-        true
+        Ok(())
     }
 
     /// Pop a message from the queue at the given position
@@ -212,6 +219,22 @@ pub struct Receiver<T> {
     tail: usize,
 }
 
+impl<T> Clone for Receiver<T> {
+    fn clone(&self) -> Self {
+        // Increment the receiver count
+        self.inner.receivers.fetch_add(1, Ordering::Relaxed);
+
+        Self { inner: self.inner.clone(), tail: self.tail.clone() }
+    }
+}
+
+impl<T> Drop for Receiver<T> {
+    fn drop(&mut self) {
+        // Decrement the receiver count
+        self.inner.receivers.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
 impl<T: Clone + 'static> Receiver<T> {
     /// Receive from the channel, returns None if the receiver lags.
     pub async fn recv(&mut self) -> Option<T> {
@@ -295,6 +318,27 @@ impl<'a, T: Clone + 'static> Future for ReceiveFut<'a, T> {
     }
 }
 
+
+/// The send half of a channel
+#[derive(Clone)]
+pub struct Sender<T> {
+    /// The wrapped inner
+    inner: Arc<Inner<T>>,
+}
+
+impl<T: Clone> Sender<T> {
+    /// Send a message on the channel, returning Err(message)
+    /// if there are no receivers to send the message to
+    pub async fn send(&self, message: T) -> Result<(), T> {
+        self.inner.push(message).await
+    }
+
+    /// Gets a receiver for this channel
+    pub async fn subscribe(&self) -> Receiver<T> {
+        self.inner.receiver().await
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -302,11 +346,11 @@ mod test {
     #[tokio::test]
     pub async fn test_inner() {
         // Create a new inner
-        let mut inner = Inner::<i32>::new(Some(2));
+        let inner = Inner::<i32>::new(Some(2));
 
         // Pushing with no receivers should return false
         // and keep the queue empty
-        assert!(!inner.push(0).await);
+        assert_eq!(inner.push(0).await, Err(0));
         assert_eq!(inner.queue.read().await.len(), 0);
 
         // Now we simulate two receivers
@@ -321,8 +365,8 @@ mod test {
         assert_eq!(r2_tail, 0);
 
         // Now, because there are receivers, pushing should return true
-        assert!(inner.push(1).await);
-        assert!(inner.push(2).await);
+        assert_eq!(inner.push(1).await, Ok(()));
+        assert_eq!(inner.push(2).await, Ok(()));
         assert_eq!(inner.queue.read().await.len(), 2);
 
         // Both receivers should receive the first value
@@ -347,8 +391,8 @@ mod test {
         assert_eq!(r2_tail, 2);
 
         // Now push two more values
-        assert!(inner.push(3).await);
-        assert!(inner.push(4).await);
+        assert_eq!(inner.push(3).await, Ok(()));
+        assert_eq!(inner.push(4).await, Ok(()));
 
         // And if both are done two at a time, it should not remove either until both others are done (but should increment the counters)
         assert_eq!(inner.pop(&mut r1_tail).await, Ok(3));
@@ -378,7 +422,7 @@ mod test {
         assert_eq!(inner.pop(&mut r2_tail).await, Err(TryRecvError::Empty));
 
         // Assert that pushing one more works
-        assert!(inner.push(5).await);
+        assert_eq!(inner.push(5).await, Ok(()));
         
         // And that it wraps to one and sets the wrapped falg
         assert_eq!(inner.head.load(Ordering::Relaxed), 1);
@@ -407,9 +451,9 @@ mod test {
         // Now lets test lagging.
 
         // Push three values
-        assert!(inner.push(6).await);
-        assert!(inner.push(7).await);
-        assert!(inner.push(8).await);
+        assert_eq!(inner.push(6).await, Ok(()));
+        assert_eq!(inner.push(7).await, Ok(()));
+        assert_eq!(inner.push(8).await, Ok(()));
 
 
 
@@ -428,7 +472,7 @@ mod test {
 
         // If we force three elements into the queue (one partially accessed by r1, and two more untouched)
         // then the length should be back to 3
-        assert!(inner.push(9).await);
+        assert_eq!(inner.push(9).await, Ok(()));
         assert_eq!(inner.queue.read().await.len(), 3);
 
         // And a successful read from r1 should also truncate to the bound
@@ -465,7 +509,7 @@ mod test {
 
         // If the receiver receives now, it would block forever, so let's push a message
         // This should return true because there is a receiver
-        assert!(inner.push(0).await);
+        assert_eq!(inner.push(0).await, Ok(()));
 
         // Now, the receiver should return 0
         assert_eq!(receiver.recv().await, Some(0));
@@ -473,21 +517,21 @@ mod test {
         assert_eq!(receiver.tail, 1);
 
         // This should also work with multiple messages
-        assert!(inner.push(1).await);
-        assert!(inner.push(2).await);
+        assert_eq!(inner.push(1).await, Ok(()));
+        assert_eq!(inner.push(2).await, Ok(()));
         assert_eq!(receiver.recv().await, Some(1));
         assert_eq!(receiver.recv().await, Some(2));
         assert_eq!(receiver.tail, 3);
 
         // Now if we force a bound overflow, the receiver should relay errors properly
-        assert!(inner.push(3).await);
-        assert!(inner.push(4).await);
-        assert!(inner.push(5).await);
+        assert_eq!(inner.push(3).await, Ok(()));
+        assert_eq!(inner.push(4).await, Ok(()));
+        assert_eq!(inner.push(5).await, Ok(()));
 
         assert_eq!(receiver.try_recv().await, Err(TryRecvError::Lagged(1)));
 
         // And if we overflow again, then receiving without try_recv should return None
-        assert!(inner.push(6).await);
+        assert_eq!(inner.push(6).await, Ok(()));
         assert_eq!(receiver.recv().await, None);
 
         // Now if we create a new receiver, it should have its tail positioned at the oldest available message
@@ -505,5 +549,41 @@ mod test {
         assert_eq!(receiver.tail, inner.head.load(Ordering::Relaxed));
         assert_eq!(receiver2.tail, inner.head.load(Ordering::Relaxed));
         assert_eq!(inner.queue.read().await.len(), 0);
+
+        // And when both receivers are dropped, receiver count zeroes out
+        drop(receiver);
+        assert_eq!(inner.receivers.load(Ordering::Relaxed), 1);
+        drop(receiver2);
+        assert_eq!(inner.receivers.load(Ordering::Relaxed), 0);
+    }
+
+    #[tokio::test]
+    pub async fn test_sender_receiver() {
+        // Create an inner, bound of 2
+        let inner = Arc::new(Inner::<i32>::new(Some(2)));
+
+        // Create a sender
+        let sender = inner.sender();
+
+        // If we try to send a message now, we will fail because there are no receivers
+        assert_eq!(sender.send(0).await, Err(0));
+
+        // Now lets create a receiver from the sender
+        let mut receiver = sender.subscribe().await;
+        // And clone a second receiver
+        let mut receiver2 = receiver.clone();
+
+        // And lets clone a second sender too
+        let sender2 = sender.clone();
+
+        // If we send something now, both receivers should get it
+        assert_eq!(sender.send(0).await, Ok(()));
+        assert_eq!(receiver.recv().await, Some(0));
+        assert_eq!(receiver2.recv().await, Some(0));
+
+        // Same with the other sender
+        assert_eq!(sender2.send(1).await, Ok(()));
+        assert_eq!(receiver.recv().await, Some(1));
+        assert_eq!(receiver2.recv().await, Some(1));
     }
 }
