@@ -3,7 +3,7 @@
 
 use alloc::boxed::Box;
 
-use crate::types::{params::SupervisorParams, message::Handler, errors::ActorError, actor::Actor};
+use crate::{types::{params::SupervisorParams, message::Handler, errors::ActorError, actor::Actor}, handle::LocalHandle};
 
 
 /// # [`Supervisor`]
@@ -29,9 +29,11 @@ impl<Params: SupervisorParams> Supervisor<Params> {
         }
     }
 
-    /// Returns a channel which can send to the supervisor
-    pub fn channel(&self) -> whisk::Channel<Box<dyn Handler<Params::Actor>>> {
-        self.messages.clone()
+    /// Returns a handle for this supervisor
+    pub fn handle(&self) -> LocalHandle<Params::Actor> {
+        LocalHandle {
+            sender: self.messages.clone(),
+        }
     }
 
     /// Ticks the supervisor once

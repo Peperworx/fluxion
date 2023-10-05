@@ -1,9 +1,12 @@
-use crate::types::{Handle, errors::{ActorError, SendError}, message::{MessageHandler, MessageSender, Handler, Message}, actor::Actor};
+use crate::types::{Handle, errors::SendError, message::{MessageHandler, MessageSender, Handler, Message}, actor::Actor};
 use alloc::boxed::Box;
 
-/// 
+/// # [`LocalHandle`]
+/// This struct wraps a channel to communicate with an actor on the local system.
+#[derive(Clone)]
 pub struct LocalHandle<A: Actor> {
-    sender: whisk::Channel<Box<dyn Handler<A>>>,
+    /// The channel that we wrap.
+    pub(crate) sender: whisk::Channel<Box<dyn Handler<A>>>,
 }
 
 impl<A: Actor> LocalHandle<A> {
@@ -27,6 +30,8 @@ impl<A: Actor> LocalHandle<A> {
     }
 }
 
+/// [`MessageSender<M>`] is implemented on [`LocalHandle<A>`] for every message for which `A`
+/// implements [`Handle`]
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl<A: Actor + Handle<M>, M: Message> MessageSender<M> for LocalHandle<A> {
     async fn request(&self, message: M) -> Result<<M>::Response, SendError> {
