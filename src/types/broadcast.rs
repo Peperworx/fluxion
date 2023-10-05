@@ -5,6 +5,18 @@ use core::{sync::atomic::{AtomicUsize, Ordering, AtomicBool}, future::Future, ta
 use alloc::{collections::VecDeque, sync::Arc, boxed::Box, vec::Vec};
 use maitake_sync::RwLock;
 
+/// Creates a new sender receiver pair
+pub async fn channel(capacity: usize) -> (Sender<T>, Receiver<T>) {
+    // Create the inner
+    let inner = Arc::new(Inner::new(Some(capacity)));
+
+    (
+        inner.sender(),
+        inner.receiver().await
+    )
+}
+
+
 /// An Error returned when receiving from the channel.
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq)]
 pub enum TryRecvError {
