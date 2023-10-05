@@ -9,9 +9,7 @@ trait StoredRef {
     async fn send_any(&self, message: Box<dyn Any>);
 }
 
-struct MSRef<M: Message> {
-    
-}
+
 
 #[tokio::main]
 async fn main() {
@@ -22,6 +20,6 @@ async fn main() {
     // Get a stored ref
     let sref = refs[0];
 
-    // Create a message specific ref from it
+    
 
 }
