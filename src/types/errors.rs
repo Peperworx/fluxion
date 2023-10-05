@@ -10,15 +10,19 @@ pub enum ActorError<E> {
     CustomError(E),
     #[error("actor supervisor failed to receive a message")]
     MessageReceiveError,
-    #[error("message handler failed to send the response")]
-    ResponseFailed,
+    
     #[error("message sent over channel failed to downcast")]
-    InvalidMessageType
+    InvalidMessageType,
+    #[error("send error")]
+    SendError(#[from] SendError)
 }
 
 /// # [`SendError`]
 /// The error type returned when sending a message to an actor
 #[derive(Error, Debug)]
 pub enum SendError {
-    
+    #[error("no response was returned")]
+    NoResponse,
+    #[error("failed to send a response")]
+    ResponseFailed,
 }

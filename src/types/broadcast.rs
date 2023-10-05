@@ -236,7 +236,7 @@ impl<T> Clone for Receiver<T> {
         // Increment the receiver count
         self.inner.receivers.fetch_add(1, Ordering::Relaxed);
 
-        Self { inner: self.inner.clone(), tail: self.tail.clone() }
+        Self { inner: self.inner.clone(), tail: self.tail }
     }
 }
 
@@ -339,8 +339,10 @@ pub struct Sender<T> {
 }
 
 impl<T: Clone> Sender<T> {
-    /// Send a message on the channel, returning Err(message)
-    /// if there are no receivers to send the message to
+    /// Send a message on the channel
+    /// 
+    /// # Errors
+    /// Returns Err(message) if there are no receivers on the channel.
     pub async fn send(&self, message: T) -> Result<(), T> {
         self.inner.push(message).await
     }

@@ -1,11 +1,9 @@
 //! # Actor Supervisor
 //! This module contains the [`Supervisor`]. This struct contains an actor, alongside code dedicated to handling messages for the actor.
 
-use core::any::Any;
+use alloc::boxed::Box;
 
-use alloc::{sync::Arc, boxed::Box};
-
-use crate::types::{params::SupervisorParams, message::{Handler, Message, MessageHandler}, errors::ActorError, actor::Actor};
+use crate::types::{params::SupervisorParams, message::Handler, errors::ActorError, actor::Actor};
 
 
 /// # [`Supervisor`]
