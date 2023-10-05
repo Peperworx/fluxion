@@ -52,14 +52,23 @@ impl<T: Clone> Inner<T> {
     }
 
     /// Creates a new reciever associated with this Inner
-    pub fn receiver(self: &Arc<Self>) -> Receiver<T> {
+    pub async fn receiver(self: &Arc<Self>) -> Receiver<T> {
         // Increment the reciever count
         self.receivers.fetch_add(1, Ordering::Relaxed);
+
+        // Lock the queue
+        let queue = self.queue.read().await;
+
+        let offset = if let Some(bound) = self.bound {
+            queue.len().min(bound)
+        } else {
+            queue.len()
+        };
 
         // Create and retrieve the receiver
         Receiver {
             inner: self.clone(),
-            tail: self.as_ref().head.load(Ordering::Relaxed)
+            tail: self.as_ref().head.load(Ordering::Relaxed) - offset
         }
     }
     
@@ -441,10 +450,10 @@ mod test {
     #[tokio::test]
     pub async fn test_receiver() {
         // Create a new inner, and store it in an Arc
-        let inner = Arc::new(Inner::<i32>::new(None));
+        let inner = Arc::new(Inner::<i32>::new(Some(2)));
 
         // Get a receiver from the inner
-        let mut receiver = inner.receiver();
+        let mut receiver = inner.receiver().await;
 
         // And get a reference to make our life easier
         let inner_ref = inner.as_ref();
@@ -470,7 +479,31 @@ mod test {
         assert_eq!(receiver.recv().await, Some(2));
         assert_eq!(receiver.tail, 3);
 
-        // And if we create a new receiver, it's tail should also be three
-        assert_eq!(inner.receiver().tail, 3);
+        // Now if we force a bound overflow, the receiver should relay errors properly
+        assert!(inner.push(3).await);
+        assert!(inner.push(4).await);
+        assert!(inner.push(5).await);
+
+        assert_eq!(receiver.try_recv().await, Err(TryRecvError::Lagged(1)));
+
+        // And if we overflow again, then receiving without try_recv should return None
+        assert!(inner.push(6).await);
+        assert_eq!(receiver.recv().await, None);
+
+        // Now if we create a new receiver, it should have its tail positioned at the oldest available message
+        let mut receiver2 = inner.receiver().await;
+        // Which is just the same as receiver 2
+        assert_eq!(receiver.tail, receiver2.tail); 
+
+        // Now both should receive both new messages
+        assert_eq!(receiver.recv().await, Some(5));
+        assert_eq!(receiver.try_recv().await, Ok(6));
+        assert_eq!(receiver2.recv().await, Some(5));
+        assert_eq!(receiver2.try_recv().await, Ok(6));
+
+        // And make sure that we have caught up
+        assert_eq!(receiver.tail, inner.head.load(Ordering::Relaxed));
+        assert_eq!(receiver2.tail, inner.head.load(Ordering::Relaxed));
+        assert_eq!(inner.queue.read().await.len(), 0);
     }
 }
