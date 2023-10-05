@@ -11,6 +11,7 @@ pub mod message;
 
 pub mod params;
 
+#[cfg(notification)]
 pub mod broadcast;
 
 use self::{errors::ActorError, actor::Actor, message::Message};

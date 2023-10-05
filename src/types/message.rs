@@ -43,7 +43,7 @@ pub trait Handler<A: Actor>: Send + Sync {
 /// trait to allow an actor to receive many different message types.
 pub struct MessageHandler<M: Message> {
     /// The message being sent
-    message: M,
+    message: Box<M>,
     /// The response channel
     responder: async_oneshot::Sender<M::Response>,
 }

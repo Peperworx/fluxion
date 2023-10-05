@@ -1,9 +1,11 @@
 //! # Actor Supervisor
 //! This module contains the [`Supervisor`]. This struct contains an actor, alongside code dedicated to handling messages for the actor.
 
+use core::any::Any;
+
 use alloc::{sync::Arc, boxed::Box};
 
-use crate::types::{params::SupervisorParams, message::{Handler, Message}, errors::ActorError, actor::Actor};
+use crate::types::{params::SupervisorParams, message::{Handler, Message, MessageHandler}, errors::ActorError, actor::Actor};
 
 
 /// # [`Supervisor`]
@@ -12,7 +14,7 @@ pub struct Supervisor<Params: SupervisorParams> {
     /// The supervised actor
     actor: Params::Actor,
     /// The message channel
-    messages: whisk::Channel<Box<dyn Handler<Params::Actor>>>,
+    messages: whisk::Channel<Box<dyn Message>>,
 }
 
 impl<Params: SupervisorParams> Supervisor<Params> {
@@ -43,7 +45,15 @@ impl<Params: SupervisorParams> Supervisor<Params> {
     pub async fn tick(&self) -> Result<(), ActorError<<Params::Actor as Actor>::Error>> {
 
         // Receive the next message from the receiver
-        let mut next = self.messages.recv().await;
+        let next = self.messages.recv().await;
+
+        // Downcast to a dyn Handler<Params::Actor>
+        let next: Option<Box<dyn Handler<Params::Actor>>> = next.downcast().ok();
+
+        // If a bad message was sent, just return
+        let Some(mut next) = next else {
+            return Err(ActorError::InvalidMessageType)
+        };
 
         // Handle the message
         next.handle(&self.actor).await?;
