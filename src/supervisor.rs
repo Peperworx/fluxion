@@ -3,7 +3,7 @@
 
 use alloc::boxed::Box;
 
-use crate::{types::{params::SupervisorParams, message::Handler, errors::ActorError, actor::Actor}, handle::LocalHandle};
+use crate::{types::{params::SupervisorParams, message::Handler, errors::ActorError, actor::Actor, broadcast}, handle::LocalHandle};
 
 
 /// # [`Supervisor`]
@@ -13,19 +13,22 @@ pub struct Supervisor<Params: SupervisorParams> {
     actor: Params::Actor,
     /// The message channel
     messages: whisk::Channel<Box<dyn Handler<Params::Actor>>>,
+    /// The shutdown channel
+    shutdown: broadcast::Receiver<()>,
 }
 
 impl<Params: SupervisorParams> Supervisor<Params> {
 
     /// Creates a new supervisor
-    pub fn new(actor: Params::Actor) -> Self {
+    pub fn new(actor: Params::Actor, shutdown: broadcast::Receiver<()>) -> Self {
         // Create a new whisk channel
         let messages = whisk::Channel::new();
 
         // Create the supervisor
         Self {
             actor,
-            messages
+            messages,
+            shutdown,
         }
     }
 
@@ -34,6 +37,11 @@ impl<Params: SupervisorParams> Supervisor<Params> {
         LocalHandle {
             sender: self.messages.clone(),
         }
+    }
+
+    /// Returns true if the supervisor should shutdown
+    pub fn should_shutdown(&self) -> bool {
+        todo!()
     }
 
     /// Ticks the supervisor once

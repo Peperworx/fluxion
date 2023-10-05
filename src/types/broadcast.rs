@@ -1,19 +1,18 @@
 //! Broadcast channel implementation used by notifications
+//! We don't just use embassy_sync here, because we want an unlimited number of senders and receivers.
 
 use core::{sync::atomic::{AtomicUsize, Ordering, AtomicBool}, future::Future, task::{Poll, Waker}, pin::Pin};
 
 use alloc::{collections::VecDeque, sync::Arc, boxed::Box, vec::Vec};
 use maitake_sync::RwLock;
 
-/// Creates a new sender receiver pair
-pub async fn channel<T: Clone>(capacity: usize) -> (Sender<T>, Receiver<T>) {
+/// Creates a new sender, from which a receiver may be created.
+#[must_use]
+pub fn channel<T: Clone>(capacity: usize) -> Sender<T> {
     // Create the inner
     let inner = Arc::new(Inner::new(Some(capacity)));
 
-    (
-        inner.sender(),
-        inner.receiver().await
-    )
+    inner.sender()
 }
 
 

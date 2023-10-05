@@ -5,11 +5,14 @@
 use alloc::{collections::BTreeMap, boxed::Box, sync::Arc};
 use maitake_sync::RwLock;
 
-use crate::{types::{actor::{ActorId, Actor}, params::{SystemParams, SupervisorGenerics}, executor::Executor, message::{MessageSender, Message}, Handle}, supervisor::Supervisor, handle::{ActorHandle, LocalHandle}};
+use crate::{types::{actor::{ActorId, Actor}, params::{SystemParams, SupervisorGenerics}, executor::Executor, message::{MessageSender, Message}, Handle, broadcast}, supervisor::Supervisor, handle::{ActorHandle, LocalHandle}};
 
 
 type ActorMap = BTreeMap<Arc<str>, Box<dyn ActorHandle>>;
 
+/// # [`System`]
+/// The [`System`] holds a map of actor references, and manages the creation and retreval of actors, as well as their lifeitmes.
+#[derive(Clone)]
 pub struct System<Params: SystemParams> {
     /// The map of actors stored in the system
     actors: Arc<RwLock<ActorMap>>,
@@ -17,6 +20,8 @@ pub struct System<Params: SystemParams> {
     id: Arc<str>,
     /// The underlying executor
     executor: Params::Executor,
+    /// The shutdown message sender
+    shutdown: broadcast::Sender<()>,
 }
 
 impl<Params: SystemParams> System<Params> {
@@ -27,7 +32,8 @@ impl<Params: SystemParams> System<Params> {
         Self {
             actors: Arc::new(RwLock::new(BTreeMap::default())),
             id: Arc::from(id),
-            executor
+            executor,
+            shutdown: broadcast::channel(1)
         }
     }
 
@@ -42,7 +48,7 @@ impl<Params: SystemParams> System<Params> {
         }
 
         // Create the supervisor
-        let supervisor = Supervisor::<SupervisorGenerics<A>>::new(actor);
+        let supervisor = Supervisor::<SupervisorGenerics<A>>::new(actor, self.shutdown.subscribe().await);
 
         // Get a handle
         let handle = supervisor.handle();
@@ -50,6 +56,11 @@ impl<Params: SystemParams> System<Params> {
         // Start a task for the supervisor
         self.executor.spawn(async move {
             loop {
+                // If we should shutdown, break
+                if supervisor.should_shutdown() {
+                    break;
+                }
+
                 // Tick the supervisor
                 let res = supervisor.tick().await;
 
