@@ -17,7 +17,7 @@ pub mod executor;
 #[cfg(notification)]
 pub mod broadcast;
 
-use self::{errors::ActorError, actor::Actor, message::Message};
+use self::{errors::ActorError, actor::{Actor, ActorContext}, message::Message};
 
 
 // Needed by async_trait.
@@ -33,5 +33,6 @@ pub trait Handle<M: Message>: Actor {
     async fn message(
         &self,
         message: &M,
+        _context: &ActorContext<Self::Params>,
     ) -> Result<M::Response, ActorError<Self::Error>>;
 }

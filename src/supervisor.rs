@@ -3,7 +3,7 @@
 
 use alloc::boxed::Box;
 
-use crate::{types::{params::SupervisorParams, message::Handler, errors::ActorError, actor::Actor, broadcast}, handle::LocalHandle};
+use crate::{types::{params::SupervisorParams, message::Handler, errors::ActorError, actor::{Actor, ActorContext}, broadcast}, handle::LocalHandle};
 
 
 /// # [`Supervisor`]
@@ -15,12 +15,13 @@ pub struct Supervisor<Params: SupervisorParams> {
     messages: whisk::Channel<Box<dyn Handler<Params::Actor>>>,
     /// The shutdown channel
     shutdown: broadcast::Receiver<()>,
+    context: ActorContext<<Params::Actor as Actor>::Params>
 }
 
 impl<Params: SupervisorParams> Supervisor<Params> {
 
     /// Creates a new supervisor
-    pub fn new(actor: Params::Actor, shutdown: broadcast::Receiver<()>) -> Self {
+    pub fn new(actor: Params::Actor, shutdown: broadcast::Receiver<()>, context: ActorContext<<Params::Actor as Actor>::Params>) -> Self {
         // Create a new whisk channel
         let messages = whisk::Channel::new();
 
@@ -29,6 +30,7 @@ impl<Params: SupervisorParams> Supervisor<Params> {
             actor,
             messages,
             shutdown,
+            context,
         }
     }
 
@@ -39,10 +41,7 @@ impl<Params: SupervisorParams> Supervisor<Params> {
         }
     }
 
-    /// Returns true if the supervisor should shutdown
-    pub fn should_shutdown(&self) -> bool {
-        todo!()
-    }
+    
 
     /// Ticks the supervisor once
     /// 
@@ -56,7 +55,7 @@ impl<Params: SupervisorParams> Supervisor<Params> {
         let mut next = self.messages.recv().await;
 
         // Handle the message
-        next.handle(&self.actor).await?;
+        next.handle(&self.actor, &self.context).await?;
 
         // Return Ok
         Ok(())

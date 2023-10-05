@@ -1,6 +1,6 @@
 
 
-use fluxion::{types::{actor::{Actor, ActorId}, params::{SupervisorParams, SystemParams}, message::{Message, MessageSender}, Handle, errors::ActorError, executor::Executor}, supervisor::Supervisor, system::System};
+use fluxion::{types::{actor::{Actor, ActorId, ActorContext}, params::{SupervisorParams, FluxionParams}, message::{Message, MessageSender}, Handle, errors::ActorError, executor::Executor}, supervisor::Supervisor, system::System};
 
 #[cfg_attr(serde, derive(serde::Serialize, serde::Deserialize))]
 struct TestMessage;
@@ -9,14 +9,23 @@ impl Message for TestMessage {
     type Response = ();
 }
 
+#[cfg_attr(serde, derive(serde::Serialize, serde::Deserialize))]
+struct TestMessage2;
+
+impl Message for TestMessage2 {
+    type Response = ();
+}
+
 struct TestActor;
 
 impl Actor for TestActor {
     type Error = ();
+
+    type Params = SystemConfig;
 }
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl Handle<()> for TestActor {
-    async fn message(&self, message: &()) -> Result<(), ActorError<()>> {
+    async fn message(&self, message: &(), context: &ActorContext<Self::Params>) -> Result<(), ActorError<()>> {
         println!("()");
         Ok(())
     }
@@ -24,8 +33,22 @@ impl Handle<()> for TestActor {
 
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl Handle<TestMessage> for TestActor {
-    async fn message(&self, message: &TestMessage) -> Result<(), ActorError<()>> {
+    async fn message(&self, message: &TestMessage, context: &ActorContext<Self::Params>) -> Result<(), ActorError<()>> {
         println!("TestMessage");
+        let context: ActorContext<_> = context.clone();
+        tokio::spawn(async move {
+            let ah = context.get::<Self, TestMessage2>("test".into()).await.unwrap();
+            ah.request(TestMessage2).await.unwrap();
+        });
+        
+        Ok(())
+    }
+}
+
+#[cfg_attr(async_trait, async_trait::async_trait)]
+impl Handle<TestMessage2> for TestActor {
+    async fn message(&self, message: &TestMessage2, context: &ActorContext<Self::Params>) -> Result<(), ActorError<()>> {
+        println!("TestMessage2");
         Ok(())
     }
 }
@@ -44,8 +67,9 @@ impl Executor for TokioExecutor {
     }
 }
 
+#[derive(Clone)]
 struct SystemConfig;
-impl SystemParams for SystemConfig {
+impl FluxionParams for SystemConfig {
     type Executor = TokioExecutor;
 }
 

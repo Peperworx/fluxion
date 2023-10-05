@@ -8,7 +8,7 @@ use alloc::boxed::Box;
 #[cfg(serde)]
 use serde::{Deserialize, Serialize};
 
-use super::{actor::Actor, errors::{ActorError, SendError}, Handle};
+use super::{actor::{Actor, ActorContext}, errors::{ActorError, SendError}, Handle};
 
 
 /// # Message
@@ -32,7 +32,7 @@ impl Message for () {
 /// # [`MessageSender`]
 /// This trait allows sending messages to an actor without knowing the actor's type.
 #[cfg_attr(async_trait, async_trait::async_trait)]
-pub trait MessageSender<M: Message> {
+pub trait MessageSender<M: Message>: Send + Sync + 'static {
     /// Send a message to an actor, and wait for a response
     /// 
     /// # Errors
@@ -47,7 +47,7 @@ pub trait MessageSender<M: Message> {
 /// of messages to be sent.
 #[cfg_attr(async_trait, async_trait::async_trait)]
 pub trait Handler<A: Actor>: Send + Sync {
-    async fn handle(&mut self, actor: &A) -> Result<(), ActorError<A::Error>>;
+    async fn handle(&mut self, actor: &A, context: &ActorContext<A::Params>) -> Result<(), ActorError<A::Error>>;
 }
 
 /// # [`MessageHandler`]
@@ -73,9 +73,9 @@ impl<M: Message> MessageHandler<M> {
 
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl<A: Actor + Handle<M>, M: Message> Handler<A> for MessageHandler<M> {
-    async fn handle(&mut self, actor: &A) -> Result<(), ActorError<A::Error>> {
+    async fn handle(&mut self, actor: &A, context: &ActorContext<A::Params>) -> Result<(), ActorError<A::Error>> {
         // Handle the message
-        let res = actor.message(&self.message).await?;
+        let res = actor.message(&self.message, context).await?;
 
         // Send the response
         self.responder.send(res).or(Err(SendError::ResponseFailed))?;

@@ -25,9 +25,9 @@ impl<Actor: super::actor::Actor> SupervisorParams for SupervisorGenerics<Actor> 
     type Actor = Actor;
 }
 
-/// # [`SystemParams`]
-/// This trait contains parameters and configuration data used by the system
-pub trait SystemParams: Send + Sync + 'static {
+/// # [`FluxionParams`]
+/// This trait contains parameters and configuration data used everywhere
+pub trait FluxionParams: Clone + Send + Sync + 'static {
 
     /// The async executor to use
     type Executor: Executor;

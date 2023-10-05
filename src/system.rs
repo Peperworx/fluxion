@@ -5,26 +5,31 @@
 use alloc::{collections::BTreeMap, boxed::Box, sync::Arc};
 use maitake_sync::RwLock;
 
-use crate::{types::{actor::{ActorId, Actor}, params::{SystemParams, SupervisorGenerics}, executor::Executor, message::{MessageSender, Message}, Handle, broadcast}, supervisor::Supervisor, handle::{ActorHandle, LocalHandle}};
+use crate::{types::{actor::{ActorId, Actor, ActorContext}, params::{FluxionParams, SupervisorGenerics}, executor::Executor, message::{MessageSender, Message}, Handle, broadcast}, supervisor::Supervisor, handle::{ActorHandle, LocalHandle}};
 
 
 type ActorMap = BTreeMap<Arc<str>, Box<dyn ActorHandle>>;
 
 /// # [`System`]
 /// The [`System`] holds a map of actor references, and manages the creation and retreval of actors, as well as their lifeitmes.
-#[derive(Clone)]
-pub struct System<Params: SystemParams> {
+pub struct System<Params: FluxionParams> {
     /// The map of actors stored in the system
     actors: Arc<RwLock<ActorMap>>,
     /// The system's ID
     id: Arc<str>,
     /// The underlying executor
-    executor: Params::Executor,
+    executor: Arc<Params::Executor>,
     /// The shutdown message sender
     shutdown: broadcast::Sender<()>,
 }
 
-impl<Params: SystemParams> System<Params> {
+impl<Params: FluxionParams> Clone for System<Params> {
+    fn clone(&self) -> Self {
+        Self { actors: self.actors.clone(), id: self.id.clone(), executor: self.executor.clone(), shutdown: self.shutdown.clone() }
+    }
+}
+
+impl<Params: FluxionParams> System<Params> {
 
     /// Creates a new system
     #[must_use]
@@ -32,14 +37,14 @@ impl<Params: SystemParams> System<Params> {
         Self {
             actors: Arc::new(RwLock::new(BTreeMap::default())),
             id: Arc::from(id),
-            executor,
+            executor: Arc::new(executor),
             shutdown: broadcast::channel(1)
         }
     }
 
 
     /// Adds an actor to the system, and returns a handle
-    pub async fn add<A: Actor>(&self, actor: A, id: &str) -> Option<LocalHandle<A>> {
+    pub async fn add<A: Actor<Params = Params>>(&self, actor: A, id: &str) -> Option<LocalHandle<A>> {
 
         // If the actor already exists, then return None.
         // Lock actors as read here temporarily.
@@ -47,8 +52,10 @@ impl<Params: SystemParams> System<Params> {
             return None;
         }
 
+        let context = ActorContext(self.clone(), id.into());
+
         // Create the supervisor
-        let supervisor = Supervisor::<SupervisorGenerics<A>>::new(actor, self.shutdown.subscribe().await);
+        let supervisor = Supervisor::<SupervisorGenerics<A>>::new(actor, self.shutdown.subscribe().await, context);
 
         // Get a handle
         let handle = supervisor.handle();
@@ -56,11 +63,7 @@ impl<Params: SystemParams> System<Params> {
         // Start a task for the supervisor
         self.executor.spawn(async move {
             loop {
-                // If we should shutdown, break
-                if supervisor.should_shutdown() {
-                    break;
-                }
-
+                
                 // Tick the supervisor
                 let res = supervisor.tick().await;
 

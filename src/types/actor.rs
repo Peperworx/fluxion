@@ -7,37 +7,39 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
-use crate::handle::LocalHandle;
+use crate::{handle::LocalHandle, system::System};
 
-use super::{errors::ActorError, Handle, message::{Message, MessageSender}};
+use super::{errors::ActorError, Handle, message::{Message, MessageSender}, params::FluxionParams};
 
 
 
 /// # [`ActorContext`]
-/// This trait is implemented on the struct that provides an actor's context.
-/// This enables nasty generic parameters to be hidden.
-#[cfg_attr(async_trait, async_trait::async_trait)]
-pub trait ActorContext {
-    /// Adds an actor to the system, and returns a handle.
-    async fn add<A: Actor>(&self, actor: A, id: &str) -> Option<LocalHandle<A>>;
-    
-    /// Retrieves a [`LocalHandle`], which allows every message type an actor supports to be used.
-    /// This will return None if the actor does not exist.
-    async fn get_local<A: Actor>(&self, id: &str) -> Option<LocalHandle<A>>;
+/// This struct allows an actor to interact with other actors
+#[derive(Clone)]
+pub struct ActorContext<Params: FluxionParams>(pub(crate) System<Params>, pub(crate) ActorId);
 
-    /// Retrieves a [`MessageSender`] for a given actor id and message. This will be a [`LocalHandle`]
-    /// if the actor is on the current system, but will be a [`ForeignHandle`] for foreign actors. [`None`] will
-    /// be returned if the target is the local system, but the actor is not found. Actors on foreign systems will
-    /// always be returned, as long as foreign messages are enabled. If they are not, then None will be returned
-    /// for all foreign actors.
-    async fn get<A: Handle<M>, M: Message>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>>;
+impl<Params: FluxionParams> ActorContext<Params> {
+    pub async fn add<A: Actor<Params = Params>>(&self, actor: A, id: &str) -> Option<LocalHandle<A>> {
+        self.0.add(actor, id).await
+    }
+
+    pub async fn get_local<A: Actor>(&self, id: &str) -> Option<LocalHandle<A>> {
+        self.0.get_local(id).await
+    }
+
+    pub async fn get<A: Handle<M>, M: Message>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>> {
+        self.0.get::<A,M>(id).await
+    }
 }
-
 
 /// # Actor
 /// This trait must be implemented for all Actors. It contains three functions, [`Actor::initialize`], [`Actor::deinitialize`], and [`Actor::cleanup`].
 /// Each have a default implementation which does nothing.
 ///
+/// ## Params
+/// The associated type Params is used to send around generics used by a bunch of internal structures.
+/// This should just be "promoted" to a generic.
+/// 
 /// ## Initialization
 /// When an Actor is added to a system, a separate management, or "supervisor" task is started which oversees the Actor's lifetime.
 /// When this supervisor task is started, [`Actor::initialize`] is immediately called. If successful, the supervisor begins the Actor's
@@ -60,17 +62,20 @@ pub trait Actor: Send + Sync + 'static {
     /// The error type returned by the actor
     type Error: Send + Sync + 'static;
 
+    type Params: FluxionParams;
+
     /// The function run upon actor initialization
-    async fn initialize<C: ActorContext>(
+    async fn initialize(
         &mut self,
-        _context: &C,
+        _context: &ActorContext<Self::Params>,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
     }
 
     /// The function run upon actor deinitialization
     async fn deinitialize(
-        &mut self
+        &mut self,
+        _context: &ActorContext<Self::Params>,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
     }
@@ -78,6 +83,7 @@ pub trait Actor: Send + Sync + 'static {
     /// The function run upon actor cleanup
     async fn cleanup(
         &mut self,
+        _context: &ActorContext<Self::Params>,
         _error: Option<ActorError<Self::Error>>,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
