@@ -27,7 +27,7 @@ impl<Actor: super::actor::Actor> SupervisorParams for SupervisorGenerics<Actor> 
 
 /// # [`SystemParams`]
 /// This trait contains parameters and configuration data used by the system
-pub trait SystemParams {
+pub trait SystemParams: Send + Sync + 'static {
 
     /// The async executor to use
     type Executor: Executor;
