@@ -1,6 +1,7 @@
 //! # Actor
 //! This module contains types and traits relatign to actors.
 
+
 // Needed by async_trait.
 #[cfg(async_trait)]
 use alloc::boxed::Box;
@@ -69,6 +70,7 @@ pub trait Actor: Send + Sync + 'static {
 /// An actor's id contains two parts: the system the actor is running on, and the actual name of the actor.
 /// 
 /// This struct represents and provides operations to act on an actor id.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ActorId(Arc<str>);
 
 impl ActorId {

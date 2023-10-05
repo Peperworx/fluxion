@@ -1,12 +1,30 @@
+//! Provides an actor "handle", which enables communication with an actor.
+
+use core::any::Any;
+
 use crate::types::{Handle, errors::SendError, message::{MessageHandler, MessageSender, Handler, Message}, actor::Actor};
 use alloc::boxed::Box;
 
+/// # [`ActorHandle`]
+/// A trait used when storing an actor handle in the system.
+pub(crate) trait ActorHandle {
+    /// Returns this actor as an any type, allowing us to concretely downcast it.
+    fn as_any(&self) -> &dyn Any;
+}
+
 /// # [`LocalHandle`]
 /// This struct wraps a channel to communicate with an actor on the local system.
-#[derive(Clone)]
+
 pub struct LocalHandle<A: Actor> {
     /// The channel that we wrap.
     pub(crate) sender: whisk::Channel<Box<dyn Handler<A>>>,
+}
+
+// Weird clone impl so that Actors do not have to be clonable.
+impl<A: Actor> Clone for LocalHandle<A> {
+    fn clone(&self) -> Self {
+        Self { sender: self.sender.clone() }
+    }
 }
 
 impl<A: Actor> LocalHandle<A> {
@@ -36,5 +54,11 @@ impl<A: Actor> LocalHandle<A> {
 impl<A: Actor + Handle<M>, M: Message> MessageSender<M> for LocalHandle<A> {
     async fn request(&self, message: M) -> Result<<M>::Response, SendError> {
         self.request(message).await
+    }
+}
+
+impl<A: Actor> ActorHandle for LocalHandle<A> {
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
