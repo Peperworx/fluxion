@@ -6,7 +6,7 @@ use alloc::{collections::VecDeque, sync::Arc, boxed::Box, vec::Vec};
 use maitake_sync::RwLock;
 
 /// Creates a new sender receiver pair
-pub async fn channel(capacity: usize) -> (Sender<T>, Receiver<T>) {
+pub async fn channel<T: Clone>(capacity: usize) -> (Sender<T>, Receiver<T>) {
     // Create the inner
     let inner = Arc::new(Inner::new(Some(capacity)));
 
