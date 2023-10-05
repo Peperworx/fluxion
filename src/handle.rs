@@ -7,7 +7,7 @@ use alloc::boxed::Box;
 
 /// # [`ActorHandle`]
 /// A trait used when storing an actor handle in the system.
-pub(crate) trait ActorHandle {
+pub(crate) trait ActorHandle: Send + Sync + 'static {
     /// Returns this actor as an any type, allowing us to concretely downcast it.
     fn as_any(&self) -> &dyn Any;
 }

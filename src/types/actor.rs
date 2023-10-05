@@ -77,15 +77,17 @@ impl ActorId {
     /// Get the actor refered to by the [`ActorId`]
     #[must_use]
     pub fn get_actor(&self) -> &str {
-        // Find the index of the first ':', or just the last element
-        let index = self.0.find(':').unwrap_or(self.0.len() - 1);
-        &self.0[index+1..]
+        // Find the index of the first ':', or get the entire string
+        let index = self.0.find(':').map_or(0, |v| v+1);
+        &self.0[index..]
     }
 
     /// Get the system refered to by the [`ActorId`]
     #[must_use]
     pub fn get_system(&self) -> &str {
-        self.0.split(':').next().unwrap_or_default()
+        // Everything before the first ':'
+        let index = self.0.find(':').map_or(0, |v| v);
+        &self.0[..index]
     }
 }
 
