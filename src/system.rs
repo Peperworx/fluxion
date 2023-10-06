@@ -8,19 +8,18 @@ use maitake_sync::RwLock;
 use crate::{types::{actor::{ActorId, Actor, ActorContext}, params::{FluxionParams, SupervisorGenerics}, executor::Executor, message::{MessageSender, Message}, Handle, broadcast}, supervisor::Supervisor, handle::{ActorHandle, LocalHandle}};
 
 
-type ActorMap = BTreeMap<Arc<str>, Box<dyn ActorHandle>>;
 
 /// # [`System`]
 /// The [`System`] holds a map of actor references, and manages the creation and retreval of actors, as well as their lifeitmes.
 pub struct System<Params: FluxionParams> {
     /// The map of actors stored in the system
-    actors: Arc<RwLock<ActorMap>>,
+    pub(crate) actors: Arc<RwLock<ActorMap>>,
     /// The system's ID
-    id: Arc<str>,
+    pub(crate) id: Arc<str>,
     /// The underlying executor
-    executor: Arc<Params::Executor>,
+    pub(crate) executor: Arc<Params::Executor>,
     /// The shutdown message sender
-    shutdown: broadcast::Sender<()>,
+    pub(crate) shutdown: broadcast::Sender<()>,
 }
 
 impl<Params: FluxionParams> Clone for System<Params> {

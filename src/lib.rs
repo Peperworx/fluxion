@@ -6,6 +6,9 @@
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]
 
+use alloc::{collections::BTreeMap, sync::Arc, boxed::Box};
+use handle::ActorHandle;
+
 extern crate alloc;
 
 
@@ -16,3 +19,6 @@ pub mod supervisor;
 pub mod handle;
 
 pub mod system;
+
+
+type ActorMap = BTreeMap<Arc<str>, Box<dyn ActorHandle>>;

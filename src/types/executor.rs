@@ -6,6 +6,8 @@ use core::future::Future;
 use core::pin::Pin;
 use alloc::boxed::Box;
 
+/// # [`Executor`]
+/// Enables spawning async tasks in an executor agnostic manner.
 pub trait Executor: Send + Sync + 'static {
     /// Spawn an async task.
     fn spawn<T>(&self, future: T) -> JoinHandle<T::Output>
