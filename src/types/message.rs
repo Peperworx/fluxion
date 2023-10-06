@@ -8,7 +8,7 @@ use alloc::boxed::Box;
 #[cfg(serde)]
 use serde::{Deserialize, Serialize};
 
-use super::{actor::{Actor, ActorContext}, errors::{ActorError, SendError}, Handle};
+use super::{actor::Actor, errors::{ActorError, SendError}, Handle};
 
 
 /// # Message

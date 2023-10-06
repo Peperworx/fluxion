@@ -1,6 +1,6 @@
 
 
-use fluxion::{types::{actor::{Actor, ActorId, ActorContext}, params::{SupervisorParams, FluxionParams}, message::{Message, MessageSender}, Handle, errors::ActorError, executor::Executor}, supervisor::Supervisor, system::Fluxion};
+use fluxion::{types::{actor::{Actor, ActorId}, params::{SupervisorParams, FluxionParams}, message::{Message, MessageSender}, Handle, errors::ActorError, executor::Executor}, supervisor::Supervisor, system::Fluxion};
 
 #[cfg_attr(serde, derive(serde::Serialize, serde::Deserialize))]
 struct TestMessage;

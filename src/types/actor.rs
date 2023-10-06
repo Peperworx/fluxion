@@ -9,13 +9,11 @@ use alloc::sync::Arc;
 
 use crate::{handle::LocalHandle, system::Fluxion};
 
-use super::{errors::ActorError, Handle, message::{Message, MessageSender}, params::FluxionParams};
+use super::{errors::ActorError, Handle, message::{Message, MessageSender}, params::FluxionParams, context::ActorContext};
 
 
 
-/// # [`ActorContext`]
-/// This struct allows an actor to interact with other actors
-pub struct ActorContext;
+
 
 /// # Actor
 /// This trait must be implemented for all Actors. It contains three functions, [`Actor::initialize`], [`Actor::deinitialize`], and [`Actor::cleanup`].

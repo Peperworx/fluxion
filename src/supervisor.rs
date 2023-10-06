@@ -3,7 +3,7 @@
 
 use alloc::boxed::Box;
 
-use crate::{types::{params::SupervisorParams, message::Handler, errors::ActorError, actor::{Actor, ActorContext}, broadcast}, handle::LocalHandle};
+use crate::{types::{params::SupervisorParams, message::Handler, errors::ActorError, actor::Actor, broadcast}, handle::LocalHandle};
 
 
 /// # [`Supervisor`]

@@ -19,7 +19,7 @@ pub mod context;
 #[cfg(notification)]
 pub mod broadcast;
 
-use self::{errors::ActorError, actor::{Actor, ActorContext}, message::Message};
+use self::{errors::ActorError, actor::Actor, message::Message};
 
 
 // Needed by async_trait.

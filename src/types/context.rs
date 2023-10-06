@@ -1,8 +1,8 @@
 //! Contains structures that allow an actor to access its outside world.
 
-use crate::{handle::ActorHandle, system::Fluxion, ActorMap};
+use crate::system::System;
+use alloc::boxed::Box;
 
-use super::{executor::Executor, params::FluxionParams};
-
-use alloc::{boxed::Box, sync::Arc};
-use maitake_sync::RwLock;
+/// # [`ActorContext`]
+/// This struct allows an actor to interact with other actors
+pub struct ActorContext(Box<dyn System>);

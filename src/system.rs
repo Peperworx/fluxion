@@ -5,7 +5,7 @@
 use alloc::{collections::BTreeMap, boxed::Box, sync::Arc};
 use maitake_sync::RwLock;
 
-use crate::{types::{actor::{ActorId, Actor, ActorContext}, params::{FluxionParams, SupervisorGenerics}, executor::Executor, message::{MessageSender, Message}, Handle, broadcast}, supervisor::Supervisor, handle::{ActorHandle, LocalHandle}, ActorMap};
+use crate::{types::{actor::{ActorId, Actor}, params::{FluxionParams, SupervisorGenerics}, executor::Executor, message::{MessageSender, Message}, Handle, broadcast}, supervisor::Supervisor, handle::{ActorHandle, LocalHandle}, ActorMap};
 
 /// # [`System`] 
 /// [`System`] is an internal trait that allows access to the utilities provided by [`Fluxion`] without requiring any generics.
