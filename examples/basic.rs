@@ -1,6 +1,6 @@
 
 
-use fluxion::{types::{actor::{Actor, ActorId, ActorContext}, params::{SupervisorParams, FluxionParams}, message::{Message, MessageSender}, Handle, errors::ActorError, executor::Executor}, supervisor::Supervisor, system::System};
+use fluxion::{types::{actor::{Actor, ActorId, ActorContext}, params::{SupervisorParams, FluxionParams}, message::{Message, MessageSender}, Handle, errors::ActorError, executor::Executor}, supervisor::Supervisor, system::Fluxion};
 
 #[cfg_attr(serde, derive(serde::Serialize, serde::Deserialize))]
 struct TestMessage;
@@ -21,25 +21,19 @@ struct TestActor;
 impl Actor for TestActor {
     type Error = ();
 
-    type Params = SystemConfig;
 }
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl Handle<()> for TestActor {
-    async fn message(&self, message: &(), context: &ActorContext<Self::Params>) -> Result<(), ActorError<()>> {
-        println!("()");
+    async fn message(&self, message: &()) -> Result<(), ActorError<()>> {
+        //println!("()");
         Ok(())
     }
 }
 
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl Handle<TestMessage> for TestActor {
-    async fn message(&self, message: &TestMessage, context: &ActorContext<Self::Params>) -> Result<(), ActorError<()>> {
+    async fn message(&self, message: &TestMessage) -> Result<(), ActorError<()>> {
         println!("TestMessage");
-        let context: ActorContext<_> = context.clone();
-        tokio::spawn(async move {
-            let ah = context.get::<Self, TestMessage2>("test".into()).await.unwrap();
-            ah.request(TestMessage2).await.unwrap();
-        });
         
         Ok(())
     }
@@ -47,7 +41,7 @@ impl Handle<TestMessage> for TestActor {
 
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl Handle<TestMessage2> for TestActor {
-    async fn message(&self, message: &TestMessage2, context: &ActorContext<Self::Params>) -> Result<(), ActorError<()>> {
+    async fn message(&self, message: &TestMessage2) -> Result<(), ActorError<()>> {
         println!("TestMessage2");
         Ok(())
     }
@@ -56,7 +50,7 @@ impl Handle<TestMessage2> for TestActor {
 struct TokioExecutor;
 
 impl Executor for TokioExecutor {
-    fn spawn<T>(&self, future: T) -> fluxion::types::executor::JoinHandle<T::Output>
+    fn spawn<T>(future: T) -> fluxion::types::executor::JoinHandle<T::Output>
     where
         T: std::future::Future + Send + 'static,
         T::Output: Send + 'static {
@@ -77,7 +71,7 @@ impl FluxionParams for SystemConfig {
 async fn main() {
 
     // Create a system
-    let system = System::<SystemConfig>::new("test", TokioExecutor);
+    let system = Fluxion::<SystemConfig>::new("test", TokioExecutor);
 
     // Add an actor
     let ah = system.add(TestActor, "test").await.unwrap();

@@ -7,7 +7,7 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
-use crate::{handle::LocalHandle, system::System};
+use crate::{handle::LocalHandle, system::Fluxion};
 
 use super::{errors::ActorError, Handle, message::{Message, MessageSender}, params::FluxionParams};
 
@@ -15,22 +15,7 @@ use super::{errors::ActorError, Handle, message::{Message, MessageSender}, param
 
 /// # [`ActorContext`]
 /// This struct allows an actor to interact with other actors
-#[derive(Clone)]
-pub struct ActorContext<Params: FluxionParams>(pub(crate) System<Params>, pub(crate) ActorId);
-
-impl<Params: FluxionParams> ActorContext<Params> {
-    pub async fn add<A: Actor<Params = Params>>(&self, actor: A, id: &str) -> Option<LocalHandle<A>> {
-        self.0.add(actor, id).await
-    }
-
-    pub async fn get_local<A: Actor>(&self, id: &str) -> Option<LocalHandle<A>> {
-        self.0.get_local(id).await
-    }
-
-    pub async fn get<A: Handle<M>, M: Message>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>> {
-        self.0.get::<A,M>(id).await
-    }
-}
+pub struct ActorContext;
 
 /// # Actor
 /// This trait must be implemented for all Actors. It contains three functions, [`Actor::initialize`], [`Actor::deinitialize`], and [`Actor::cleanup`].
@@ -62,12 +47,11 @@ pub trait Actor: Send + Sync + 'static {
     /// The error type returned by the actor
     type Error: Send + Sync + 'static;
 
-    type Params: FluxionParams;
 
     /// The function run upon actor initialization
     async fn initialize(
         &mut self,
-        _context: &ActorContext<Self::Params>,
+        _context: &ActorContext,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
     }
@@ -75,7 +59,6 @@ pub trait Actor: Send + Sync + 'static {
     /// The function run upon actor deinitialization
     async fn deinitialize(
         &mut self,
-        _context: &ActorContext<Self::Params>,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
     }
@@ -83,7 +66,6 @@ pub trait Actor: Send + Sync + 'static {
     /// The function run upon actor cleanup
     async fn cleanup(
         &mut self,
-        _context: &ActorContext<Self::Params>,
         _error: Option<ActorError<Self::Error>>,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())

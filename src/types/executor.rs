@@ -10,7 +10,7 @@ use alloc::boxed::Box;
 /// Enables spawning async tasks in an executor agnostic manner.
 pub trait Executor: Send + Sync + 'static {
     /// Spawn an async task.
-    fn spawn<T>(&self, future: T) -> JoinHandle<T::Output>
+    fn spawn<T>(future: T) -> JoinHandle<T::Output>
     where
         T: Future + Send + 'static,
         T::Output: Send + 'static;

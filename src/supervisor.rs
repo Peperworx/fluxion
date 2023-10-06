@@ -15,13 +15,12 @@ pub struct Supervisor<Params: SupervisorParams> {
     messages: whisk::Channel<Box<dyn Handler<Params::Actor>>>,
     /// The shutdown channel
     shutdown: broadcast::Receiver<()>,
-    context: ActorContext<<Params::Actor as Actor>::Params>
 }
 
 impl<Params: SupervisorParams> Supervisor<Params> {
 
     /// Creates a new supervisor
-    pub fn new(actor: Params::Actor, shutdown: broadcast::Receiver<()>, context: ActorContext<<Params::Actor as Actor>::Params>) -> Self {
+    pub fn new(actor: Params::Actor, shutdown: broadcast::Receiver<()>) -> Self {
         // Create a new whisk channel
         let messages = whisk::Channel::new();
 
@@ -30,7 +29,6 @@ impl<Params: SupervisorParams> Supervisor<Params> {
             actor,
             messages,
             shutdown,
-            context,
         }
     }
 
@@ -55,7 +53,7 @@ impl<Params: SupervisorParams> Supervisor<Params> {
         let mut next = self.messages.recv().await;
 
         // Handle the message
-        next.handle(&self.actor, &self.context).await?;
+        next.handle(&self.actor).await?;
 
         // Return Ok
         Ok(())
