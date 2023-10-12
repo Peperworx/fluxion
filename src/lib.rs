@@ -81,7 +81,7 @@ impl<Params: FluxionParams> System for Fluxion<Params> {
         );
 
         // Create the supervisor
-        let supervisor = Supervisor::<SupervisorGenerics<A>>::new(actor, context, self.shutdown.subscribe().await);
+        let supervisor = Supervisor::<SupervisorGenerics<A, Params::Executor>>::new(actor, context, self.shutdown.subscribe().await);
 
         // Get a handle
         let handle = supervisor.handle();

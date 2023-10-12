@@ -15,14 +15,19 @@ pub trait SupervisorParams {
 
     /// This is the type of the supervised actor.
     type Actor: Actor;
+
+    /// The executor the actor is running on
+    type Executor: Executor;
 }
 
 /// # [`SupervisorGenerics`]
 /// A struct that converts the associated types on [`SupervisorParams`] to generics
-pub struct SupervisorGenerics<Actor: super::actor::Actor>(PhantomData<Actor>);
+pub struct SupervisorGenerics<Actor: super::actor::Actor, Executor: super::executor::Executor>(PhantomData<(Actor, Executor)>);
 
-impl<Actor: super::actor::Actor> SupervisorParams for SupervisorGenerics<Actor> {
+impl<Actor: super::actor::Actor, Executor: super::executor::Executor> SupervisorParams for SupervisorGenerics<Actor, Executor> {
     type Actor = Actor;
+
+    type Executor = Executor;
 }
 
 /// # [`FluxionParams`]
