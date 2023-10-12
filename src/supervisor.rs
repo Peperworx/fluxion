@@ -17,8 +17,6 @@ pub struct Supervisor<Params: SupervisorParams> {
     shutdown: broadcast::Receiver<()>,
     /// The actor's context
     context: <Params::Actor as Actor>::Context,
-    /// The executor used by the system
-    executor: Params::Executor,
 }
 
 impl<Params: SupervisorParams> Supervisor<Params> {
