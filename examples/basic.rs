@@ -46,8 +46,6 @@ impl<CTX: Context> Handle<TestMessage> for TestActor<CTX> {
 
         let ah = context.get_local::<TestActor<CTX::Context>>(context.get_id().get_actor()).await.unwrap();
         tokio::spawn(async move {
-            
-        
             ah.request(TestMessage2).await.unwrap();
         });
         
