@@ -7,9 +7,9 @@
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
-use crate::{handle::LocalHandle, system::Fluxion};
 
-use super::{errors::ActorError, Handle, message::{Message, MessageSender}, params::FluxionParams, context::ActorContext};
+
+use super::{errors::ActorError, context::Context};
 
 
 
@@ -19,9 +19,11 @@ use super::{errors::ActorError, Handle, message::{Message, MessageSender}, param
 /// This trait must be implemented for all Actors. It contains three functions, [`Actor::initialize`], [`Actor::deinitialize`], and [`Actor::cleanup`].
 /// Each have a default implementation which does nothing.
 ///
-/// ## Params
-/// The associated type Params is used to send around generics used by a bunch of internal structures.
-/// This should just be "promoted" to a generic.
+/// ## Associated Types
+/// The [`Actor`] trait takes two associated types:
+/// - `Error`, which is the custom error type returned by the actor.
+/// - `Context`, which should be an implementor of [`Context`]. This should normally be backed by a generic on the
+/// `struct` that implements [`Actor`] to allow more code reusability.
 /// 
 /// ## Initialization
 /// When an Actor is added to a system, a separate management, or "supervisor" task is started which oversees the Actor's lifetime.
@@ -45,11 +47,13 @@ pub trait Actor: Send + Sync + 'static {
     /// The error type returned by the actor
     type Error: Send + Sync + 'static;
 
+    /// The Actor's Context
+    type Context: Context;
 
     /// The function run upon actor initialization
     async fn initialize(
         &mut self,
-        _context: &ActorContext,
+        _context: &Self::Context,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
     }
@@ -57,6 +61,7 @@ pub trait Actor: Send + Sync + 'static {
     /// The function run upon actor deinitialization
     async fn deinitialize(
         &mut self,
+        _context: &Self::Context,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
     }
@@ -64,6 +69,7 @@ pub trait Actor: Send + Sync + 'static {
     /// The function run upon actor cleanup
     async fn cleanup(
         &mut self,
+        _context: &Self::Context,
         _error: Option<ActorError<Self::Error>>,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())

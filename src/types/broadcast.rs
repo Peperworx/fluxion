@@ -1,5 +1,5 @@
 //! Broadcast channel implementation used by notifications
-//! We don't just use embassy_sync here, because we want an unlimited number of senders and receivers.
+//! We don't just use `embassy_sync` here, because we want an unlimited number of senders and receivers.
 
 use core::{sync::atomic::{AtomicUsize, Ordering, AtomicBool}, future::Future, task::{Poll, Waker}, pin::Pin};
 
