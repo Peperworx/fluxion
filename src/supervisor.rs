@@ -56,7 +56,7 @@ impl<Params: SupervisorParams> Supervisor<Params> {
         let mut next = self.messages.recv().await;
 
         // Handle the message
-        next.handle(&self.actor).await?;
+        next.handle(&self.actor, &self.context).await?;
 
         // Return Ok
         Ok(())

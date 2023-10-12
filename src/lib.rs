@@ -50,6 +50,17 @@ impl<Params: FluxionParams> Clone for Fluxion<Params> {
     }
 }
 
+impl<Params: FluxionParams> Fluxion<Params> {
+    pub fn new(id: &str, executor: Params::Executor) -> Self {
+
+        Self {
+            actors: Arc::new(RwLock::new(BTreeMap::new())),
+            id: id.into(),
+            executor: Arc::new(executor),
+            shutdown: broadcast::channel(64),
+        }
+    }
+}
 
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl<Params: FluxionParams> System for Fluxion<Params> {
@@ -76,7 +87,7 @@ impl<Params: FluxionParams> System for Fluxion<Params> {
         let handle = supervisor.handle();
 
         // Start a task for the supervisor
-        Params::Executor::spawn(async move {
+        self.executor.spawn(async move {
             loop {
                 
                 // Tick the supervisor

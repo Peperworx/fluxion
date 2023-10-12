@@ -34,6 +34,7 @@ use alloc::boxed::Box;
 pub trait Handle<M: Message>: Actor {
     async fn message(
         &self,
-        message: &M
+        message: &M,
+        context: &Self::Context,
     ) -> Result<M::Response, ActorError<Self::Error>>;
 }

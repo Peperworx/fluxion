@@ -11,7 +11,7 @@ use alloc::boxed::Box;
 /// This trait allows an actor's context to be defined generically, and provides functions for interacting with
 /// the system and retrieving details about the actor.
 
-pub trait Context: System {
+pub trait Context: System + Send + Sync + 'static {
     /// Retrieve's the actor's ID
     fn get_id(&self) -> ActorId;
 }
