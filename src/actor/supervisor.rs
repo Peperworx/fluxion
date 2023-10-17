@@ -35,38 +35,47 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
     }
 
     /// Returns a handle for this supervisor
+    #[must_use]
     pub fn handle(&self) -> LocalHandle<C, A> {
         LocalHandle {
             sender: self.messages.clone(),
         }
     }
 
-    
-
-    /// Ticks the supervisor once
+    /// Internal function that runs the supervisor's main loop for receiving messages
+    /// Returns any errors immediately, returns Ok(()) when the main loop terminates
+    /// gracefully, most likely by a call to shutdown.
     /// 
     /// # Errors
     /// This function errors whenever one of the following occurs:
     /// - Receiving a message fails
     /// - Handling a message fails
-    pub async fn tick(&mut self) -> Result<(), ActorError<A::Error>> {
-        
-        futures::select_biased! {
-            shutdown = self.shutdown.recv().fuse() => {
-                todo!()
-            },
-            mut next = self.messages.recv().fuse() => {
-                // Clone the actor as an Arc, allowing us to send it between threads
-                let actor = self.actor.clone();
-                
-                // Handle the message in a separate task
-                <C::Executor as Executor>::spawn(async move {
-                    next.handle(&actor).await;
-                });
+    async fn tick(&mut self) -> Result<(), ActorError<A::Error>> {
+        loop {
+            futures::select_biased! {
+                _ = self.shutdown.recv().fuse() => {
+                    break;
+                },
+                mut next = self.messages.recv().fuse() => {
+                    // Clone the actor as an Arc, allowing us to send it between threads
+                    let actor = self.actor.clone();
+                    
+                    // Handle the message in a separate task
+                    <C::Executor as Executor>::spawn(async move {
+                        next.handle(&actor).await;
+                    });
+                }
             }
         }
 
         // Return Ok
         Ok(())
     }
+
+    /// Runs the actor's entire lifecycle, returning any errors along the way
+    pub async fn run(&mut self) -> Result<(), ActorError<Actor::Error>> {
+        Ok(())
+    }
+
+    
 }
