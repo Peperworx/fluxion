@@ -21,7 +21,7 @@ pub mod message;
 pub use types::{
     errors::{ActorError, SendError},
     executor::{Executor, JoinHandle},
-    broadcast::{Receiver, Sender, TryRecvError, channel},
+    broadcast,
     params::FluxionParams,
 };
 

@@ -6,6 +6,8 @@ pub mod context;
 
 pub mod handle;
 
+pub mod supervisor;
+
 // Needed by async_trait.
 #[cfg(async_trait)]
 use alloc::boxed::Box;
