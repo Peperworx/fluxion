@@ -84,7 +84,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         self.actor.write().await.initialize().await?;
 
         // Tick the actor's main loop
-        self.tick().await?;
+        self.tick().await;
 
         // Deinitialize the actor
         self.actor.write().await.deinitialize().await?;
