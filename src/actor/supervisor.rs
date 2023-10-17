@@ -3,6 +3,7 @@
 
 use alloc::{boxed::Box, sync::Arc};
 use futures::FutureExt;
+use maitake_sync::RwLock;
 
 use crate::{FluxionParams, Actor, InvertedHandler, types::broadcast, ActorError, Executor};
 
@@ -12,7 +13,7 @@ use super::handle::LocalHandle;
 /// This struct wraps an actor, and is owned by a task which constantly receives messages over an asynchronous mpsc channel.
 pub struct Supervisor<C: FluxionParams, A: Actor<C>> {
     /// The supervised actor
-    actor: Arc<A>,
+    actor: Arc<RwLock<A>>,
     /// The message channel
     messages: whisk::Channel<Box<dyn InvertedHandler<C, A>>>,
     /// The shutdown channel
@@ -28,7 +29,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
 
         // Create the supervisor
         Self {
-            actor: Arc::new(actor),
+            actor: Arc::new(RwLock::new(actor)),
             messages,
             shutdown,
         }
@@ -62,7 +63,8 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                     
                     // Handle the message in a separate task
                     <C::Executor as Executor>::spawn(async move {
-                        next.handle(&actor).await;
+                        let a = actor.read().await;
+                        next.handle(&a).await;
                     });
                 }
             }
@@ -72,10 +74,45 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         Ok(())
     }
 
-    /// Runs the actor's entire lifecycle, returning any errors along the way
-    pub async fn run(&mut self) -> Result<(), ActorError<Actor::Error>> {
+    /// Internal function that runs the application's entire lifecycle, except for cleanup, which is handled by [`run`]
+    /// 
+    /// # Errors
+    /// Passes along any errors from a failure to receive messages or any errors returned by the actor.
+    async fn run_internal(&mut self) -> Result<(), ActorError<A::Error>> {
+        
+        // Initialize the actor
+        self.actor.write().await.initialize().await?;
+
+        // Tick the actor's main loop
+        self.tick().await?;
+
+        // Deinitialize the actor
+        self.actor.write().await.deinitialize().await?;
+
         Ok(())
     }
 
+    /// Runs the actor's entire lifecycle/
+    /// 
+    /// # Errors
+    /// Passes along any errors from a failure to receive messages or any errors returned by the actor.
+    pub async fn run(&mut self) -> Result<(), ActorError<A::Error>> {
+
+        // Run the application
+        let res = self.run_internal().await;
+
+        // Run cleanup, providing the error if the result was an error
+        match res {
+            Err(e) => {
+                // When there is an error, make sure to borrow it.
+                self.actor.write().await.cleanup(Some(&e)).await?;
+                Err(e)
+            },
+            Ok(()) => {
+                // Cleanup no errors
+                self.actor.write().await.cleanup(None).await
+            }
+        }
+    }
     
 }

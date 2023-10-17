@@ -73,7 +73,7 @@ pub trait Actor<C: FluxionParams>: Send + Sync + 'static {
     /// The function run upon actor cleanup
     async fn cleanup(
         &mut self,
-        _error: Option<ActorError<Self::Error>>,
+        _error: Option<&ActorError<Self::Error>>,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
     }

@@ -2,7 +2,7 @@
 //! Inverted message handlers allow the `handle` function to be called on the messages themselves, instead of the actor.
 //! This allows various generics to be removed, and enables many different message types to be sent to the same actor.
 
-use crate::{FluxionParams, Actor, ActorError, Message, SendError, Handler, Executor};
+use crate::{FluxionParams, Actor, ActorError, Message, SendError, Handler};
 
 #[cfg(async_trait)]
 use alloc::boxed::Box;
