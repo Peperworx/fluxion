@@ -1,11 +1,7 @@
 //! Contains structures that allow an actor to access its outside world.
 
-use crate::handle::LocalHandle;
 
-use crate::types::{params::FluxionParams, message::{MessageSender, Message}, Handle};
-use super::{ActorId, Actor};
-
-use alloc::boxed::Box;
+use crate::ActorId;
 
 
 /// # [`Context`]

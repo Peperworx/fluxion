@@ -13,13 +13,31 @@ extern crate alloc;
 
 pub mod types;
 
-
-pub mod handle;
-
-
 pub mod actor;
 
+pub mod message;
 
-use alloc::{collections::BTreeMap, sync::Arc, boxed::Box};
+
+pub use types::{
+    errors::{ActorError, SendError},
+    executor::{Executor, JoinHandle},
+    broadcast::{Receiver, Sender, TryRecvError, channel},
+    params::FluxionParams,
+};
+
+pub use actor::{
+    Actor, ActorId,
+    context::{
+        Context, ActorContext
+    }
+};
+
+pub use message::{
+    Message, Handler,
+    inverted::{InvertedHandler, InvertedMessage},
+    MessageSender
+};
+
 
 //type ActorMap = BTreeMap<Arc<str>, Box<dyn ActorHandle>>;
+

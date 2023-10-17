@@ -2,7 +2,7 @@
 //! This module contains several traits which are used to conveniently pass around generic parameters which would otherwise become unwieldley.
 //! This also allows these parameters to be enabled or disabled depending on feature flags.
 
-use super::executor::Executor;
+use crate::Executor;
 
 
 

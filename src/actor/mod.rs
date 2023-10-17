@@ -2,19 +2,17 @@
 //! This module contains types and traits relatign to actors.
 
 
+pub mod context;
+
+pub mod handle;
+
 // Needed by async_trait.
 #[cfg(async_trait)]
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
+use crate::{ActorError, FluxionParams};
 
-
-use crate::types::{errors::ActorError, params::FluxionParams};
-
-use self::context::Context;
-
-
-pub mod context;
 
 
 /// # Actor
