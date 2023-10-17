@@ -2,6 +2,7 @@
 //! This module contains the [`Supervisor`]. This struct contains an actor, alongside code dedicated to handling messages for the actor.
 
 use alloc::{boxed::Box, sync::Arc};
+use futures::FutureExt;
 
 use crate::{FluxionParams, Actor, InvertedHandler, types::broadcast, ActorError, Executor};
 
@@ -48,18 +49,22 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
     /// This function errors whenever one of the following occurs:
     /// - Receiving a message fails
     /// - Handling a message fails
-    pub async fn tick(&self) -> Result<(), ActorError<A::Error>> {
-
-        // Receive the next message from the receiver
-        let mut next = self.messages.recv().await;
-
-        // Clone the actor as an Arc, allowing us to send it between threads
-        let actor = self.actor.clone();
-
-        // Handle the message in a separate task
-        <C::Executor as Executor>::spawn(async move {
-            next.handle(&actor).await;
-        });
+    pub async fn tick(&mut self) -> Result<(), ActorError<A::Error>> {
+        
+        futures::select_biased! {
+            shutdown = self.shutdown.recv().fuse() => {
+                todo!()
+            },
+            mut next = self.messages.recv().fuse() => {
+                // Clone the actor as an Arc, allowing us to send it between threads
+                let actor = self.actor.clone();
+                
+                // Handle the message in a separate task
+                <C::Executor as Executor>::spawn(async move {
+                    next.handle(&actor).await;
+                });
+            }
+        }
 
         // Return Ok
         Ok(())
