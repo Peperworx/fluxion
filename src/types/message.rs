@@ -8,8 +8,9 @@ use alloc::boxed::Box;
 #[cfg(serde)]
 use serde::{Deserialize, Serialize};
 
-use super::{actor::Actor, errors::{ActorError, SendError}, Handle};
+use super::{errors::{ActorError, SendError}, Handle, params::FluxionParams};
 
+use crate::actor::Actor;
 
 /// # Message
 /// This trait is used to mark Messages. Notifications are just Messages with a response type of `()`.
@@ -46,8 +47,8 @@ pub trait MessageSender<M: Message>: Send + Sync + 'static {
 /// allowing Fluxion to get rid of the `M` generic, allowing many different types
 /// of messages to be sent.
 #[cfg_attr(async_trait, async_trait::async_trait)]
-pub trait Handler<A: Actor>: Send + Sync {
-    async fn handle(&mut self, actor: &A, context: &A::Context) -> Result<(), ActorError<A::Error>>;
+pub trait Handler<C: FluxionParams, A: Actor<C>>: Send + Sync {
+    async fn handle(&mut self, actor: &A) -> Result<(), ActorError<A::Error>>;
 }
 
 /// # [`MessageHandler`]
@@ -72,10 +73,10 @@ impl<M: Message> MessageHandler<M> {
 }
 
 #[cfg_attr(async_trait, async_trait::async_trait)]
-impl<A: Actor + Handle<M>, M: Message> Handler<A> for MessageHandler<M> {
-    async fn handle(&mut self, actor: &A, context: &A::Context) -> Result<(), ActorError<A::Error>> {
+impl<C: FluxionParams, A: Handle<C, M>, M: Message> Handler<C, A> for MessageHandler<M> {
+    async fn handle(&mut self, actor: &A) -> Result<(), ActorError<A::Error>> {
         // Handle the message
-        let res = actor.message(&self.message, context).await?;
+        let res = actor.message(&self.message).await?;
 
         // Send the response
         self.responder.send(res).or(Err(SendError::ResponseFailed))?;

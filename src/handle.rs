@@ -2,7 +2,8 @@
 
 use core::any::Any;
 
-use crate::types::{Handle, errors::SendError, message::{MessageHandler, MessageSender, Handler, Message}, actor::Actor};
+use crate::types::{Handle, errors::SendError, message::{MessageHandler, MessageSender, Handler, Message}, params::FluxionParams};
+use crate::actor::Actor;
 use alloc::boxed::Box;
 
 /// # [`ActorHandle`]
@@ -15,19 +16,19 @@ pub(crate) trait ActorHandle: Send + Sync + 'static {
 /// # [`LocalHandle`]
 /// This struct wraps a channel to communicate with an actor on the local system.
 
-pub struct LocalHandle<A: Actor> {
+pub struct LocalHandle<C: FluxionParams, A: Actor<C>> {
     /// The channel that we wrap.
-    pub(crate) sender: whisk::Channel<Box<dyn Handler<A>>>,
+    pub(crate) sender: whisk::Channel<Box<dyn Handler<C, A>>>,
 }
 
 // Weird clone impl so that Actors do not have to be clonable.
-impl<A: Actor> Clone for LocalHandle<A> {
+impl<C: FluxionParams, A: Actor<C>> Clone for LocalHandle<C, A> {
     fn clone(&self) -> Self {
         Self { sender: self.sender.clone() }
     }
 }
 
-impl<A: Actor> LocalHandle<A> {
+impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
 
     /// Sends a message to the actor and waits for a response
     /// 
@@ -35,7 +36,7 @@ impl<A: Actor> LocalHandle<A> {
     /// Returns an error if no response is received
     pub async fn request<M: Message>(&self, message: M) -> Result<M::Response, SendError>
     where
-        A: Handle<M> {
+        A: Handle<C, M> {
 
         // Create the message handle
         let (mh, rx) = MessageHandler::new(message);
@@ -51,13 +52,13 @@ impl<A: Actor> LocalHandle<A> {
 /// [`MessageSender<M>`] is implemented on [`LocalHandle<A>`] for every message for which `A`
 /// implements [`Handle`]
 #[cfg_attr(async_trait, async_trait::async_trait)]
-impl<A: Actor + Handle<M>, M: Message> MessageSender<M> for LocalHandle<A> {
+impl<C: FluxionParams, A: Handle<C, M>, M: Message> MessageSender<M> for LocalHandle<C, A> {
     async fn request(&self, message: M) -> Result<<M>::Response, SendError> {
         self.request(message).await
     }
 }
 
-impl<A: Actor> ActorHandle for LocalHandle<A> {
+impl<C: FluxionParams, A: Actor<C>> ActorHandle for LocalHandle<C, A> {
     fn as_any(&self) -> &dyn Any {
         self
     }

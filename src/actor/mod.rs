@@ -9,10 +9,12 @@ use alloc::sync::Arc;
 
 
 
-use super::{errors::ActorError, context::Context};
+use crate::types::{errors::ActorError, params::FluxionParams};
+
+use self::context::Context;
 
 
-
+pub mod context;
 
 
 /// # Actor
@@ -20,10 +22,15 @@ use super::{errors::ActorError, context::Context};
 /// Each have a default implementation which does nothing.
 ///
 /// ## Associated Types
-/// The [`Actor`] trait takes two associated types:
-/// - `Error`, which is the custom error type returned by the actor.
-/// - `Context`, which should be an implementor of [`Context`]. This should normally be backed by a generic on the
-/// `struct` that implements [`Actor`] to allow more code reusability.
+/// The [`Actor`] trait takesan associated type `Error`, which is the custom error type returned by the actor.
+///
+/// ## Generics
+/// The single generic taken by [`Actor`] is configuration data used by Fluxion for compile time config.
+/// It is a type implementing the trait [`crate::types::params::FluxionParams`], where each associated type
+/// is configurable. This mainly contains information such as what the notification type used by the system is,
+/// which async executor is being used, and other related information. Implementors of [`Actor`] may wish
+/// to confine themselves to specific parameters (such as a specific executor), and as such this is provided
+/// as a generic instead of an associated type.
 /// 
 /// ## Initialization
 /// When an Actor is added to a system, a separate management, or "supervisor" task is started which oversees the Actor's lifetime.
@@ -43,17 +50,15 @@ use super::{errors::ActorError, context::Context};
 /// This trait uses [`async_trait`] when on stable. Once async functions in traits are stablized, this dependency will be removed.
 /// On nightly, the `nightly` feature may be enabled, which uses `#![feature(async_fn_in_trait)]`
 #[cfg_attr(async_trait, async_trait::async_trait)]
-pub trait Actor: Send + Sync + 'static {
+pub trait Actor<C: FluxionParams>: Send + Sync + 'static {
     /// The error type returned by the actor
     type Error: Send + Sync + 'static;
 
-    /// The Actor's Context
-    type Context: Context;
+
 
     /// The function run upon actor initialization
     async fn initialize(
         &mut self,
-        _context: &Self::Context,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
     }
@@ -61,7 +66,6 @@ pub trait Actor: Send + Sync + 'static {
     /// The function run upon actor deinitialization
     async fn deinitialize(
         &mut self,
-        _context: &Self::Context,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
     }
@@ -69,7 +73,6 @@ pub trait Actor: Send + Sync + 'static {
     /// The function run upon actor cleanup
     async fn cleanup(
         &mut self,
-        _context: &Self::Context,
         _error: Option<ActorError<Self::Error>>,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
