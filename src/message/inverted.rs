@@ -41,17 +41,12 @@ impl<M: Message> InvertedMessage<M> {
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl<C: FluxionParams, A: Handler<C, M>, M: Message> InvertedHandler<C, A> for InvertedMessage<M> {
     async fn handle(&mut self, actor: &A) -> Result<(), ActorError<A::Error>> {
-        <C::Executor as Executor>::spawn(async {
-            // Handle the message
-            let res = actor.message(&self.message).await;
+        // Handle the message
+        let res = actor.message(&self.message).await?;
 
-            let Ok(res) = res else {
-                return;
-            };
+        // Send the response
+        self.responder.send(res).or(Err(SendError::ResponseFailed))?;
 
-            // Send the response
-            self.responder.send(res).or(Err(SendError::ResponseFailed));
-        });
         Ok(())
     }
 }

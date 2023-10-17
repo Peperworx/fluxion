@@ -1,9 +1,9 @@
 //! # Actor Supervisor
 //! This module contains the [`Supervisor`]. This struct contains an actor, alongside code dedicated to handling messages for the actor.
 
-use alloc::boxed::Box;
+use alloc::{boxed::Box, sync::Arc};
 
-use crate::{FluxionParams, Actor, InvertedHandler, types::broadcast, ActorError};
+use crate::{FluxionParams, Actor, InvertedHandler, types::broadcast, ActorError, Executor};
 
 use super::handle::LocalHandle;
 
@@ -11,7 +11,7 @@ use super::handle::LocalHandle;
 /// This struct wraps an actor, and is owned by a task which constantly receives messages over an asynchronous mpsc channel.
 pub struct Supervisor<C: FluxionParams, A: Actor<C>> {
     /// The supervised actor
-    actor: A,
+    actor: Arc<A>,
     /// The message channel
     messages: whisk::Channel<Box<dyn InvertedHandler<C, A>>>,
     /// The shutdown channel
@@ -27,7 +27,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
 
         // Create the supervisor
         Self {
-            actor,
+            actor: Arc::new(actor),
             messages,
             shutdown,
         }
@@ -53,8 +53,13 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         // Receive the next message from the receiver
         let mut next = self.messages.recv().await;
 
-        // Handle the message
-        next.handle(&self.actor).await?;
+        // Clone the actor as an Arc, allowing us to send it between threads
+        let actor = self.actor.clone();
+
+        // Handle the message in a separate task
+        <C::Executor as Executor>::spawn(async move {
+            next.handle(&actor).await;
+        });
 
         // Return Ok
         Ok(())

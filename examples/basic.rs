@@ -6,7 +6,7 @@ use fluxion::{Executor, FluxionParams};
 struct TokioExecutor;
 
 impl Executor for TokioExecutor {
-    fn spawn<T>(&self, future: T) -> fluxion::types::executor::JoinHandle<T::Output>
+    fn spawn<T>(future: T) -> fluxion::types::executor::JoinHandle<T::Output>
     where
         T: std::future::Future + Send + 'static,
         T::Output: Send + 'static {
