@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 use alloc::{collections::BTreeMap, sync::Arc, boxed::Box, vec::Vec};
 use maitake_sync::RwLock;
 
-use crate::{actor::handle::ActorHandle, FluxionParams};
+use crate::{actor::{handle::{ActorHandle, LocalHandle}, supervisor::Supervisor}, FluxionParams, Actor, Executor};
 
 
 /// The type alias for the map of actors stored in the system.
@@ -74,5 +74,42 @@ impl<C: FluxionParams> Fluxion<C> {
 
         // Return the number of shutdown actors.
         shutdown_actors
+    }
+
+    /// Add an actor to the system
+    /// 
+    /// # Returns
+    /// Returns [`None`] if the actor was not added to the system.
+    /// If the actor was added to the system, returns [`Some`]
+    /// containing the actor's [`LocalHandle`].
+    pub async fn add<A: Actor<C>>(&self, actor: A, id: &str) -> Option<LocalHandle<C, A>> {
+        // If the actor already exists, then return None.
+        // Lock actors as read here temporarily.
+        if self.actors.read().await.contains_key(id) {
+            return None;
+        }
+
+        // Create the supervisor
+        let mut supervisor = Supervisor::<C, A>::new(actor);
+
+        // Get a handle
+        let handle = supervisor.handle();
+
+        // Start a task for the supervisor
+        <C::Executor as Executor>::spawn(async move {
+            // Run the supervisor
+            if supervisor.run().await.is_err() {
+                todo!("Error handling");
+            }
+        });
+
+        // Lock the actors map as write
+        let mut actors = self.actors.write().await;
+        
+        // Insert a clone of the handle in the actors list
+        actors.insert(id.into(), Box::new(handle.clone()));
+
+        // Return the handle
+        Some(handle)
     }
 }

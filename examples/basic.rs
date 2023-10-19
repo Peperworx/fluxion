@@ -1,8 +1,8 @@
 
 
-use std::time::Duration;
+use std::{time::Duration, alloc::System};
 
-use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, actor::supervisor::Supervisor};
+use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, actor::supervisor::Supervisor, system::Fluxion};
 
 
 
@@ -34,12 +34,6 @@ struct TestActor;
 #[async_trait::async_trait]
 impl<C: FluxionParams> Actor<C> for TestActor {
     type Error = ();
-
-    async fn deinitialize(&mut self) -> Result<(), ActorError<()>> {
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        println!("Deinitialized");
-        Ok(())
-    }
 }
 
 #[cfg_attr(async_trait, async_trait::async_trait)]
@@ -55,21 +49,15 @@ impl<C: FluxionParams> Handler<C, ()> for TestActor {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    // Create supervisor
-    let mut sv = Supervisor::<SystemConfig, _>::new(TestActor);
+    // Create the system
+    let system = Fluxion::<SystemConfig>::new("host");
 
-    // Get the actor handle
-    let ah = sv.handle();
-
-    // Start the supervisor
-    tokio::spawn(async move {
-        sv.run().await.unwrap();
-    });
+    // Add an actor to the system
+    let ah = system.add(TestActor, "test").await.unwrap();
 
     // Send a message
     ah.request(()).await.unwrap();
 
-    // Shutdown the actor
-    ah.shutdown().await;
-
+    // Shutdown the system
+    system.shutdown().await;
 }

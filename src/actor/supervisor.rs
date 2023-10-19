@@ -62,7 +62,9 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                     // Handle the message in a separate task
                     <C::Executor as Executor>::spawn(async move {
                         let a = actor.read().await;
-                        message.handle(&a).await;
+                        if message.handle(&a).await.is_err() {
+                            todo!("Error handling")
+                        }
                     });
                 },
                 ActorControlMessage::Shutdown(s) => {
