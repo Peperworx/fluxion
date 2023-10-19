@@ -2,7 +2,6 @@
 //! This module contains the [`Supervisor`]. This struct contains an actor, alongside code dedicated to handling messages for the actor.
 
 use alloc::{boxed::Box, sync::Arc};
-use futures::FutureExt;
 use maitake_sync::RwLock;
 
 use crate::{FluxionParams, Actor, InvertedHandler, ActorError, Executor};
