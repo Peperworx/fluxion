@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use alloc::vec::Vec;
 
-/// # [`MessageSerializer`]`
+/// # [`MessageSerializer`]
 /// This trait is used to simplify the serialization and deserialization of messages and their responses
 #[cfg(serde)]
 pub trait MessageSerializer {
