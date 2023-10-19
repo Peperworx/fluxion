@@ -23,7 +23,6 @@ pub mod system;
 pub use types::{
     errors::{ActorError, SendError},
     executor::{Executor, JoinHandle},
-    broadcast,
     params::FluxionParams,
 };
 

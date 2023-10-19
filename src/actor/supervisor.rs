@@ -5,7 +5,7 @@ use alloc::{boxed::Box, sync::Arc};
 use futures::FutureExt;
 use maitake_sync::RwLock;
 
-use crate::{FluxionParams, Actor, InvertedHandler, types::broadcast, ActorError, Executor};
+use crate::{FluxionParams, Actor, InvertedHandler, ActorError, Executor};
 
 use super::handle::LocalHandle;
 
@@ -15,15 +15,13 @@ pub struct Supervisor<C: FluxionParams, A: Actor<C>> {
     /// The supervised actor
     actor: Arc<RwLock<A>>,
     /// The message channel
-    messages: whisk::Channel<Box<dyn InvertedHandler<C, A>>>,
-    /// The shutdown channel
-    shutdown: broadcast::Receiver<()>,
+    messages: whisk::Channel<Option<Box<dyn InvertedHandler<C, A>>>>,
 }
 
 impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
 
     /// Creates a new supervisor
-    pub fn new(actor: A, shutdown: broadcast::Receiver<()>) -> Self {
+    pub fn new(actor: A) -> Self {
         // Create a new whisk channel
         let messages = whisk::Channel::new();
 
@@ -31,7 +29,6 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         Self {
             actor: Arc::new(RwLock::new(actor)),
             messages,
-            shutdown,
         }
     }
 
@@ -53,21 +50,23 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
     /// - Handling a message fails
     async fn tick(&mut self) -> Result<(), ActorError<A::Error>> {
         loop {
-            futures::select_biased! {
-                _ = self.shutdown.recv().fuse() => {
-                    break;
-                },
-                mut next = self.messages.recv().fuse() => {
-                    // Clone the actor as an Arc, allowing us to send it between threads
-                    let actor = self.actor.clone();
+
+            // Receive the next message
+            let next = self.messages.recv().await;
+
+            // None means that we should gracefully exit.
+            let Some(mut next) = next else {
+                break;
+            };
+
+            // Clone the actor as an Arc, allowing us to send it between threads
+            let actor = self.actor.clone();
                     
-                    // Handle the message in a separate task
-                    <C::Executor as Executor>::spawn(async move {
-                        let a = actor.read().await;
-                        next.handle(&a).await;
-                    });
-                }
-            }
+            // Handle the message in a separate task
+            <C::Executor as Executor>::spawn(async move {
+                let a = actor.read().await;
+                next.handle(&a).await;
+            });
         }
 
         // Return Ok

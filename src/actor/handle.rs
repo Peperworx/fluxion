@@ -21,7 +21,7 @@ pub(crate) trait ActorHandle: Send + Sync + 'static {
 /// This struct wraps an mpsc channel which communicates with an actor running on the local system.
 pub struct LocalHandle<C: FluxionParams, A: Actor<C>> {
     /// The channel that we wrap.
-    pub(crate) sender: whisk::Channel<Box<dyn InvertedHandler<C, A>>>,
+    pub(crate) sender: whisk::Channel<Option<Box<dyn InvertedHandler<C, A>>>>,
 }
 
 
@@ -47,7 +47,7 @@ impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
         let (mh, rx) = InvertedMessage::new(message);
 
         // Send the handler
-        self.sender.send(Box::new(mh)).await;
+        self.sender.send(Some(Box::new(mh))).await;
 
         // Wait for a response
         rx.await.or(Err(SendError::NoResponse))
