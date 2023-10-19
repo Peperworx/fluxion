@@ -5,15 +5,21 @@ use core::any::Any;
 use crate::{FluxionParams, Actor, InvertedHandler, Message, SendError, Handler, InvertedMessage, MessageSender};
 
 use alloc::boxed::Box;
+use async_oneshot::Receiver;
 
 use super::ActorControlMessage;
 
 /// # [`ActorHandle`]
 /// A trait used when storing an actor handle in the system.
+#[cfg_attr(async_trait, async_trait::async_trait)]
 pub(crate) trait ActorHandle: Send + Sync + 'static {
     /// Returns this stored actor as an any type, which allows us to downcast it
     /// to a concrete type.
     fn as_any(&self) -> &dyn Any;
+
+    /// Begins the actor's shutdown process, returning a channel
+    /// that will respond when the shutdown is complete.
+    async fn begin_shutdown(&self) -> Option<Receiver<()>>;
 }
 
 
@@ -79,9 +85,19 @@ impl<C: FluxionParams, A: Handler<C, M>, M: Message> MessageSender<M> for LocalH
     }
 }
 
-
+#[cfg_attr(async_trait, async_trait::async_trait)]
 impl<C: FluxionParams, A: Actor<C>> ActorHandle for LocalHandle<C, A> {
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    async fn begin_shutdown(&self) -> Option<Receiver<()>> {
+        // Create a channel for the actor to acknowledge the shutdown on
+        let (tx, rx) = async_oneshot::oneshot();
+
+        // Send the message
+        self.sender.send(ActorControlMessage::Shutdown(tx)).await;
+
+        Some(rx)
     }
 }
