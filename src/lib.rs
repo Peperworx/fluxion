@@ -19,6 +19,10 @@ pub mod message;
 
 pub mod system;
 
+mod fluxion;
+
+pub use fluxion::*;
+
 
 pub use types::{
     errors::{ActorError, SendError},
@@ -32,6 +36,8 @@ pub use actor::{
         Context, ActorContext
     }
 };
+
+pub use system::System;
 
 pub use message::{
     Message, Handler,

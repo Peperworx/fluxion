@@ -14,7 +14,7 @@ pub trait Context: Send + Sync + 'static {
 }
 
 /// # [`ActorContext`]
-/// Implements [`Context`] and [`System`].
+/// Implements [`Context`] and [`System`]
 pub struct ActorContext {
 
     /// The actor's ID

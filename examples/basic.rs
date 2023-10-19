@@ -1,7 +1,7 @@
 
 
 
-use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, system::Fluxion};
+use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System};
 
 
 
