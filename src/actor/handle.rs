@@ -6,6 +6,8 @@ use crate::{FluxionParams, Actor, InvertedHandler, Message, SendError, Handler, 
 
 use alloc::boxed::Box;
 
+use super::ActorControlMessage;
+
 /// # [`ActorHandle`]
 /// A trait used when storing an actor handle in the system.
 pub(crate) trait ActorHandle: Send + Sync + 'static {
@@ -21,7 +23,7 @@ pub(crate) trait ActorHandle: Send + Sync + 'static {
 /// This struct wraps an mpsc channel which communicates with an actor running on the local system.
 pub struct LocalHandle<C: FluxionParams, A: Actor<C>> {
     /// The channel that we wrap.
-    pub(crate) sender: whisk::Channel<Option<Box<dyn InvertedHandler<C, A>>>>,
+    pub(crate) sender: whisk::Channel<ActorControlMessage<Box<dyn InvertedHandler<C, A>>>>,
 }
 
 
@@ -47,10 +49,23 @@ impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
         let (mh, rx) = InvertedMessage::new(message);
 
         // Send the handler
-        self.sender.send(Some(Box::new(mh))).await;
+        self.sender.send(ActorControlMessage::Message(Box::new(mh))).await;
 
         // Wait for a response
         rx.await.or(Err(SendError::NoResponse))
+    }
+
+    /// Shutdown the actor
+    pub async fn shutdown(&self) {
+        // Create a channel for the actor to acknowledge the shutdown on
+        let (tx, rx) = async_oneshot::oneshot();
+
+        // Send the message
+        self.sender.send(ActorControlMessage::Shutdown(tx)).await;
+
+        // Await a response.
+        // If the channel is dropped, we take no news as good news
+        let _ = rx.await;
     }
 }
 

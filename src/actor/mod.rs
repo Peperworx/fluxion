@@ -113,3 +113,10 @@ where
         ActorId(value.into())
     }
 }
+
+/// # [`ActorControlMessage`]
+/// Contains either a message to send the actor, or a shutdown command.
+pub(crate) enum ActorControlMessage<M> {
+    Message(M),
+    Shutdown(async_oneshot::Sender<()>),
+}

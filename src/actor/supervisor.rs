@@ -2,11 +2,12 @@
 //! This module contains the [`Supervisor`]. This struct contains an actor, alongside code dedicated to handling messages for the actor.
 
 use alloc::{boxed::Box, sync::Arc};
+use async_oneshot::Sender;
 use maitake_sync::RwLock;
 
 use crate::{FluxionParams, Actor, InvertedHandler, ActorError, Executor};
 
-use super::handle::LocalHandle;
+use super::{handle::LocalHandle, ActorControlMessage};
 
 /// # [`Supervisor`]
 /// This struct wraps an actor, and is owned by a task which constantly receives messages over an asynchronous mpsc channel.
@@ -14,7 +15,7 @@ pub struct Supervisor<C: FluxionParams, A: Actor<C>> {
     /// The supervised actor
     actor: Arc<RwLock<A>>,
     /// The message channel
-    messages: whisk::Channel<Option<Box<dyn InvertedHandler<C, A>>>>,
+    messages: whisk::Channel<ActorControlMessage<Box<dyn InvertedHandler<C, A>>>>,
 }
 
 impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
@@ -40,54 +41,58 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
     }
 
     /// Internal function that runs the supervisor's main loop for receiving messages
-    /// Returns any errors immediately, returns Ok(()) when the main loop terminates
-    /// gracefully, most likely by a call to shutdown.
+    /// Returns any errors immediately, and returns a shutdown acknowledgement channel
+    /// whenever the actor exits gracefully.
     /// 
     /// # Errors
     /// This function errors whenever one of the following occurs:
     /// - Receiving a message fails
     /// - Handling a message fails
-    async fn tick(&mut self) -> Result<(), ActorError<A::Error>> {
+    async fn tick(&mut self) -> Result<Sender<()>, ActorError<A::Error>> {
         loop {
 
             // Receive the next message
             let next = self.messages.recv().await;
 
-            // None means that we should gracefully exit.
-            let Some(mut next) = next else {
-                break;
-            };
+            match next {
+                ActorControlMessage::Message(mut message) => {
+                    // Clone the actor as an Arc, allowing us to send it between threads
+                    let actor = self.actor.clone();
 
-            // Clone the actor as an Arc, allowing us to send it between threads
-            let actor = self.actor.clone();
-                    
-            // Handle the message in a separate task
-            <C::Executor as Executor>::spawn(async move {
-                let a = actor.read().await;
-                next.handle(&a).await;
-            });
+                    // Handle the message in a separate task
+                    <C::Executor as Executor>::spawn(async move {
+                        let a = actor.read().await;
+                        message.handle(&a).await;
+                    });
+                },
+                ActorControlMessage::Shutdown(s) => {
+                    // If we should shutdown, return the acknowledgement channel
+                    // so that we only acknowledge after all deinitialization has been run
+                    return Ok(s);
+                },
+            }
+
+            
         }
-
-        // Return Ok
-        Ok(())
     }
 
     /// Internal function that runs the application's entire lifecycle, except for cleanup, which is handled by [`run`]
+    /// Returns the shutdown acknowledgement channel when exiting gracefully.
     /// 
     /// # Errors
     /// Passes along any errors from a failure to receive messages or any errors returned by the actor.
-    async fn run_internal(&mut self) -> Result<(), ActorError<A::Error>> {
+    async fn run_internal(&mut self) -> Result<Sender<()>, ActorError<A::Error>> {
         
         // Initialize the actor
         self.actor.write().await.initialize().await?;
 
         // Tick the actor's main loop
-        self.tick().await;
+        let res = self.tick().await;
 
         // Deinitialize the actor
         self.actor.write().await.deinitialize().await?;
 
-        Ok(())
+        res
     }
 
     /// Runs the actor's entire lifecycle/
@@ -106,9 +111,14 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                 self.actor.write().await.cleanup(Some(&e)).await?;
                 Err(e)
             },
-            Ok(()) => {
-                // Cleanup no errors
-                self.actor.write().await.cleanup(None).await
+            Ok(mut s) => {
+                // Cleanup with no errors
+                self.actor.write().await.cleanup(None).await?;
+
+                // Acknowledge shutdown, ignoring the result (too late to do anything now.)
+                let _ = s.send(());
+
+                Ok(())
             }
         }
     }
