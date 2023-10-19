@@ -2,6 +2,9 @@
 //! 
 //! The core functions are provided in the trait [`System`] to reduce code duplication for implementors of [`super::Context`].
 
+#[cfg(foreign)]
+use serde::{Serialize, Deserialize};
+
 use crate::{FluxionParams, Actor, actor::handle::LocalHandle, Handler, Message, ActorId, MessageSender};
 use alloc::boxed::Box;
 
@@ -16,6 +19,21 @@ pub trait System<C: FluxionParams> {
     /// If the actor was added to the system, returns [`Some`]
     /// containing the actor's [`LocalHandle`].
     async fn add<A: Actor<C>>(&self, actor: A, id: &str) -> Option<LocalHandle<C, A>>;
+
+    /// Initializes foreign message support for an actor.
+    /// 
+    /// `actor_id` should be the id of the local actor, while `foreign_id` should be how foreign actors
+    /// identify this actor. Only one message type per `foreign_id` is supported.
+    /// 
+    /// # Returns
+    /// Returns `true` if the foreign proxy is successfully setup, and `false` if the `foreign_id` is already used.
+    #[cfg(foreign)]
+    async fn foreign_proxy<A, M, R, S>(&self, actor_id: &str, foreign_id: &str) -> bool
+    where
+        A: Handler<C, M>,
+        M: Message<Response = R> + Serialize + for<'a> Deserialize<'a>,
+        R: Send + Sync + 'static + Serialize + for<'a> Deserialize<'a>,
+        S: crate::types::serialize::MessageSerializer;
 
     /// Get a local actor as a `LocalHandle`. Useful for running management functions like shutdown
     /// on known local actors.

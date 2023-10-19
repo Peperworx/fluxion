@@ -1,6 +1,9 @@
 //! Contains structures that allow an actor to access its outside world.
 
 
+#[cfg(foreign)]
+use serde::{Serialize, Deserialize};
+
 use alloc::boxed::Box;
 
 use crate::{ActorId, System, FluxionParams, Fluxion, Actor, MessageSender, Handler, Message};
@@ -43,6 +46,16 @@ impl<C: FluxionParams> System<C> for ActorContext<C> {
         self.system.add(actor, id).await
     }
 
+    
+    #[cfg(foreign)]
+    async fn foreign_proxy<A, M, R, S>(&self, actor_id: &str, foreign_id: &str) -> bool
+    where
+        A: Handler<C, M>,
+        M: Message<Response = R> + Serialize + for<'a> Deserialize<'a>,
+        R: Send + Sync + 'static + Serialize + for<'a> Deserialize<'a>,
+        S: crate::types::serialize::MessageSerializer {
+            self.system.foreign_proxy::<A, M, R, S>(actor_id, foreign_id).await
+        }
     
     async fn get_local<A: Actor<C>>(&self, id: &str) -> Option<LocalHandle<C, A>> {
         self.system.get_local(id).await

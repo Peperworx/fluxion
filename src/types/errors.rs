@@ -2,9 +2,13 @@
 //! Contains different error types used throughout Fluxion.
 use thiserror_no_std::Error;
 
+#[cfg(foreign)]
+use serde::{Serialize, Deserialize};
+
 /// # [`ActorError`]
 /// The error type returned by [`Actor`]s, which allows for a custom error type via generics.
 #[derive(Error, Debug)]
+#[cfg_attr(foreign, derive(Serialize, Deserialize))]
 pub enum ActorError<E> {
     #[error("custom error from actor")]
     CustomError(E),
@@ -20,6 +24,7 @@ pub enum ActorError<E> {
 /// # [`SendError`]
 /// The error type returned when sending a message to an actor
 #[derive(Error, Debug)]
+#[cfg_attr(foreign, derive(Serialize, Deserialize))]
 pub enum SendError {
     #[error("no response was returned")]
     NoResponse,

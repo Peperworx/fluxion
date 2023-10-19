@@ -1,5 +1,9 @@
 //! Contains [`Fluxion`], the main implementor of [`System`].
 
+#[cfg(serde)]
+use serde::{Deserialize, Serialize};
+
+use crate::{InvertedHandler, actor::ActorControlMessage};
 
 use core::marker::PhantomData;
 
@@ -12,6 +16,8 @@ use crate::{actor::{handle::{ActorHandle, LocalHandle}, supervisor::Supervisor},
 /// The type alias for the map of actors stored in the system.
 type ActorMap = BTreeMap<Arc<str>, Box<dyn ActorHandle>>;
 
+#[cfg(foreign)]
+type ForeignMap = BTreeMap<Arc<str>, whisk::Channel<Option<(Vec<u8>, async_oneshot::Sender<Vec<u8>>)>>>;
 
 /// # [`Fluxion`]
 /// The core management functionality of fluxion.
@@ -25,6 +31,9 @@ pub struct Fluxion<C: FluxionParams> {
     actors: Arc<RwLock<ActorMap>>,
     /// The system's ID
     id: Arc<str>,
+    /// Foreign message channels
+    #[cfg(foreign)]
+    foreign: Arc<RwLock<ForeignMap>>,
     /// Phantom data associating the generics with this struct
     _phantom: PhantomData<C>,
 }
@@ -36,6 +45,8 @@ impl<C: FluxionParams> Fluxion<C> {
         Fluxion {
             actors: Arc::new(RwLock::new(BTreeMap::default())),
             id: id.into(),
+            #[cfg(foreign)]
+            foreign: Arc::new(RwLock::new(BTreeMap::default())),
             _phantom: PhantomData,
         }
     }
@@ -125,6 +136,71 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
 
         // Return the handle
         Some(handle)
+    }
+
+    
+    #[cfg(foreign)]
+    async fn foreign_proxy<A, M, R, S>(&self, actor_id: &str, foreign_id: &str) -> bool
+    where
+        A: Handler<C, M>,
+        M: Message<Response = R> + Serialize + for<'a> Deserialize<'a>,
+        R: Send + Sync + 'static + Serialize + for<'a> Deserialize<'a>,
+        S: crate::types::serialize::MessageSerializer
+    {
+        
+        // Get the actor as a local handle, returning false
+        // if it can not be found.
+        let Some(actor) = self.get_local::<A>(actor_id).await else {
+            return false;
+        };
+
+        // Lock the foreign handler map
+        let mut foreign = self.foreign.write().await;
+        
+        // If the foreign id already exists, return false
+        if foreign.contains_key(foreign_id) {
+            return false;
+        }
+
+        // Create a new channel for foreign messages to this actor
+        let channel = whisk::Channel::<Option<(Vec<u8>, async_oneshot::Sender<Vec<u8>>)>>::new();
+
+        // Clone it for the new task
+        let rx = channel.clone();
+
+        // Spawn a new task that receives, deserializes, and dispatches.
+        <C::Executor as Executor>::spawn(async move {
+            loop {
+                // Receive on the channel
+                let next = rx.recv().await;
+
+                // If None, exit
+                let Some(mut next) = next else {
+                    break;
+                };
+
+                // Deserialize, continuing if it fails
+                let Some(message) = S::deserialize::<M>(next.0) else {
+                    continue;
+                };
+
+                // Dispatch the message
+                let res = actor.request(message).await;
+
+                // Serialize the response, continue if it fails.
+                let Some(res) = S::serialize(res) else {
+                    continue;
+                };
+
+                // Send the response
+                let _ = next.1.send(res);
+            }
+        });
+
+        // Now that foreign messages are being handled, add 
+        foreign.insert(foreign_id.into(), channel);
+
+        todo!()
     }
 
     /// Get a local actor as a `LocalHandle`. Useful for running management functions like shutdown
