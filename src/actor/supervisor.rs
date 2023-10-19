@@ -5,7 +5,7 @@ use alloc::{boxed::Box, sync::Arc};
 use async_oneshot::Sender;
 use maitake_sync::RwLock;
 
-use crate::{FluxionParams, Actor, InvertedHandler, ActorError, Executor};
+use crate::{FluxionParams, Actor, InvertedHandler, ActorError, Executor, ActorContext};
 
 use super::{handle::LocalHandle, ActorControlMessage};
 
@@ -16,12 +16,14 @@ pub struct Supervisor<C: FluxionParams, A: Actor<C>> {
     actor: Arc<RwLock<A>>,
     /// The message channel
     messages: whisk::Channel<ActorControlMessage<Box<dyn InvertedHandler<C, A>>>>,
+    /// The actor's context
+    context: Arc<ActorContext<C>>,
 }
 
 impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
 
     /// Creates a new supervisor
-    pub fn new(actor: A) -> Self {
+    pub fn new(actor: A, context: ActorContext<C>) -> Self {
         // Create a new whisk channel
         let messages = whisk::Channel::new();
 
@@ -29,6 +31,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         Self {
             actor: Arc::new(RwLock::new(actor)),
             messages,
+            context: Arc::new(context),
         }
     }
 
@@ -58,11 +61,14 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                 ActorControlMessage::Message(mut message) => {
                     // Clone the actor as an Arc, allowing us to send it between threads
                     let actor = self.actor.clone();
+                    
+                    // Clone the context as an arc too
+                    let context = self.context.clone();
 
                     // Handle the message in a separate task
                     <C::Executor as Executor>::spawn(async move {
                         let a = actor.read().await;
-                        if message.handle(&a).await.is_err() {
+                        if message.handle(&context, &a).await.is_err() {
                             todo!("Error handling")
                         }
                     });
@@ -86,13 +92,13 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
     async fn run_internal(&mut self) -> Result<Sender<()>, ActorError<A::Error>> {
         
         // Initialize the actor
-        self.actor.write().await.initialize().await?;
+        self.actor.write().await.initialize(&self.context).await?;
 
         // Tick the actor's main loop
         let res = self.tick().await;
 
         // Deinitialize the actor
-        self.actor.write().await.deinitialize().await?;
+        self.actor.write().await.deinitialize(&self.context).await?;
 
         res
     }
@@ -110,12 +116,12 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         match res {
             Err(e) => {
                 // When there is an error, make sure to borrow it.
-                self.actor.write().await.cleanup(Some(&e)).await?;
+                self.actor.write().await.cleanup(&self.context, Some(&e)).await?;
                 Err(e)
             },
             Ok(mut s) => {
                 // Cleanup with no errors
-                self.actor.write().await.cleanup(None).await?;
+                self.actor.write().await.cleanup(&self.context, None).await?;
 
                 // Acknowledge shutdown, ignoring the result (too late to do anything now.)
                 let _ = s.send(());

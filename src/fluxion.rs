@@ -6,7 +6,7 @@ use core::marker::PhantomData;
 use alloc::{collections::BTreeMap, sync::Arc, boxed::Box, vec::Vec};
 use maitake_sync::RwLock;
 
-use crate::{actor::{handle::{ActorHandle, LocalHandle}, supervisor::Supervisor}, FluxionParams, Actor, Executor, Handler, Message, ActorId, MessageSender, System};
+use crate::{actor::{handle::{ActorHandle, LocalHandle}, supervisor::Supervisor}, FluxionParams, Actor, Executor, Handler, Message, ActorId, MessageSender, System, ActorContext};
 
 
 /// The type alias for the map of actors stored in the system.
@@ -16,6 +16,10 @@ type ActorMap = BTreeMap<Arc<str>, Box<dyn ActorHandle>>;
 /// # [`Fluxion`]
 /// The core management functionality of fluxion.
 /// Handles the creation, shutdown, and management of actors.
+/// 
+/// Used `Arc` internally, so this can be cloned around, although it is not recommended.
+/// Immutable references can be used to do most things instead.
+#[derive(Clone)]
 pub struct Fluxion<C: FluxionParams> {
     /// The map of actors
     actors: Arc<RwLock<ActorMap>>,
@@ -96,8 +100,11 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
             return None;
         }
 
+        // Create the actor's context
+        let context = ActorContext::new(id.into(), self.clone());
+
         // Create the supervisor
-        let mut supervisor = Supervisor::<C, A>::new(actor);
+        let mut supervisor = Supervisor::<C, A>::new(actor, context);
 
         // Get a handle
         let handle = supervisor.handle();

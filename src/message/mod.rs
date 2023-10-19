@@ -11,7 +11,7 @@ use alloc::boxed::Box;
 #[cfg(serde)]
 use serde::{Deserialize, Serialize};
 
-use crate::{Actor, FluxionParams, ActorError};
+use crate::{Actor, FluxionParams, ActorError, ActorContext};
 
 
 /// # Message
@@ -39,6 +39,7 @@ impl Message for () {
 pub trait Handler<C: FluxionParams, M: Message>: Actor<C> {
     async fn message(
         &self,
+        context: &ActorContext<C>,
         message: &M
     ) -> Result<M::Response, ActorError<Self::Error>>;
 }

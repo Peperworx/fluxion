@@ -32,9 +32,7 @@ pub use types::{
 
 pub use actor::{
     Actor, ActorId,
-    context::{
-        Context, ActorContext
-    }
+    context::ActorContext,
 };
 
 pub use system::System;

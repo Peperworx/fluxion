@@ -13,7 +13,7 @@ pub mod supervisor;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
-use crate::{ActorError, FluxionParams};
+use crate::{ActorError, FluxionParams, ActorContext};
 
 
 
@@ -59,6 +59,7 @@ pub trait Actor<C: FluxionParams>: Send + Sync + 'static {
     /// The function run upon actor initialization
     async fn initialize(
         &mut self,
+        _context: &ActorContext<C>
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
     }
@@ -66,6 +67,7 @@ pub trait Actor<C: FluxionParams>: Send + Sync + 'static {
     /// The function run upon actor deinitialization
     async fn deinitialize(
         &mut self,
+        _context: &ActorContext<C>
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
     }
@@ -73,6 +75,7 @@ pub trait Actor<C: FluxionParams>: Send + Sync + 'static {
     /// The function run upon actor cleanup
     async fn cleanup(
         &mut self,
+        _context: &ActorContext<C>,
         _error: Option<&ActorError<Self::Error>>,
     ) -> Result<(), ActorError<Self::Error>> {
         Ok(())
