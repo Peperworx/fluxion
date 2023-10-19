@@ -44,7 +44,7 @@ impl<C: FluxionParams> Fluxion<C> {
         &self.id
     }
 
-    /// Shutdown all local actors
+    /// Shutdown and remove all local actors.
     /// 
     /// # Returns
     /// Returns the number of actors shutdown
@@ -153,5 +153,27 @@ impl<C: FluxionParams> Fluxion<C> {
 
             todo!()
         }}
+    }
+
+    /// Removes an actor from the system, and waits for it to stop execution
+    pub async fn remove(&self, id: &str) {
+        // Remove the actor and get it's original handle
+        let actor = self.actors.write().await.remove(id);
+
+        // If it did not exist, we don't care.
+        // But if it did, shut it down.
+        if let Some(actor) = actor {
+            // Begin the shutdown
+            let rx = actor.begin_shutdown().await;
+
+            // And if a receiver was provided, wait for it to complete
+            let Some(rx) = rx else {
+                return;
+            };
+
+            // We don't care if this does not run.
+            // If it doesn't, the actor has just shutdown.
+            let _ = rx.await;
+        }
     }
 }
