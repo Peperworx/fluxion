@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 use alloc::{collections::BTreeMap, sync::Arc, boxed::Box, vec::Vec};
 use maitake_sync::RwLock;
 
-use crate::{actor::{handle::{ActorHandle, LocalHandle}, supervisor::Supervisor}, FluxionParams, Actor, Executor};
+use crate::{actor::{handle::{ActorHandle, LocalHandle}, supervisor::Supervisor}, FluxionParams, Actor, Executor, Handler, Message, ActorId, MessageSender};
 
 
 /// The type alias for the map of actors stored in the system.
@@ -111,5 +111,47 @@ impl<C: FluxionParams> Fluxion<C> {
 
         // Return the handle
         Some(handle)
+    }
+
+    /// Get a local actor as a `LocalHandle`. Useful for running management functions like shutdown
+    /// on known local actors.
+    pub async fn get_local<A: Actor<C>>(&self, id: &str) -> Option<LocalHandle<C, A>> {
+        // Lock the map as read
+        let actors = self.actors.read().await;
+
+        // Get the actor, and map the value to a downcast
+        actors.get(id)
+            .and_then(|v| v.as_any().downcast_ref().cloned())
+    }
+
+    /// Get an actor from its id as a `Box<dyn MessageSender>`.
+    /// Use this for most usecases, as it will also handle foreign actors.
+    pub async fn get<A: Handler<C, M>, M: Message>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>> {
+        
+        // If the system is the local system, find the actor
+        if id.get_system() == self.id.as_ref() || id.get_system().is_empty() {
+            
+            // Lock actors as read
+            let actors = self.actors.read().await;
+            
+            // Get the actor, returning None if it does not exist
+            let actor = actors.get(id.get_actor())?;
+            
+            // Try to downcast to a concrete type
+            let actor: &LocalHandle<C, A> = actor.as_any().downcast_ref().as_ref()?;
+
+            // Clone and box the handle
+            let handle = Box::new(actor.clone());
+
+            // Return it
+            Some(handle)
+        } else {#[cfg(not(foreign))] {
+            // If foreign messages are disabled, return None
+            None
+        } #[cfg(foreign)] {
+
+
+            todo!()
+        }}
     }
 }

@@ -1,8 +1,7 @@
 
 
-use std::{time::Duration, alloc::System};
 
-use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, actor::supervisor::Supervisor, system::Fluxion};
+use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, system::Fluxion};
 
 
 
@@ -56,6 +55,18 @@ async fn main() {
     let ah = system.add(TestActor, "test").await.unwrap();
 
     // Send a message
+    ah.request(()).await.unwrap();
+
+    // We can also get the actor's handle as a trait.
+    // This only requires the actor's type when the handle is retrieved, allowing
+    // better interoperability with other crates. This comes with the downside of
+    // requiring that the message type being used is known, and management functions are not available.
+    // If management functions are needed, use `get_local` instead, which returns the same as the `add`
+    // method.
+    drop(ah);
+    let ah = system.get::<TestActor, ()>("test".into()).await.unwrap();
+
+    // Works in the same way
     ah.request(()).await.unwrap();
 
     // Shutdown the system
