@@ -62,8 +62,17 @@ impl<C: FluxionParams> System<C> for ActorContext<C> {
     }
 
     
-    async fn get<A: Handler<C, M>, M: Message>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>> {
-        self.system.get::<A, M>(id).await
+    async fn get<
+        A: Handler<C, M>,
+        #[cfg(not(foreign))] M: Message,
+        #[cfg(foreign)] M: Message<Response = R> + Serialize,
+        #[cfg(foreign)] R: for<'a> Deserialize<'a>>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>> {
+        
+        #[cfg(foreign)]
+        let res = self.system.get::<A, M, R>(id).await;
+        #[cfg(not(foreign))]
+        let res = self.system.get::<A, M>(id).await;
+        res
     }
 
     /// Removes an actor from the system, and waits for it to stop execution

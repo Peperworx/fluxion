@@ -4,6 +4,8 @@
 
 use crate::Executor;
 
+use super::serialize::MessageSerializer;
+
 
 
 /// # [`FluxionParams`]
@@ -13,4 +15,7 @@ pub trait FluxionParams: Clone + Send + Sync + 'static {
 
     /// The async executor to use
     type Executor: Executor;
+
+    /// The serializer to use for foreign messages
+    type Serializer: MessageSerializer;
 }

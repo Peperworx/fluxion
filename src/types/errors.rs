@@ -30,4 +30,6 @@ pub enum SendError {
     NoResponse,
     #[error("failed to send a response")]
     ResponseFailed,
+    #[error("failed to serialize a message")]
+    SerializationFailed,
 }

@@ -3,17 +3,15 @@
 
 pub mod inverted;
 
+#[cfg(foreign)]
+pub mod foreign;
 
 // Needed by async_trait.
 #[cfg(async_trait)]
 use alloc::boxed::Box;
 
-use alloc::vec::Vec;
 
-#[cfg(serde)]
-use serde::{Deserialize, Serialize};
-
-use crate::{Actor, FluxionParams, ActorError, ActorContext, ActorId};
+use crate::{Actor, FluxionParams, ActorError, ActorContext,};
 
 
 /// # Message
@@ -55,18 +53,3 @@ pub trait MessageSender<M: Message>: Send + Sync + 'static {
 }
 
 
-/// # [`ForeignMessage`]
-/// Contains data for foreign messages that are used in their routing and resolution.
-#[cfg(foreign)]
-pub struct ForeignMessage {
-    /// The message's target; the actor that the message is being sent to.
-    pub target: ActorId,
-    /// The source of the message; the actor that is sending the message.
-    /// If the message is sent outside of the actor, the system will be the originating system,
-    /// while the actor field will be empty.
-    pub source: ActorId,
-    /// The contents of the message
-    pub message: Vec<u8>,
-    /// The channel to respond to the message over.
-    pub responder: async_oneshot::Sender<Vec<u8>>,
-}

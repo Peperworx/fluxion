@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 /// # [`MessageSerializer`]
 /// This trait is used to simplify the serialization and deserialization of messages and their responses
 #[cfg(serde)]
-pub trait MessageSerializer {
+pub trait MessageSerializer: Send + Sync + 'static {
 
     /// Deserialize a message, returns [`None`] in case of error.
     fn deserialize<T: for<'a> Deserialize<'a>>(message: Vec<u8>) -> Option<T>;

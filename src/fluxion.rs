@@ -3,7 +3,7 @@
 #[cfg(serde)]
 use serde::{Deserialize, Serialize};
 
-use crate::{InvertedHandler, actor::ActorControlMessage, message::ForeignMessage};
+use crate::{InvertedHandler, actor::ActorControlMessage, message::{foreign::ForeignMessage, foreign::ForeignHandle}};
 
 use core::marker::PhantomData;
 
@@ -150,11 +150,12 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
         A: Handler<C, M>,
         M: Message<Response = R> + Serialize + for<'a> Deserialize<'a>,
         R: Send + Sync + 'static + Serialize + for<'a> Deserialize<'a>,
-        S: crate::types::serialize::MessageSerializer
     {
         
         // Get the actor as a local handle, returning false
         // if it can not be found.
+
+        use crate::types::serialize::MessageSerializer;
         let Some(actor) = self.get_local::<A>(actor_id).await else {
             return false;
         };
@@ -185,7 +186,7 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
                 };
 
                 // Deserialize, continuing if it fails
-                let Some(message) = S::deserialize::<M>(next.message) else {
+                let Some(message) = <C::Serializer as MessageSerializer>::deserialize::<M>(next.message) else {
                     continue;
                 };
 
@@ -193,7 +194,7 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
                 let res = actor.request(message).await;
 
                 // Serialize the response, continue if it fails.
-                let Some(res) = S::serialize(res) else {
+                let Some(res) = <C::Serializer as MessageSerializer>::serialize(res) else {
                     continue;
                 };
 
@@ -221,7 +222,11 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
 
     /// Get an actor from its id as a `Box<dyn MessageSender>`.
     /// Use this for most cases, as it will also handle foreign actors.
-    async fn get<A: Handler<C, M>, M: Message>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>> {
+    async fn get<
+        A: Handler<C, M>,
+        #[cfg(not(foreign))] M: Message,
+        #[cfg(foreign)] M: Message<Response = R> + Serialize,
+        #[cfg(foreign)] R: for<'a> Deserialize<'a>>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>> {
         
         // If the system is the local system, find the actor
         if id.get_system() == self.id.as_ref() || id.get_system().is_empty() {
@@ -245,8 +250,11 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
             None
         } #[cfg(foreign)] {
 
+            // Create a foreign message handle
+            let foreign_handle = ForeignHandle::<C::Serializer>::new(self.outbound_foreign.clone(), id);
 
-            todo!()
+            // Box it and return
+            Some(Box::new(foreign_handle))
         }}
     }
 
