@@ -3,7 +3,7 @@
 #[cfg(serde)]
 use serde::{Deserialize, Serialize};
 
-use crate::{InvertedHandler, actor::ActorControlMessage};
+use crate::{InvertedHandler, actor::ActorControlMessage, message::ForeignMessage};
 
 use core::marker::PhantomData;
 
@@ -17,7 +17,7 @@ use crate::{actor::{handle::{ActorHandle, LocalHandle}, supervisor::Supervisor},
 type ActorMap = BTreeMap<Arc<str>, Box<dyn ActorHandle>>;
 
 #[cfg(foreign)]
-type ForeignMap = BTreeMap<Arc<str>, whisk::Channel<Option<(Vec<u8>, async_oneshot::Sender<Vec<u8>>)>>>;
+type ForeignMap = BTreeMap<Arc<str>, whisk::Channel<Option<ForeignMessage>>>;
 
 /// # [`Fluxion`]
 /// The core management functionality of fluxion.
@@ -31,9 +31,12 @@ pub struct Fluxion<C: FluxionParams> {
     actors: Arc<RwLock<ActorMap>>,
     /// The system's ID
     id: Arc<str>,
-    /// Foreign message channels
+    /// Inbound foreign message channels
     #[cfg(foreign)]
     foreign: Arc<RwLock<ForeignMap>>,
+    /// Outbound foreign message channel
+    #[cfg(foreign)]
+    outbound_foreign: whisk::Channel<ForeignMessage>,
     /// Phantom data associating the generics with this struct
     _phantom: PhantomData<C>,
 }
@@ -47,6 +50,8 @@ impl<C: FluxionParams> Fluxion<C> {
             id: id.into(),
             #[cfg(foreign)]
             foreign: Arc::new(RwLock::new(BTreeMap::default())),
+            #[cfg(foreign)]
+            outbound_foreign: whisk::Channel::new(),
             _phantom: PhantomData,
         }
     }
@@ -163,7 +168,7 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
         }
 
         // Create a new channel for foreign messages to this actor
-        let channel = whisk::Channel::<Option<(Vec<u8>, async_oneshot::Sender<Vec<u8>>)>>::new();
+        let channel = whisk::Channel::<Option<ForeignMessage>>::new();
 
         // Clone it for the new task
         let rx = channel.clone();
@@ -180,7 +185,7 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
                 };
 
                 // Deserialize, continuing if it fails
-                let Some(message) = S::deserialize::<M>(next.0) else {
+                let Some(message) = S::deserialize::<M>(next.message) else {
                     continue;
                 };
 
@@ -193,7 +198,7 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
                 };
 
                 // Send the response
-                let _ = next.1.send(res);
+                let _ = next.responder.send(res);
             }
         });
 
