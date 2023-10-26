@@ -33,3 +33,12 @@ pub enum SendError {
     #[error("failed to serialize a message")]
     SerializationFailed,
 }
+
+/// # [`ForeignError`]
+/// Errors generated when handling a foreign message
+#[cfg(foreign)]
+#[derive(Error, Debug)]
+pub enum ForeignError {
+    #[error("the target's system does not match")]
+    SystemNoMatch,
+}

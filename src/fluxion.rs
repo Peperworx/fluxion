@@ -3,6 +3,9 @@
 #[cfg(serde)]
 use serde::{Deserialize, Serialize};
 
+#[cfg(foreign)]
+use crate::types::errors::ForeignError;
+
 use crate::{InvertedHandler, actor::ActorControlMessage, message::{foreign::ForeignMessage, foreign::ForeignHandle}};
 
 use core::marker::PhantomData;
@@ -56,6 +59,12 @@ impl<C: FluxionParams> Fluxion<C> {
         }
     }
 
+    /// Gets the outbound foreign channel
+    #[cfg(foreign)]
+    pub fn outbound_foreign(&self) -> whisk::Channel<ForeignMessage> {
+        self.outbound_foreign.clone()
+    }
+
     /// Gets the system's id
     /// 
     /// # Returns
@@ -97,6 +106,19 @@ impl<C: FluxionParams> Fluxion<C> {
         shutdown_actors
     }
 
+    /// Relays a foreign message to an actor on this system.
+    /// Upon error, the caller should respond to the message with `None`,
+    /// unless there is a possibility of recovery.
+    #[cfg(foreign)]
+    pub fn relay_foreign(&self, message: &ForeignMessage) -> Result<(), ForeignError> {
+
+        // If for some reason the message's system does not match, error
+        if message.target.get_system() != self.id.as_ref() {
+            return Err(ForeignError::SystemNoMatch);
+        }
+
+        Ok(())
+    }
     
 }
 
@@ -199,7 +221,7 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
                 };
 
                 // Send the response
-                let _ = next.responder.send(res);
+                let _ = next.responder.send(Some(res));
             }
         });
 
@@ -208,6 +230,8 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
 
         todo!()
     }
+
+    
 
     /// Get a local actor as a `LocalHandle`. Useful for running management functions like shutdown
     /// on known local actors.

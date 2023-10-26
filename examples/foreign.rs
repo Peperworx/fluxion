@@ -1,7 +1,7 @@
 
 
 
-use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message};
+use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message, types::serialize::MessageSerializer};
 use serde::{Serialize, Deserialize};
 
 
@@ -21,11 +21,26 @@ impl Executor for TokioExecutor {
     }
 }
 
+/// Define a bincode serializer
+struct BincodeSerializer;
+
+impl MessageSerializer for BincodeSerializer {
+    fn deserialize<T: for<'a> Deserialize<'a>>(message: Vec<u8>) -> Option<T> {
+        bincode::deserialize(&message).ok()
+    }
+
+    fn serialize<T: Serialize>(message: T) -> Option<Vec<u8>> {
+        bincode::serialize(&message).ok()
+    }
+}
+
 /// Define system configuration
 #[derive(Clone)]
 struct SystemConfig;
 impl FluxionParams for SystemConfig {
     type Executor = TokioExecutor;
+
+    type Serializer = BincodeSerializer;
 }
 
 #[derive(Serialize, Deserialize)]
@@ -63,7 +78,7 @@ impl<C: FluxionParams> Handler<C, TestMessage> for TestActor {
     ) -> Result<(), ActorError<Self::Error>> {
         println!("TestMessage");
         // Relay to the () handler
-        let ah = context.get::<Self, ()>(context.get_id()).await.unwrap();
+        let ah = context.get::<Self, (), _>(context.get_id()).await.unwrap();
         ah.request(()).await.unwrap();
         Ok(())
     }
@@ -71,30 +86,28 @@ impl<C: FluxionParams> Handler<C, TestMessage> for TestActor {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    // Create the system
+    // Create a system
     let system = Fluxion::<SystemConfig>::new("host");
 
-    // Add an actor to the system
-    let ah = system.add(TestActor, "test").await.unwrap();
+    // Create a system for our foreign example
+    let foreign = Fluxion::<SystemConfig>::new("foreign");
 
-    // Send a message
-    ah.request(()).await.unwrap();
+    // Create a task which will relay foreign messages from system to foreign
+    let s1 = system.clone();
+    let f1 = foreign.clone();
+    tokio::spawn(async move {
+        let outbound = s1.outbound_foreign();
 
-    // We can also get the actor's handle as a trait.
-    // This only requires the actor's type when the handle is retrieved, allowing
-    // better interoperability with other crates. This comes with the downside of
-    // requiring that the message type being used is known, and management functions are not available.
-    // If management functions are needed, use `get_local` instead, which returns the same as the `add`
-    // method.
-    let sender_ah = system.get::<TestActor, ()>("test".into()).await.unwrap();
+        loop {
+            let m = outbound.recv().await;
 
-    // Works in the same way
-    sender_ah.request(()).await.unwrap();
+            // Relay the foreign message to f1. There would normally be some more logic in here,
+            // especially when sending a message over a network or between processes.
+            f1.relay_foreign(m).await;
+        }
+    });
 
-    // We can also send messages from message handlers, but we have to use a channel that supports the message.
-    // We could get the actor again, or just reuse the local handle.
-    ah.request(TestMessage).await.unwrap();
-
-    // Shutdown the system
+    // Shutdown both systems
     system.shutdown().await;
+    foreign.shutdown().await;
 }
