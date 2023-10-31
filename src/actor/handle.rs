@@ -49,11 +49,8 @@ impl<C: FluxionParams, A: Actor<C>> Clone for LocalHandle<C, A> {
 
 impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
 
-    /// Sends a message to the actor and waits for a response
-    /// 
-    /// # Errors
-    /// Returns an error if no response is received
-    pub(crate) async fn request<M: Message>(&self, message: Event<M>) -> Result<M::Response, SendError>
+    /// Internal implementation for request.
+    pub(crate) async fn request_internal<M: Message>(&self, message: Event<M>) -> Result<M::Response, SendError>
     where
         A: Handler<C, M> {
         
@@ -66,7 +63,27 @@ impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
 
         // Wait for a response
         rx.await.or(Err(SendError::NoResponse))
+        // Create the Event wrapping the message
+        
     }
+
+    /// Sends a message to the actor and waits for a response
+    /// 
+    /// # Errors
+    /// Returns an error if no response is received
+    pub(crate) async fn request<M: Message>(&self, message: M) -> Result<M::Response, SendError>
+    where
+        A: Handler<C, M> {
+        
+        let event = Event {
+            message,
+            source: self.owner.clone(),
+            target: self.target.clone(),
+        };
+
+        self.request_internal(event).await
+    }
+
 
     /// Shutdown the actor
     pub async fn shutdown(&self) {
@@ -88,15 +105,10 @@ impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl<C: FluxionParams, A: Handler<C, M>, M: Message> MessageSender<M> for LocalHandle<C, A> {
     async fn request(&self, message: M) -> Result<<M>::Response, SendError> {
-        // Create the Event wrapping the message
-        let event = Event {
-            message,
-            source: self.owner.clone(),
-            target: self.target.clone(),
-        };
+        
         
 
-        self.request(event).await
+        self.request(message).await
     }
 }
 

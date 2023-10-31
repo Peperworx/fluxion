@@ -1,9 +1,9 @@
 
 
 
-use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message, types::serialize::MessageSerializer};
+use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message, types::serialize::MessageSerializer, Event};
 use serde::{Serialize, Deserialize};
-
+use fluxion::MessageSender;
 
 
 /// Define an executor to use
@@ -62,7 +62,7 @@ impl<C: FluxionParams> Handler<C, ()> for TestActor {
     async fn message(
         &self,
         _context: &ActorContext<C>,
-        _message: &()
+        _message: &Event<()>
     ) -> Result<(), ActorError<Self::Error>> {
         println!("()");
         Ok(())
@@ -74,7 +74,7 @@ impl<C: FluxionParams> Handler<C, TestMessage> for TestActor {
     async fn message(
         &self,
         context: &ActorContext<C>,
-        _message: &TestMessage
+        _message: &Event<TestMessage>,
     ) -> Result<(), ActorError<Self::Error>> {
         println!("TestMessage");
         // Relay to the () handler

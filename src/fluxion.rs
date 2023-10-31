@@ -298,7 +298,7 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
                 };
 
                 // Dispatch the message
-                let res = actor.request(Event {
+                let res = actor.request_internal(Event {
                     message,
                     source: Some(next.source),
                     target: next.target
