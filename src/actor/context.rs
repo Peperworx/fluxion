@@ -38,3 +38,60 @@ impl<C: FluxionParams> ActorContext<C> {
         self.id.clone()
     }
 }
+
+#[cfg_attr(async_trait, async_trait::async_trait)]
+impl<C: FluxionParams> System<C> for ActorContext<C> {
+/// Add an actor to the system
+    /// 
+    /// # Returns
+    /// Returns [`None`] if the actor was not added to the system.
+    /// If the actor was added to the system, returns [`Some`]
+    /// containing the actor's [`LocalHandle`].
+    async fn add<A: Actor<C>>(&self, actor: A, id: &str) -> Option<LocalHandle<C, A>> {
+        // Use this actor as the owner
+        self.system.add_internal(actor, id, Some(self.id.clone())).await
+    }
+
+    
+    #[cfg(foreign)]
+    async fn foreign_proxy<A, M, R>(&self, actor_id: &str, foreign_id: &str) -> bool
+    where
+        A: Handler<C, M>,
+        M: Message<Response = R> + Serialize + for<'a> Deserialize<'a>,
+        R: Send + Sync + 'static + Serialize + for<'a> Deserialize<'a>,
+    {
+        // Relay to the system's implementation
+        self.system.foreign_proxy::<A, M, R>(actor_id, foreign_id).await
+    }
+
+    
+
+    /// Get a local actor as a `LocalHandle`. Useful for running management functions like shutdown
+    /// on known local actors.
+    async fn get_local<A: Actor<C>>(&self, id: &str) -> Option<LocalHandle<C, A>> {
+        // Use this actor as the owner
+        self.system.get_local_internal(id, Some(self.id.clone())).await
+    }
+
+    /// Get an actor from its id as a `Box<dyn MessageSender>`.
+    /// Use this for most cases, as it will also handle foreign actors.
+    async fn get<
+        A: Handler<C, M>,
+        #[cfg(not(foreign))] M: Message,
+        #[cfg(foreign)] M: Message<Response = R> + Serialize,
+        #[cfg(foreign)] R: for<'a> Deserialize<'a>>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>> {
+        // Use thsi actor as the owner
+        #[cfg(foreign)]
+        let res = self.system.get_internal::<A, M, R>(id, Some(self.id.clone())).await;
+        #[cfg(not(foreign))]
+        let res = self.get_internal::<A,M>(id, Some(self.id.clone())).await;
+        res
+    }
+    
+
+    /// Removes an actor from the system, and waits for it to stop execution
+    async fn remove(&self, id: &str) {
+        // Delegate to the system's implementation
+        self.system.remove(id).await;
+    }
+}
