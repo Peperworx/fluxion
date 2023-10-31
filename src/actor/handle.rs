@@ -71,7 +71,7 @@ impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
     /// 
     /// # Errors
     /// Returns an error if no response is received
-    pub(crate) async fn request<M: Message>(&self, message: M) -> Result<M::Response, SendError>
+    pub async fn request<M: Message>(&self, message: M) -> Result<M::Response, SendError>
     where
         A: Handler<C, M> {
         
