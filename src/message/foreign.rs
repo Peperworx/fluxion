@@ -1,3 +1,7 @@
+//! # Foreign
+//! This module contains structs used by foreign messages.
+
+
 use core::marker::PhantomData;
 
 use crate::{ActorId, types::serialize::MessageSerializer, MessageSender, Message, SendError};
@@ -11,11 +15,11 @@ use serde::{Serialize, Deserialize};
 
 
 /// # [`ForeignMessage`]
-/// Contains data for foreign messages that are used in their routing and resolution.
+/// Contains the wrapped message, alongside a responder and associated metadata.
 pub struct ForeignMessage {
     /// The message's target; the actor that the message is being sent to.
     pub target: ActorId,
-    /// The message's source
+    /// The message's source; the actor that sent the message.
     pub source: ActorId,
     /// The contents of the message
     pub message: Vec<u8>,
@@ -51,6 +55,8 @@ impl<S: MessageSerializer> ForeignHandle<S> {
 
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl<S: MessageSerializer, M: Message<Response = R> + Serialize, R: for<'a> Deserialize<'a>> MessageSender<M> for ForeignHandle<S> {
+    /// Serializes, sends, and awaits a response for a message targeted at a foreign actor.
+    /// See [`MessageSender::request`] for more info.
     async fn request(&self, message: M) -> Result<M::Response, crate::types::errors::SendError> {
 
         // Serialize the message
