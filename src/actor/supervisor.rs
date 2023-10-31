@@ -5,7 +5,7 @@ use alloc::{boxed::Box, sync::Arc};
 use async_oneshot::Sender;
 use maitake_sync::RwLock;
 
-use crate::{FluxionParams, Actor, InvertedHandler, ActorError, Executor, ActorContext};
+use crate::{FluxionParams, Actor, InvertedHandler, ActorError, Executor, ActorContext, ActorId};
 
 use super::{handle::LocalHandle, ActorControlMessage};
 
@@ -35,11 +35,13 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         }
     }
 
-    /// Returns a handle for this supervisor
+    /// Returns a handle for this supervisor, owned by the provided actor id
     #[must_use]
-    pub fn handle(&self) -> LocalHandle<C, A> {
+    pub fn handle(&self, owner: Option<ActorId>) -> LocalHandle<C, A> {
         LocalHandle {
             sender: self.messages.clone(),
+            owner,
+            target: self.context.get_id()
         }
     }
 
