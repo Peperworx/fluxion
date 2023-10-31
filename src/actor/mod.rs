@@ -8,6 +8,8 @@ pub mod handle;
 
 pub mod supervisor;
 
+use core::fmt::Display;
+
 // Needed by async_trait.
 #[cfg(async_trait)]
 use alloc::boxed::Box;
@@ -114,6 +116,12 @@ where
 {
     fn from(value: T) -> Self {
         ActorId(value.into())
+    }
+}
+
+impl Display for ActorId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(&self.0)
     }
 }
 

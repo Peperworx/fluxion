@@ -43,7 +43,7 @@ impl FluxionParams for SystemConfig {
     type Serializer = BincodeSerializer;
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct TestMessage;
 
 impl Message for TestMessage {
@@ -62,9 +62,9 @@ impl<C: FluxionParams> Handler<C, ()> for TestActor {
     async fn message(
         &self,
         _context: &ActorContext<C>,
-        _message: &Event<()>
+        message: &Event<()>
     ) -> Result<(), ActorError<Self::Error>> {
-        println!("()");
+        println!("{} Received {:?} from {:?}", message.target, message.message, message.source);
         Ok(())
     }
 }
@@ -74,9 +74,9 @@ impl<C: FluxionParams> Handler<C, TestMessage> for TestActor {
     async fn message(
         &self,
         context: &ActorContext<C>,
-        _message: &Event<TestMessage>,
+        message: &Event<TestMessage>,
     ) -> Result<(), ActorError<Self::Error>> {
-        println!("TestMessage");
+        println!("{} Received {:?} from {:?}", message.target, message.message, message.source);
         // Relay to the () handler
         let ah = context.get::<Self, (), _>("foreign:test".into()).await.unwrap();
         ah.request(()).await.unwrap();
