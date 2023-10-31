@@ -1,16 +1,18 @@
-//! Provides an actor "handle", which enables communication with an actor.
+//! # Handle
+//! 
+//! Provides traits and structs for directly interacting with specific actors.
 
 use core::any::Any;
 
 use crate::{FluxionParams, Actor, InvertedHandler, Message, SendError, Handler, InvertedMessage, MessageSender, Event, ActorId};
 
 use alloc::boxed::Box;
-use async_oneshot::Receiver;
 
 use super::ActorControlMessage;
 
 /// # [`ActorHandle`]
-/// A trait used when storing an actor handle in the system.
+/// This trait is implemented for every actor handle, and simply provides methods that are generic to every actor.
+/// This trait is then stored directly in the system's internal map.
 #[cfg_attr(async_trait, async_trait::async_trait)]
 pub(crate) trait ActorHandle: Send + Sync + 'static {
     /// Returns this stored actor as an any type, which allows us to downcast it
@@ -19,14 +21,15 @@ pub(crate) trait ActorHandle: Send + Sync + 'static {
 
     /// Begins the actor's shutdown process, returning a channel
     /// that will respond when the shutdown is complete.
-    async fn begin_shutdown(&self) -> Option<Receiver<()>>;
+    async fn begin_shutdown(&self) -> Option<async_oneshot::Receiver<()>>;
 }
 
 
 
 
 /// # [`LocalHandle`]
-/// This struct wraps an mpsc channel which communicates with an actor running on the local system.
+/// Provides an interface with a local actor.
+/// This is acheived by wrapping an mpsc channel, the other end of which is held by the actor's supervisor.
 pub struct LocalHandle<C: FluxionParams, A: Actor<C>> {
     /// The channel that we wrap.
     pub(crate) sender: whisk::Channel<ActorControlMessage<Box<dyn InvertedHandler<C, A>>>>,
@@ -50,6 +53,13 @@ impl<C: FluxionParams, A: Actor<C>> Clone for LocalHandle<C, A> {
 impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
 
     /// Internal implementation for request.
+    /// 
+    /// This function creates an inverted message handler and sends it over the channel, waiting for a response.
+    /// This function is internal because instead of directly taking a message, it takes an Event, which can have
+    /// different contents depending on where this function was called from.
+    /// 
+    /// # Errors
+    /// Returns a [`SendError::NoResponse`] if no response was received from the actor.
     pub(crate) async fn request_internal<M: Message>(&self, message: Event<M>) -> Result<M::Response, SendError>
     where
         A: Handler<C, M> {
@@ -70,7 +80,7 @@ impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
     /// Sends a message to the actor and waits for a response
     /// 
     /// # Errors
-    /// Returns an error if no response is received
+    /// Returns a [`SendError::NoResponse`] if no response was received from the actor.
     pub async fn request<M: Message>(&self, message: M) -> Result<M::Response, SendError>
     where
         A: Handler<C, M> {
@@ -85,7 +95,7 @@ impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
     }
 
 
-    /// Shutdown the actor
+    /// Shutdown the actor, and wait for the actor to either acknowledge shutdown or drop the channel.
     pub async fn shutdown(&self) {
         // Create a channel for the actor to acknowledge the shutdown on
         let (tx, rx) = async_oneshot::oneshot();
@@ -104,21 +114,21 @@ impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
 /// implements [`Handler`]
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl<C: FluxionParams, A: Handler<C, M>, M: Message> MessageSender<M> for LocalHandle<C, A> {
+    /// See [`MessageSender::request`] and [`LocalHandle::request`] for more info.
     async fn request(&self, message: M) -> Result<<M>::Response, SendError> {
-        
-        
-
         self.request(message).await
     }
 }
 
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl<C: FluxionParams, A: Actor<C>> ActorHandle for LocalHandle<C, A> {
+    /// See [`ActorHandle::as_any`] for more info.
     fn as_any(&self) -> &dyn Any {
         self
     }
 
-    async fn begin_shutdown(&self) -> Option<Receiver<()>> {
+    /// See [`ActorHandle::begin_shutdown`] for more info.
+    async fn begin_shutdown(&self) -> Option<async_oneshot::Receiver<()>> {
         // Create a channel for the actor to acknowledge the shutdown on
         let (tx, rx) = async_oneshot::oneshot();
 
