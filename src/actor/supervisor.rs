@@ -1,16 +1,16 @@
 //! # Actor Supervisor
-//! This module contains the [`Supervisor`]. This struct contains an actor, alongside code dedicated to handling messages for the actor.
+//! This module contains the [`Supervisor`], which wraps an actor and message channel, delegating received messages and handling the actor's lifecycle.
 
 use alloc::{boxed::Box, sync::Arc};
 use async_oneshot::Sender;
 use maitake_sync::RwLock;
 
 use crate::{FluxionParams, Actor, InvertedHandler, ActorError, Executor, ActorContext, ActorId};
-
 use super::{handle::LocalHandle, ActorControlMessage};
 
 /// # [`Supervisor`]
 /// This struct wraps an actor, and is owned by a task which constantly receives messages over an asynchronous mpsc channel.
+/// These messages are delegated to the actor.
 pub struct Supervisor<C: FluxionParams, A: Actor<C>> {
     /// The supervised actor
     actor: Arc<RwLock<A>>,
@@ -35,7 +35,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         }
     }
 
-    /// Returns a handle for this supervisor, owned by the provided actor id
+    /// Returns a handle for this supervisor, owned by the provided actor id.
     #[must_use]
     pub fn handle(&self, owner: Option<ActorId>) -> LocalHandle<C, A> {
         LocalHandle {
@@ -86,7 +86,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         }
     }
 
-    /// Internal function that runs the application's entire lifecycle, except for cleanup, which is handled by [`run`]
+    /// Internal function that runs the application's entire lifecycle, except for cleanup, which is handled by [`Self::run`]
     /// Returns the shutdown acknowledgement channel when exiting gracefully.
     /// 
     /// # Errors
@@ -105,10 +105,13 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         res
     }
 
-    /// Runs the actor's entire lifecycle/
+    /// Runs the actor's entire lifecycle.
     /// 
     /// # Errors
-    /// Passes along any errors from a failure to receive messages or any errors returned by the actor.
+    /// This function errors whenever one of the following occurs:
+    /// - Receiving a message fails
+    /// - Handling a message fails
+    /// - Initialization, deinitialization, or cleanup errors.
     pub async fn run(&mut self) -> Result<(), ActorError<A::Error>> {
 
         // Run the application
