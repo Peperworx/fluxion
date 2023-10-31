@@ -19,6 +19,17 @@ use crate::{ActorError, FluxionParams, ActorContext};
 
 
 
+/// # [`ActorControlMessage`]
+/// Represents different message types used to control a local actor.
+pub(crate) enum ActorControlMessage<M> {
+    /// A message, which should be dispatched to the actor
+    Message(M),
+    /// A shutdown command, which should be obeyed, and after the shutdown is complete,
+    /// a response should be sent over the oneshot.
+    Shutdown(async_oneshot::Sender<()>),
+}
+
+
 /// # Actor
 /// This trait must be implemented for all Actors. It contains three functions, [`Actor::initialize`], [`Actor::deinitialize`], and [`Actor::cleanup`].
 /// Each have a default implementation which does nothing.
@@ -85,10 +96,13 @@ pub trait Actor<C: FluxionParams>: Send + Sync + 'static {
 }
 
 
+
+
+
+
 /// # [`ActorId`]
 /// An actor's id contains two parts: the system the actor is running on, and the actual name of the actor.
-/// 
-/// This struct represents and provides operations to act on an actor id.
+/// This struct allows both parts to be retrieved separately from a wrapped [`Arc<str>`].
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ActorId(Arc<str>);
 
@@ -125,9 +139,3 @@ impl Display for ActorId {
     }
 }
 
-/// # [`ActorControlMessage`]
-/// Contains either a message to send the actor, or a shutdown command.
-pub(crate) enum ActorControlMessage<M> {
-    Message(M),
-    Shutdown(async_oneshot::Sender<()>),
-}
