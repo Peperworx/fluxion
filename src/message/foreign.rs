@@ -15,6 +15,8 @@ use serde::{Serialize, Deserialize};
 pub struct ForeignMessage {
     /// The message's target; the actor that the message is being sent to.
     pub target: ActorId,
+    /// The message's source
+    pub source: ActorId,
     /// The contents of the message
     pub message: Vec<u8>,
     /// The channel to respond to the message over.

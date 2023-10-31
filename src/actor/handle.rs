@@ -53,19 +53,13 @@ impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
     /// 
     /// # Errors
     /// Returns an error if no response is received
-    async fn request<M: Message>(&self, message: M) -> Result<M::Response, SendError>
+    pub(crate) async fn request<M: Message>(&self, message: Event<M>) -> Result<M::Response, SendError>
     where
         A: Handler<C, M> {
         
-        // Create the Event wrapping the message
-        let event = Event {
-            message,
-            source: self.owner.clone(),
-            target: self.target.clone(),
-        };
         
         // Create the message handle
-        let (mh, rx) = InvertedMessage::new(event);
+        let (mh, rx) = InvertedMessage::new(message);
 
         // Send the handler
         self.sender.send(ActorControlMessage::Message(Box::new(mh))).await;
@@ -94,7 +88,15 @@ impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl<C: FluxionParams, A: Handler<C, M>, M: Message> MessageSender<M> for LocalHandle<C, A> {
     async fn request(&self, message: M) -> Result<<M>::Response, SendError> {
-        self.request(message).await
+        // Create the Event wrapping the message
+        let event = Event {
+            message,
+            source: self.owner.clone(),
+            target: self.target.clone(),
+        };
+        
+
+        self.request(event).await
     }
 }
 
