@@ -136,6 +136,55 @@ impl<C: FluxionParams> Fluxion<C> {
         Ok(())
     }
     
+    /// Internal implementation of System::add
+    pub(crate) async fn add_internal<A: Actor<C>>(&self, actor: A, id: &str, owner: Option<ActorId>) -> Option<LocalHandle<C, A>> {
+        // If the actor already exists, then return None.
+        // Lock actors as read here temporarily.
+        if self.actors.read().await.contains_key(id) {
+            return None;
+        }
+
+        // Create the actor's context
+        let context = ActorContext::new(id.into(), self.clone());
+
+        // Create the supervisor
+        let mut supervisor = Supervisor::<C, A>::new(actor, context);
+
+        // Get a handle.
+        let handle = supervisor.handle(owner);
+
+        // Start a task for the supervisor
+        <C::Executor as Executor>::spawn(async move {
+            // Run the supervisor
+            if supervisor.run().await.is_err() {
+                todo!("Error handling");
+            }
+        });
+
+        // Lock the actors map as write
+        let mut actors = self.actors.write().await;
+        
+        // Insert a clone of the handle in the actors list
+        actors.insert(id.into(), Box::new(handle.clone()));
+
+        // Return the handle
+        Some(handle)
+    }
+
+    /// Internal implementation of System::get_local
+    pub(crate) async fn get_local_internal<A: Actor<C>>(&self, id: &str, owner: Option<ActorId>) -> Option<LocalHandle<C, A>> {
+        // Lock the map as read
+        let actors = self.actors.read().await;
+
+        // Get the actor, and map the value to a downcast
+        // Additionally, update the owner of the handle.
+        actors.get(id)
+            .and_then(|v| v.as_any().downcast_ref().cloned())
+            .map(|mut v: LocalHandle<C, A>| {
+                v.owner = owner;
+                v
+            })
+    }
 
     /// # Internal implementation of System::get
     /// Get an actor from its id as a `Box<dyn MessageSender>`.
@@ -191,37 +240,8 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
     /// If the actor was added to the system, returns [`Some`]
     /// containing the actor's [`LocalHandle`].
     async fn add<A: Actor<C>>(&self, actor: A, id: &str) -> Option<LocalHandle<C, A>> {
-        // If the actor already exists, then return None.
-        // Lock actors as read here temporarily.
-        if self.actors.read().await.contains_key(id) {
-            return None;
-        }
-
-        // Create the actor's context
-        let context = ActorContext::new(id.into(), self.clone());
-
-        // Create the supervisor
-        let mut supervisor = Supervisor::<C, A>::new(actor, context);
-
-        // Get a handle
-        let handle = supervisor.handle();
-
-        // Start a task for the supervisor
-        <C::Executor as Executor>::spawn(async move {
-            // Run the supervisor
-            if supervisor.run().await.is_err() {
-                todo!("Error handling");
-            }
-        });
-
-        // Lock the actors map as write
-        let mut actors = self.actors.write().await;
-        
-        // Insert a clone of the handle in the actors list
-        actors.insert(id.into(), Box::new(handle.clone()));
-
-        // Return the handle
-        Some(handle)
+        // Use the internal add function, with No default owner
+        self.add_internal(actor, id, None).await
     }
 
     
@@ -299,12 +319,8 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
     /// Get a local actor as a `LocalHandle`. Useful for running management functions like shutdown
     /// on known local actors.
     async fn get_local<A: Actor<C>>(&self, id: &str) -> Option<LocalHandle<C, A>> {
-        // Lock the map as read
-        let actors = self.actors.read().await;
-
-        // Get the actor, and map the value to a downcast
-        actors.get(id)
-            .and_then(|v| v.as_any().downcast_ref().cloned())
+        // Delegate to internal implementation, using no owner
+        self.get_local_internal(id, None).await
     }
 
     /// Get an actor from its id as a `Box<dyn MessageSender>`.
