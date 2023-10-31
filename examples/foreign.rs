@@ -78,7 +78,7 @@ impl<C: FluxionParams> Handler<C, TestMessage> for TestActor {
     ) -> Result<(), ActorError<Self::Error>> {
         println!("TestMessage");
         // Relay to the () handler
-        let ah = context.get::<Self, (), _>(context.get_id()).await.unwrap();
+        let ah = context.get::<Self, (), _>("foreign:test".into()).await.unwrap();
         ah.request(()).await.unwrap();
         Ok(())
     }
@@ -103,9 +103,33 @@ async fn main() {
 
             // Relay the foreign message to f1. There would normally be some more logic in here,
             // especially when sending a message over a network or between processes.
-            f1.relay_foreign(m).await;
+            f1.relay_foreign(m).await.unwrap();
         }
     });
+
+    let s2 = system.clone();
+    let f2 = foreign.clone();
+    tokio::spawn(async move {
+        let outbound = f2.outbound_foreign();
+
+        loop {
+            let m = outbound.recv().await;
+
+            // Relay the foreign message to f1. There would normally be some more logic in here,
+            // especially when sending a message over a network or between processes.
+            s2.relay_foreign(m).await.unwrap();
+        }
+    });
+
+    // Add an actor on the foreign system
+    foreign.add(TestActor, "test").await.unwrap();
+    foreign.foreign_proxy::<TestActor, (), ()>("test", "test").await;
+
+    let ah = system.add(TestActor, "test").await.unwrap();
+
+    ah.request(TestMessage).await.unwrap();
+
+
 
     // Shutdown both systems
     system.shutdown().await;

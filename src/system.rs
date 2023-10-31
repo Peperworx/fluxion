@@ -28,12 +28,11 @@ pub trait System<C: FluxionParams> {
     /// # Returns
     /// Returns `true` if the foreign proxy is successfully setup, and `false` if the `foreign_id` is already used.
     #[cfg(foreign)]
-    async fn foreign_proxy<A, M, R, S>(&self, actor_id: &str, foreign_id: &str) -> bool
+    async fn foreign_proxy<A, M, R>(&self, actor_id: &str, foreign_id: &str) -> bool
     where
         A: Handler<C, M>,
         M: Message<Response = R> + Serialize + for<'a> Deserialize<'a>,
-        R: Send + Sync + 'static + Serialize + for<'a> Deserialize<'a>,
-        S: crate::types::serialize::MessageSerializer;
+        R: Send + Sync + 'static + Serialize + for<'a> Deserialize<'a>;
 
     /// Get a local actor as a `LocalHandle`. Useful for running management functions like shutdown
     /// on known local actors.

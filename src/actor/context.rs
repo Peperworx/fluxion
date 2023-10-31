@@ -48,13 +48,12 @@ impl<C: FluxionParams> System<C> for ActorContext<C> {
 
     
     #[cfg(foreign)]
-    async fn foreign_proxy<A, M, R, S>(&self, actor_id: &str, foreign_id: &str) -> bool
+    async fn foreign_proxy<A, M, R>(&self, actor_id: &str, foreign_id: &str) -> bool
     where
         A: Handler<C, M>,
         M: Message<Response = R> + Serialize + for<'a> Deserialize<'a>,
-        R: Send + Sync + 'static + Serialize + for<'a> Deserialize<'a>,
-        S: crate::types::serialize::MessageSerializer {
-            self.system.foreign_proxy::<A, M, R, S>(actor_id, foreign_id).await
+        R: Send + Sync + 'static + Serialize + for<'a> Deserialize<'a> {
+            self.system.foreign_proxy::<A, M, R>(actor_id, foreign_id).await
         }
     
     async fn get_local<A: Actor<C>>(&self, id: &str) -> Option<LocalHandle<C, A>> {

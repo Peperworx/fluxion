@@ -182,7 +182,7 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
 
     
     #[cfg(foreign)]
-    async fn foreign_proxy<A, M, R, S>(&self, actor_id: &str, foreign_id: &str) -> bool
+    async fn foreign_proxy<A, M, R>(&self, actor_id: &str, foreign_id: &str) -> bool
     where
         A: Handler<C, M>,
         M: Message<Response = R> + Serialize + for<'a> Deserialize<'a>,
@@ -240,10 +240,10 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
             }
         });
 
-        // Now that foreign messages are being handled, add 
+        // Now that foreign messages are being handled, add the channel
         foreign.insert(foreign_id.into(), channel);
 
-        todo!()
+        true
     }
 
     
