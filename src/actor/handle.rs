@@ -2,7 +2,7 @@
 
 use core::any::Any;
 
-use crate::{FluxionParams, Actor, InvertedHandler, Message, SendError, Handler, InvertedMessage, MessageSender};
+use crate::{FluxionParams, Actor, InvertedHandler, Message, SendError, Handler, InvertedMessage, MessageSender, Event, ActorId};
 
 use alloc::boxed::Box;
 use async_oneshot::Receiver;
@@ -30,13 +30,19 @@ pub(crate) trait ActorHandle: Send + Sync + 'static {
 pub struct LocalHandle<C: FluxionParams, A: Actor<C>> {
     /// The channel that we wrap.
     pub(crate) sender: whisk::Channel<ActorControlMessage<Box<dyn InvertedHandler<C, A>>>>,
+    /// The owner of this channel.
+    /// None if the channel was taken from the system, and if taken from an actor's context
+    /// contains the actor's id.
+    pub(crate) owner: Option<ActorId>,
+    /// The actor that this message targets
+    pub(crate) target: ActorId,
 }
 
 
 // Weird clone impl so that Actors do not have to implement Clone.
 impl<C: FluxionParams, A: Actor<C>> Clone for LocalHandle<C, A> {
     fn clone(&self) -> Self {
-        Self { sender: self.sender.clone() }
+        Self { sender: self.sender.clone(), owner: self.owner.clone(), target: self.target.clone() }
     }
 }
 
@@ -47,12 +53,19 @@ impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
     /// 
     /// # Errors
     /// Returns an error if no response is received
-    pub async fn request<M: Message>(&self, message: M) -> Result<M::Response, SendError>
+    async fn request<M: Message>(&self, message: M) -> Result<M::Response, SendError>
     where
         A: Handler<C, M> {
-
+        
+        // Create the Event wrapping the message
+        let event = Event {
+            message,
+            source: self.owner.clone(),
+            target: self.target.clone(),
+        };
+        
         // Create the message handle
-        let (mh, rx) = InvertedMessage::new(message);
+        let (mh, rx) = InvertedMessage::new(event);
 
         // Send the handler
         self.sender.send(ActorControlMessage::Message(Box::new(mh))).await;
