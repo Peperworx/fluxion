@@ -2,7 +2,7 @@
 //! Inverted message handlers allow the `handle` function to be called on the messages themselves, instead of the actor.
 //! This allows various generics to be removed, and enables many different message types to be sent to the same actor.
 
-use crate::{FluxionParams, Actor, ActorError, Message, SendError, Handler, ActorContext};
+use crate::{FluxionParams, Actor, ActorError, Message, SendError, Handler, ActorContext, Event};
 
 #[cfg(async_trait)]
 use alloc::boxed::Box;
@@ -22,14 +22,14 @@ pub trait InvertedHandler<C: FluxionParams, A: Actor<C>>: Send + Sync {
 /// type, but only after actor creation. This allows many different message types to be sent to the same actor.
 pub struct InvertedMessage<M: Message> {
     /// The message being sent
-    message: M,
+    message: Event<M>,
     /// The response channel
     responder: async_oneshot::Sender<M::Response>,
 }
 
 impl<M: Message> InvertedMessage<M> {
-    /// Creates a new [`MessageHandler`] and oneshot response receiver channel.
-    pub fn new(message: M) -> (Self, async_oneshot::Receiver<M::Response>) {
+    /// Creates a new [`InvertedMessage`] and oneshot response receiver channel.
+    pub fn new(message: Event<M>) -> (Self, async_oneshot::Receiver<M::Response>) {
         let (responder, rx) = async_oneshot::oneshot();
 
         (Self {
