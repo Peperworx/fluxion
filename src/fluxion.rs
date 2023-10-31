@@ -138,14 +138,22 @@ impl<C: FluxionParams> Fluxion<C> {
     
     /// Internal implementation of System::add
     pub(crate) async fn add_internal<A: Actor<C>>(&self, actor: A, id: &str, owner: Option<ActorId>) -> Option<LocalHandle<C, A>> {
+
+        // Create the actor id
+        let aid = ActorId::from(id);
+
+        // Strip the system, and insert this system in
+        let id = alloc::string::String::from(self.id.as_ref());
+        let id = ActorId::from(id + ":" + aid.get_actor());
+
         // If the actor already exists, then return None.
         // Lock actors as read here temporarily.
-        if self.actors.read().await.contains_key(id) {
+        if self.actors.read().await.contains_key(id.get_actor()) {
             return None;
         }
 
         // Create the actor's context
-        let context = ActorContext::new(id.into(), self.clone());
+        let context = ActorContext::new(id.clone(), self.clone());
 
         // Create the supervisor
         let mut supervisor = Supervisor::<C, A>::new(actor, context);
@@ -165,7 +173,7 @@ impl<C: FluxionParams> Fluxion<C> {
         let mut actors = self.actors.write().await;
         
         // Insert a clone of the handle in the actors list
-        actors.insert(id.into(), Box::new(handle.clone()));
+        actors.insert(id.get_actor().into(), Box::new(handle.clone()));
 
         // Return the handle
         Some(handle)
