@@ -1,12 +1,13 @@
 //! Contains [`Fluxion`], the main implementor of [`System`].
 
-#[cfg(serde)]
+#[cfg(foreign)]
 use serde::{Deserialize, Serialize};
 
 #[cfg(foreign)]
-use crate::types::errors::ForeignError;
-
-use crate::message::{foreign::ForeignMessage, foreign::ForeignHandle};
+use crate::{
+    types::errors::ForeignError,
+    message::{foreign::ForeignMessage, foreign::ForeignHandle},
+};
 
 use core::marker::PhantomData;
 

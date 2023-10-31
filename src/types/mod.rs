@@ -9,5 +9,5 @@ pub mod params;
 
 pub mod executor;
 
-#[cfg(foreign)]
+#[cfg(serde)]
 pub mod serialize;

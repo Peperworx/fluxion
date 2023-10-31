@@ -33,15 +33,13 @@ futures = { version = "0.3.28", default-features = false, features = ["async-awa
 
 
 [features]
-default = ["async-trait", "foreign", "notification"]
+default = ["async-trait", "foreign"]
 # Enables async-trait for async functions in traits. If disabled, requires nightly.
 async-trait = ["dep:async-trait"]
 # Enables foreign message support.
 foreign = ["serde"]
 # Enables serde support
 serde = ["dep:serde"]
-# Enables notification support
-notification = []
 
 
 [build-dependencies]
