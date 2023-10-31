@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(foreign)]
 use crate::types::errors::ForeignError;
 
-use crate::{InvertedHandler, actor::ActorControlMessage, message::{foreign::ForeignMessage, foreign::ForeignHandle}};
+use crate::message::{foreign::ForeignMessage, foreign::ForeignHandle};
 
 use core::marker::PhantomData;
 
@@ -136,7 +136,7 @@ impl<C: FluxionParams> Fluxion<C> {
         Ok(())
     }
     
-    /// Internal implementation of System::add
+    /// Internal implementation of [`System::add`]
     pub(crate) async fn add_internal<A: Actor<C>>(&self, actor: A, id: &str, owner: Option<ActorId>) -> Option<LocalHandle<C, A>> {
 
         // Create the actor id
@@ -179,7 +179,7 @@ impl<C: FluxionParams> Fluxion<C> {
         Some(handle)
     }
 
-    /// Internal implementation of System::get_local
+    /// Internal implementation of [`System::get_local`]
     pub(crate) async fn get_local_internal<A: Actor<C>>(&self, id: &str, owner: Option<ActorId>) -> Option<LocalHandle<C, A>> {
         // Lock the map as read
         let actors = self.actors.read().await;
@@ -194,7 +194,7 @@ impl<C: FluxionParams> Fluxion<C> {
             })
     }
 
-    /// # Internal implementation of System::get
+    /// # Internal implementation of [`System::get`]
     /// Get an actor from its id as a `Box<dyn MessageSender>`.
     /// Use this for most cases, as it will also handle foreign actors.
     /// Takes an additional parameter for the owner of the returned handle.

@@ -3,7 +3,6 @@
 
 use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message, types::serialize::MessageSerializer, Event};
 use serde::{Serialize, Deserialize};
-use fluxion::MessageSender;
 
 
 /// Define an executor to use
