@@ -32,15 +32,18 @@ pub struct ForeignHandle<S: MessageSerializer> {
     channel: whisk::Channel<ForeignMessage>,
     /// The id of the target actor
     target: ActorId,
+    /// The owner of this handle
+    owner: ActorId,
     /// Phantom data to force a single serializer.
     _phantom: PhantomData<S>,
 }
 
 impl<S: MessageSerializer> ForeignHandle<S> {
     #[must_use]
-    pub fn new(channel: whisk::Channel<ForeignMessage>, target: ActorId) -> Self {
+    pub fn new(channel: whisk::Channel<ForeignMessage>, target: ActorId, owner: ActorId) -> Self {
         Self {
             channel, target,
+            owner,
             _phantom: PhantomData
         }
     }
@@ -62,6 +65,7 @@ impl<S: MessageSerializer, M: Message<Response = R> + Serialize, R: for<'a> Dese
         // Create the foreign message
         let message = ForeignMessage {
             target: self.target.clone(),
+            source: self.owner.clone(),
             message,
             responder
         };

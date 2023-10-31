@@ -220,9 +220,15 @@ impl<C: FluxionParams> Fluxion<C> {
             // If foreign messages are disabled, return None
             None
         } #[cfg(foreign)] {
+            
+            // Get an owner for the message. If no owner, just use the current system
+            let owner = owner.unwrap_or_else(|| {
+                let v = alloc::string::String::from(self.id.as_ref()) + ":";
+                v.into()
+            });
 
             // Create a foreign message handle
-            let foreign_handle = ForeignHandle::<C::Serializer>::new(self.outbound_foreign.clone(), id);
+            let foreign_handle = ForeignHandle::<C::Serializer>::new(self.outbound_foreign.clone(), id, owner);
 
             // Box it and return
             Some(Box::new(foreign_handle))
