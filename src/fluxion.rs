@@ -109,14 +109,29 @@ impl<C: FluxionParams> Fluxion<C> {
     /// Relays a foreign message to an actor on this system.
     /// Upon error, the caller should respond to the message with `None`,
     /// unless there is a possibility of recovery.
+    /// 
+    /// # Errors
+    /// Returns an error if the foreign message failed to relay to this system.
     #[cfg(foreign)]
-    pub fn relay_foreign(&self, message: &ForeignMessage) -> Result<(), ForeignError> {
+    pub async fn relay_foreign(&self, message: ForeignMessage) -> Result<(), ForeignError> {
 
         // If for some reason the message's system does not match, error
         if message.target.get_system() != self.id.as_ref() {
             return Err(ForeignError::SystemNoMatch);
         }
 
+        // Lock the foreign channel
+        let foreign = self.foreign.read().await;
+
+        // Try to lookup the foregin channel for the actor
+        let Some(fc) = foreign.get(message.target.get_actor()) else {
+            return Err(ForeignError::NoActor);
+        };
+
+        // Relay the message
+        fc.send(Some(message)).await;
+
+        // OK
         Ok(())
     }
     

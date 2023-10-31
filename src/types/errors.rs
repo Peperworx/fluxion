@@ -41,4 +41,6 @@ pub enum SendError {
 pub enum ForeignError {
     #[error("the target's system does not match")]
     SystemNoMatch,
+    #[error("there is no actor with the matching id")]
+    NoActor,
 }
