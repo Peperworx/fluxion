@@ -3,6 +3,8 @@
 
 pub mod inverted;
 
+pub mod event;
+
 #[cfg(foreign)]
 pub mod foreign;
 
@@ -11,7 +13,7 @@ pub mod foreign;
 use alloc::boxed::Box;
 
 
-use crate::{Actor, FluxionParams, ActorError, ActorContext,};
+use crate::{Actor, FluxionParams, ActorError, ActorContext, Event,};
 
 
 /// # Message
@@ -34,7 +36,7 @@ pub trait Handler<C: FluxionParams, M: Message>: Actor<C> {
     async fn message(
         &self,
         context: &ActorContext<C>,
-        message: &M
+        message: &Event<M>
     ) -> Result<M::Response, ActorError<Self::Error>>;
 }
 

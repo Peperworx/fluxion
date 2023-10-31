@@ -61,6 +61,7 @@ impl<C: FluxionParams> Fluxion<C> {
 
     /// Gets the outbound foreign channel
     #[cfg(foreign)]
+    #[must_use]
     pub fn outbound_foreign(&self) -> whisk::Channel<ForeignMessage> {
         self.outbound_foreign.clone()
     }

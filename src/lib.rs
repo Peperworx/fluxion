@@ -40,7 +40,8 @@ pub use system::System;
 pub use message::{
     Message, Handler,
     inverted::{InvertedHandler, InvertedMessage},
-    MessageSender
+    MessageSender,
+    event::Event,
 };
 
 
