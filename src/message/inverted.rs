@@ -12,6 +12,8 @@ use alloc::boxed::Box;
 /// of knowing the message's type. 
 #[cfg_attr(async_trait, async_trait::async_trait)]
 pub trait InvertedHandler<C: FluxionParams, A: Actor<C>>: Send + Sync {
+    /// Removes the requirement of knowing a message's type by having the message dispatch itself
+    ///  (using a trait) to an actor with a given context.
     async fn handle(&mut self, context: &ActorContext<C>, actor: &A) -> Result<(), ActorError<A::Error>>;
 }
 
@@ -28,7 +30,8 @@ pub struct InvertedMessage<M: Message> {
 }
 
 impl<M: Message> InvertedMessage<M> {
-    /// Creates a new [`InvertedMessage`] and oneshot response receiver channel.
+    /// Creates a new [`InvertedMessage`] and oneshot response receiver channel from a given [`Event`]
+    #[must_use]
     pub fn new(message: Event<M>) -> (Self, async_oneshot::Receiver<M::Response>) {
         let (responder, rx) = async_oneshot::oneshot();
 
@@ -40,6 +43,9 @@ impl<M: Message> InvertedMessage<M> {
 
 #[cfg_attr(async_trait, async_trait::async_trait)]
 impl<C: FluxionParams, A: Handler<C, M>, M: Message> InvertedHandler<C, A> for InvertedMessage<M> {
+    /// Handles a message on a given actor, with a given context.
+    /// 
+    /// See [`InvertedHandler::handle`] for more info.
     async fn handle(&mut self, context: &ActorContext<C>, actor: &A) -> Result<(), ActorError<A::Error>> {
         // Handle the message
         let res = actor.message(context, &self.message).await?;
