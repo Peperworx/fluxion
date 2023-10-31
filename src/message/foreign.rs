@@ -35,6 +35,7 @@ pub struct ForeignHandle<S: MessageSerializer> {
 }
 
 impl<S: MessageSerializer> ForeignHandle<S> {
+    #[must_use]
     pub fn new(channel: whisk::Channel<ForeignMessage>, target: ActorId) -> Self {
         Self {
             channel, target,
