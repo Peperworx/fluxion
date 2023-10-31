@@ -92,17 +92,22 @@ impl<C: FluxionParams> System<C> for ActorContext<C> {
     /// Delegates to the [`Fluxion`] instance's internal get function, specifying the actor
     /// that owns the context as the owner of the returned handle.
     /// See [`System::get`] for more info.
+    #[cfg(foreign)]
     async fn get<
         A: Handler<C, M>,
-        #[cfg(not(foreign))] M: Message,
-        #[cfg(foreign)] M: Message<Response = R> + Serialize,
-        #[cfg(foreign)] R: for<'a> Deserialize<'a>>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>> {
-        // Use thsi actor as the owner
-        #[cfg(foreign)]
-        let res = self.system.get_internal::<A, M, R>(id, Some(self.id.clone())).await;
-        #[cfg(not(foreign))]
-        let res = self.get_internal::<A,M>(id, Some(self.id.clone())).await;
-        res
+        M: Message + Serialize>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>>
+    where
+        M::Response: for<'a> Deserialize<'a>
+    {
+        self.system.get_internal::<A,M>(id, Some(self.id.clone())).await
+    }
+        
+    #[cfg(not(foreign))]
+    async fn get<
+        A: Handler<C, M>,
+        M: Message>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>>
+    {
+        self.system.get_internal::<A,M>(id, Some(self.id.clone())).await
     }
     
 

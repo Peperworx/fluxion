@@ -198,11 +198,13 @@ impl<C: FluxionParams> Fluxion<C> {
     /// Get an actor from its id as a `Box<dyn MessageSender>`.
     /// Use this for most cases, as it will also handle foreign actors.
     /// Takes an additional parameter for the owner of the returned handle.
+    #[cfg(foreign)]
     pub(crate) async fn get_internal<
         A: Handler<C, M>,
-        #[cfg(not(foreign))] M: Message,
-        #[cfg(foreign)] M: Message<Response = R> + Serialize,
-        #[cfg(foreign)] R: for<'a> Deserialize<'a>>(&self, id: ActorId, owner: Option<ActorId>) -> Option<Box<dyn MessageSender<M>>> {
+        M: Message + Serialize>(&self, id: ActorId, owner: Option<ActorId>) -> Option<Box<dyn MessageSender<M>>>
+    where
+        M::Response: for<'a> Deserialize<'a>
+    {
         
         // If the system is the local system, find the actor
         if id.get_system() == self.id.as_ref() || id.get_system().is_empty() {
@@ -224,10 +226,7 @@ impl<C: FluxionParams> Fluxion<C> {
 
             // Return it
             Some(handle)
-        } else {#[cfg(not(foreign))] {
-            // If foreign messages are disabled, return None
-            None
-        } #[cfg(foreign)] {
+        } else {
             
             // Get an owner for the message. If no owner, just use the current system
             let owner = owner.unwrap_or_else(|| {
@@ -240,7 +239,38 @@ impl<C: FluxionParams> Fluxion<C> {
 
             // Box it and return
             Some(Box::new(foreign_handle))
-        }}
+        }
+    }
+
+    #[cfg(not(foreign))]
+    pub(crate) async fn get_internal<
+        A: Handler<C, M>,M: Message,
+        #[cfg(foreign)] M: Message + Serialize>(&self, id: ActorId, owner: Option<ActorId>) -> Option<Box<dyn MessageSender<M>>> {
+        
+        // If the system is the local system, find the actor
+        if id.get_system() == self.id.as_ref() || id.get_system().is_empty() {
+            
+            // Lock actors as read
+            let actors = self.actors.read().await;
+            
+            // Get the actor, returning None if it does not exist
+            let actor = actors.get(id.get_actor())?;
+            
+            // Try to downcast to a concrete type
+            let actor: &LocalHandle<C, A> = actor.as_any().downcast_ref().as_ref()?;
+
+            // Clone and box the handle
+            let mut handle = Box::new(actor.clone());
+
+            // Update the owner
+            handle.owner = owner;
+
+            // Return it
+            Some(handle)
+        } else  {
+            // If foreign messages are disabled, return None
+            None
+        }
     }
 }
 
@@ -339,16 +369,22 @@ impl<C: FluxionParams> System<C> for Fluxion<C> {
 
     /// Get an actor from its id as a `Box<dyn MessageSender>`.
     /// Use this for most cases, as it will also handle foreign actors.
+    #[cfg(foreign)]
     async fn get<
         A: Handler<C, M>,
-        #[cfg(not(foreign))] M: Message,
-        #[cfg(foreign)] M: Message<Response = R> + Serialize,
-        #[cfg(foreign)] R: for<'a> Deserialize<'a>>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>> {
-        #[cfg(foreign)]
-        let res = self.get_internal::<A, M, R>(id, None).await;
-        #[cfg(not(foreign))]
-        let res = self.get_internal::<A,M>(id, None).await;
-        res
+        M: Message + Serialize>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>>
+    where
+        M::Response: for<'a> Deserialize<'a>
+    {
+        self.get_internal::<A,M>(id, None).await
+    }
+        
+    #[cfg(not(foreign))]
+    async fn get<
+        A: Handler<C, M>,
+        M: Message>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>>
+    {
+        self.get_internal::<A,M>(id, None).await
     }
     
 

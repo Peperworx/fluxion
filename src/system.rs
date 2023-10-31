@@ -40,11 +40,18 @@ pub trait System<C: FluxionParams> {
 
     /// Get an actor from its id as a `Box<dyn MessageSender>`.
     /// Use this for most cases, as it will also handle foreign actors.
+    #[cfg(foreign)]
     async fn get<
         A: Handler<C, M>,
-        #[cfg(not(foreign))] M: Message,
-        #[cfg(foreign)] M: Message<Response = R> + Serialize,
-        #[cfg(foreign)] R: for<'a> Deserialize<'a>>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>>;
+        M: Message + Serialize>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>>
+    where
+        M::Response: for<'a> Deserialize<'a>;
+        
+    #[cfg(not(foreign))]
+    async fn get<
+        A: Handler<C, M>,
+        M: Message>(&self, id: ActorId) -> Option<Box<dyn MessageSender<M>>>;
+
 
     /// Removes an actor from the system, and waits for it to stop execution
     async fn remove(&self, id: &str);
