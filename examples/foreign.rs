@@ -1,7 +1,7 @@
 
 
 
-use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message, types::serialize::MessageSerializer, Event};
+use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message, MessageSerializer, Event};
 use serde::{Serialize, Deserialize};
 
 

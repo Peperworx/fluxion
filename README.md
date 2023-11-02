@@ -21,4 +21,5 @@ Fluxion is an actor framework designed with distributed systems in mind, namely 
 Fluxion's usage is rather complex at the moment. While a new crate that will simplify it greatly is planned, currently the best source for usage documentation is in `examples`. Extensive documentation is currently in the works.
 
 ## License
+
 Fluxion is Dual-Licensed under Apache 2.0 and MIT.

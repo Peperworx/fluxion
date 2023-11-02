@@ -44,6 +44,9 @@ pub use message::{
     event::Event,
 };
 
+#[cfg(serde)]
+pub use types::serialize::MessageSerializer;
+
 
 
 

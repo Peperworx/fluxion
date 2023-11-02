@@ -26,6 +26,8 @@ theme:
     - navigation.expand
     - navigation.indexes
     - navigation.top
+    - content.code.copy
+    - content.code.annotate
 
 repo_url: https://github.com/peperworx/fluxion
 markdown_extensions:
@@ -36,3 +38,12 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
+  - toc:
+      permalink: true
+nav:
+  - 'index.md'
+  - 'Getting Started':
+    - 'getting_started/index.md'
+    - 'Defining an Executor': 'getting_started/executor.md'
+    - 'Defining a Message Serializer': 'getting_started/serialization.md'
+    - 'Initializing Fluxion': 'getting_started/initialization.md'
