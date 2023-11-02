@@ -12,9 +12,42 @@ use config::FluxionConfig;
 use fluxion::Fluxion;
 
 #[tokio::main]
-fn main() {
+async fn main() {
     // Create a Fluxion instance using our configuration, and give it the name `host`
-    let system = 
+    let system = Fluxion::<FluxionConfig>::new("host");
 }
 
+```
+
+That was pretty easy! We just used the `tokio::main` proc macro to make the main function async (we will use it later), and created a new fluxion instance.
+
+Now, actually defining messages and actors is a little more complex. Actors require that `FluxionConfig` generic, however to make it easier for other libraries to use an actor, we can simply make that a generic:
+
+```rust
+mod config;
+
+use config::FluxionConfig;
+
+use fluxion::{Fluxion, Actor, FluxionParams};
+
+/// Our actor, which can contain any data we want. For now we will leave it empty.
+struct MyActor;
+
+#[async_trait::async_trait]
+impl<C: FluxionParams> Actor<C> for TestActor {
+    type Error = ();
+}
+
+#[tokio::main]
+async fn main() {
+    // Create a Fluxion instance using our configuration, and give it the name `host`
+    let system = Fluxion::<FluxionConfig>::new("host");
+}
+
+```
+
+Here we simply define a new unit struct, and implement `Actor` for it. We need to provide an error type that our actor might return, however we can leave it `()` for now. We also need to use the `async_trait` crate until `async_fn_in_traits` is stabilized:
+
+```sh
+cargo add async_trait
 ```
