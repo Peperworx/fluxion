@@ -1,319 +1,92 @@
-//! The implementation of foreign messages
+//! # Foreign
+//! This module contains structs used by foreign messages.
 
 
-use tokio::sync::oneshot;
+use core::marker::PhantomData;
 
-use crate::{actor::path::ActorPath, error::ActorError};
+use crate::{ActorId, types::serialize::MessageSerializer, MessageSender, Message, SendError};
 
-use super::{AsMessageType, Message, MessageType};
+use alloc::vec::Vec;
 
-#[cfg(not(feature = "federated"))]
-use std::marker::PhantomData;
+#[cfg(async_trait)]
+use alloc::boxed::Box;
+use serde::{Serialize, Deserialize};
 
-#[cfg(not(feature="bincode"))]
-use super::DynMessageResponse;
-/// # ForeignMessage
-/// The enum sent along a foreign message channel.
-#[derive(Debug)]
-#[cfg(feature = "federated")]
-pub enum ForeignMessage<F: Message> {
-    /// Contains a federated message sent to a foreign actor
-    /// as well as its responder oneshot and target
-    FederatedMessage(F, Option<oneshot::Sender<F::Response>>, ActorPath),
-    /// Contains a message sent to a foreign actor as well as it's responder and target
-    #[cfg(not(feature="bincode"))]
-    Message(
-        Box<DynMessageResponse>,
-        Option<oneshot::Sender<Box<DynMessageResponse>>>,
-        ActorPath,
-    ),
-    #[cfg(feature="bincode")]
-    Message(
-        Vec<u8>,
-        Option<oneshot::Sender<Vec<u8>>>,
-        ActorPath,
-    ),
+
+
+/// # [`ForeignMessage`]
+/// Contains the wrapped message, alongside a responder and associated metadata.
+pub struct ForeignMessage {
+    /// The message's target; the actor that the message is being sent to.
+    pub target: ActorId,
+    /// The message's source; the actor that sent the message.
+    pub source: ActorId,
+    /// The contents of the message
+    pub message: Vec<u8>,
+    /// The channel to respond to the message over.
+    /// If None is received, the foreign actor does not exist.
+    pub responder: async_oneshot::Sender<Option<Vec<u8>>>,
 }
 
-#[derive(Debug)]
-#[cfg(not(feature = "federated"))]
-pub struct ForeignMessage<F: Message> {
-    /// PhantomData to hold F
-    _phantom: PhantomData<F>,
-    /// The message contents
-    #[cfg(not(feature="bincode"))]
-    pub contents: Box<DynMessageResponse>,
-    #[cfg(feature="bincode")]
-    pub contents: Vec<u8>,
-    /// The message responder
-    #[cfg(not(feature="bincode"))]
-    pub responder: Option<oneshot::Sender<Box<DynMessageResponse>>>,
-    #[cfg(feature="bincode")]
-    pub responder: Option<oneshot::Sender<Vec<u8>>>,
-    /// The message target
-    pub target: ActorPath,
+
+/// # [`ForeignHandle`]
+/// A handle for foreign messages that wraps the outbound foreign message channel
+pub struct ForeignHandle<S: MessageSerializer> {
+    /// The outbound foreign message channel
+    channel: whisk::Channel<ForeignMessage>,
+    /// The id of the target actor
+    target: ActorId,
+    /// The owner of this handle
+    owner: ActorId,
+    /// Phantom data to force a single serializer.
+    _phantom: PhantomData<S>,
 }
 
-#[cfg(feature = "federated")]
-impl<F: Message> ForeignMessage<F> {
-    /// Gets the target of the message
-    pub fn get_target(&self) -> &ActorPath {
-        match self {
-            ForeignMessage::FederatedMessage(_, _, t) => t,
-            ForeignMessage::Message(_, _, t) => t,
-        }
-    }
-
-    /// Pops an actor off of target
-    pub fn pop_target(self) -> Self {
-        match self {
-            ForeignMessage::FederatedMessage(a, b, c) => {
-                ForeignMessage::FederatedMessage(a, b, c.popfirst())
-            }
-            ForeignMessage::Message(a, b, c) => ForeignMessage::Message(a, b, c.popfirst()),
+impl<S: MessageSerializer> ForeignHandle<S> {
+    #[must_use]
+    pub fn new(channel: whisk::Channel<ForeignMessage>, target: ActorId, owner: ActorId) -> Self {
+        Self {
+            channel, target,
+            owner,
+            _phantom: PhantomData
         }
     }
 }
 
-#[cfg(not(feature = "federated"))]
-impl<F: Message> ForeignMessage<F> {
-    /// Gets the target of the message
-    pub fn get_target(&self) -> &ActorPath {
-        &self.target
-    }
+#[cfg_attr(async_trait, async_trait::async_trait)]
+impl<S: MessageSerializer, M: Message<Response = R> + Serialize, R: for<'a> Deserialize<'a>> MessageSender<M> for ForeignHandle<S> {
+    /// Serializes, sends, and awaits a response for a message targeted at a foreign actor.
+    /// See [`MessageSender::request`] for more info.
+    async fn request(&self, message: M) -> Result<M::Response, crate::types::errors::SendError> {
 
-    /// Pops an actor off of target
-    pub fn pop_target(self) -> Self {
-        ForeignMessage {
-            _phantom: self._phantom,
-            contents: self.contents,
-            responder: self.responder,
-            target: self.target.popfirst(),
-        }
-    }
-}
-#[cfg(feature = "federated")]
-impl<F: Message, M: Message> AsMessageType<F, M> for ForeignMessage<F> {
-    fn as_message_type(&self) -> Result<MessageType<F, M>, ActorError> {
-        Ok(match self {
-            ForeignMessage::FederatedMessage(m, _, _) => MessageType::Federated(m.clone()),
-            ForeignMessage::Message(m, _, _) => {
-                // Downcast
-                #[cfg(not(feature="bincode"))]
-                let m = m
-                    .downcast_ref::<M>()
-                    .ok_or(ActorError::ForeignResponseUnexpected)?;
-
-                #[cfg(feature="bincode")]
-                #[cfg(not(feature="foreign"))]
-                let m = &m;
-
-                #[cfg(feature="bincode")]
-                let m: M = bincode::deserialize(m).or(Err(ActorError::ForeignResponseUnexpected))?;
-
-                
-                #[cfg(any(not(feature="foreign"), not(feature="bincode")))]
-                let res = {
-                    #[cfg(feature = "federated")]
-                    let res = MessageType::<F, M>::Message(m.clone());
-
-                    #[cfg(not(feature = "federated"))]
-                    let res = MessageType::<F, M>(m, PhantomData::default());
-
-                    res
-                };
-                
-                #[cfg(feature="foreign")]
-                #[cfg(feature="bincode")]
-                let res = {
-                    #[cfg(feature = "federated")]
-                    let res = MessageType::Message(m);
-
-                    #[cfg(not(feature = "federated"))]
-                    let res = MessageType::<F, M>(m, PhantomData::default());
-
-                    res
-                };
-                
-                res
-            }
-        })
-    }
-}
-
-#[cfg(not(feature = "federated"))]
-impl<F: Message, M: Message> AsMessageType<F, M> for ForeignMessage<F> {
-    fn as_message_type(&self) -> Result<MessageType<F, M>, ActorError> {
-        // Downcast
-        #[cfg(not(feature="bincode"))]
-        let m = self.contents
-            .downcast_ref::<M>()
-            .ok_or(ActorError::ForeignResponseUnexpected)?;
-        
-        
-        #[cfg(feature="bincode")]
-        let m: M = bincode::deserialize(&self.contents).or(Err(ActorError::ForeignResponseUnexpected))?;
-        
-        #[cfg(any(not(feature="foreign"), not(feature="bincode")))]
-        let res = {
-            #[cfg(feature = "federated")]
-            let res = MessageType::<F, M>::Message(m);
-
-            #[cfg(not(feature = "federated"))]
-            let res = MessageType::<F,M>(m.clone(), PhantomData::default());
-            res
-        };
-        
-        #[cfg(feature="foreign")]
-        #[cfg(feature="bincode")]
-        let res = {
-            #[cfg(feature = "federated")]
-            let res = MessageType::<F, M>::Message(m);
-
-            #[cfg(not(feature = "federated"))]
-            let res = MessageType::<F, M>(m, PhantomData::default());
-            res
-        };
-        
-        Ok(res)
-    }
-}
-
-/// # ForeignReciever
-/// [`ForeignReciever`] is a trait that can be implemented on any type that can recieve a foreign message.
-/// This is used to abstract over actors stored in a system so that it is not necessary to know the type of their messages.
-#[cfg(feature = "foreign")]
-#[async_trait::async_trait]
-pub(crate) trait ForeignReceiver {
-    /// The type of the federated message that is sent by both the local and foreign system
-    type Federated: Message;
-
-    /// This function recieves a foreign message and handles it
-    async fn handle_foreign(
-        &self,
-        foreign: ForeignMessage<Self::Federated>,
-    ) -> Result<(), ActorError>;
-}
-
-/// # ForeignMessenger
-/// [`ForeignMessenger`] is a trait that can be implemented on any type that is used to send messages to a foreign actor.
-#[cfg(feature = "foreign")]
-#[async_trait::async_trait]
-pub(crate) trait ForeignMessenger {
-    /// The type of the federated message that is sent by both the local and foreign system
-    type Federated: Message;
-
-    /// This function must be implemented by every [`ForeignMessenger`]. It sends the passed foreign
-    /// message to the foreign actor.
-    async fn send_raw_foreign(
-        &self,
-        message: ForeignMessage<Self::Federated>,
-    ) -> Result<(), ActorError>;
-
-    /// This function must be implemented by every [`ForeignMessenger]`
-    /// It must return true if someone is ready to recieve a foreign message
-    async fn can_send_foreign(&self) -> bool;
-
-    /// This function is automatically implemented. It takes a local message, and
-    /// sends it using [`ForeignMessenger::send_raw_foreign`]
-    async fn send_message_foreign<M: Message>(
-        &self,
-        message: M,
-        responder: Option<oneshot::Sender<M::Response>>,
-        target_actor: &ActorPath,
-    ) -> Result<(), ActorError> {
-        // If we should wait for a response, then do so
-    
-        let (foreign_responder, responder_recieve) = if responder.is_some() {
-            #[cfg(feature = "bincode")]
-            let channel = oneshot::channel::<Vec<u8>>();
-            #[cfg(not(feature = "bincode"))]
-            let channel = oneshot::channel();
-            (Some(channel.0), Some(channel.1))
-        } else {
-            (None, None)
+        // Serialize the message
+        let Some(message) = S::serialize(message) else {
+            // Return a send error if this failed
+            return Err(SendError::SerializationFailed);
         };
 
-        // Put the message into a foreign message
-        #[cfg(feature = "federated")]
-        let foreign = ForeignMessage::<Self::Federated>::Message(
-            {
-                #[cfg(not(feature="bincode"))]
-                let v = Box::new(message);
-                #[cfg(feature="bincode")]
-                let v = bincode::serialize(&message).or(Err(ActorError::ForeignSendFail))?;
+        // Create a responder
+        let (responder, waiter) = async_oneshot::oneshot();
 
-                v
-            },
-            foreign_responder,
-            target_actor.clone(),
-        );
-
-        #[cfg(not(feature = "federated"))]
-        let foreign = ForeignMessage{
-            _phantom: PhantomData::default(),
-            contents: {
-                #[cfg(not(feature="bincode"))]
-                let v = Box::new(message);
-                #[cfg(feature="bincode")]
-                let v = bincode::serialize(&message).or(Err(ActorError::ForeignSendFail))?;
-
-                v
-            },
-            responder: foreign_responder,
-            target: target_actor.clone(),
-        };
-
-        // If someone is listening for a foreign message, then send the foreign message
-        if self.can_send_foreign().await {
-            self.send_raw_foreign(foreign).await?;
-        } else {
-            return Ok(());
-        }
-
-        // If we should wait for a response, then do so
-        if let (Some(target), Some(source)) = (responder, responder_recieve) {
-            // Wait for the foreign response
-            let res = source.await.or(Err(ActorError::ForeignRespondFailed))?;
-
-            // Downcast
-            #[cfg(not(feature="bincode"))]
-            let res = res
-                .downcast_ref::<M::Response>()
-                .ok_or(ActorError::ForeignResponseUnexpected)?;
-            
-            #[cfg(feature="bincode")]
-            let res: M::Response = bincode::deserialize(&res).or(Err(ActorError::ForeignResponseUnexpected))?;
-            
-            
-
-            // Relay the response
-            #[cfg(all(feature="bincode", feature = "foreign"))]
-            target
-                .send(res)
-                .or(Err(ActorError::ForeignResponseRelayFail))?;
-            #[cfg(not(all(feature="bincode", feature = "foreign")))]
-            target
-                .send(res.clone())
-                .or(Err(ActorError::ForeignResponseRelayFail))?;
-        }
-
-        Ok(())
-    }
-
-    /// This function is automatically implemented. It takes a local federated message, and
-    /// sends it using [`ForeignMessenger::send_raw_foreign`]
-    #[cfg(feature = "federated")]
-    async fn send_federated_foreign(
-        &self,
-        federated: Self::Federated,
-        responder: Option<oneshot::Sender<<Self::Federated as Message>::Response>>,
-        target_actor: &ActorPath,
-    ) -> Result<(), ActorError> {
         // Create the foreign message
-        let foreign = ForeignMessage::FederatedMessage(federated, responder, target_actor.clone());
+        let message = ForeignMessage {
+            target: self.target.clone(),
+            source: self.owner.clone(),
+            message,
+            responder
+        };
 
         // Send the foreign message
-        self.send_raw_foreign(foreign).await
+        self.channel.send(message).await;
+
+        // Wait for a response and deserialize
+        let res = waiter.await.or(Err(SendError::NoResponse))?
+            .ok_or(SendError::NoResponse)?;
+
+        let Some(res) = S::deserialize::<R>(res) else {
+            return Err(SendError::NoResponse);
+        };
+
+        Ok(res)
     }
 }

@@ -1,0 +1,1 @@
+If this crate successfully builds, then Fluxion and its dependencies fully support no_std by default.

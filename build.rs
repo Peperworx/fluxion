@@ -3,8 +3,12 @@ use cfg_aliases::cfg_aliases;
 fn main() {
     // Setup cfg aliases
     cfg_aliases! {
-        // Tracing
-        tracing: { feature = "tracing" },
-        release_tracing: { all(tracing, any(feature = "release_tracing", debug_assertions)) }
+        // Async trait backends
+        async_trait: { feature = "async-trait" },
+        // Features
+        foreign: { feature = "foreign" },
+        serde: { feature = "serde" },
+        federated: { feature = "federated" },
+        notification: { feature = "notification" },
     }
 }

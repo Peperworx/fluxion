@@ -1,165 +1,136 @@
-use fluxion::{
-    ActorContext, SupervisorErrorPolicy, Actor,
-    ActorError,
-    HandleFederated, HandleMessage, HandleNotification,
-    Message, Notification,
-    system,
-};
+
+
+
+use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message, types::serialize::MessageSerializer, Event};
 use serde::{Serialize, Deserialize};
 
-#[cfg(tracing)]
-use tracing::Level;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// Define an executor to use
+struct TokioExecutor;
+
+impl Executor for TokioExecutor {
+    fn spawn<T>(future: T) -> fluxion::types::executor::JoinHandle<T::Output>
+    where
+        T: std::future::Future + Send + 'static,
+        T::Output: Send + 'static {
+        let handle = tokio::spawn(future);
+        fluxion::types::executor::JoinHandle { handle: Box::pin(async {
+            handle.await.unwrap()
+        }) }
+    }
+}
+
+/// Define a bincode serializer
+struct BincodeSerializer;
+
+impl MessageSerializer for BincodeSerializer {
+    fn deserialize<T: for<'a> Deserialize<'a>>(message: Vec<u8>) -> Option<T> {
+        bincode::deserialize(&message).ok()
+    }
+
+    fn serialize<T: Serialize>(message: T) -> Option<Vec<u8>> {
+        bincode::serialize(&message).ok()
+    }
+}
+
+/// Define system configuration
+#[derive(Clone)]
+struct SystemConfig;
+impl FluxionParams for SystemConfig {
+    type Executor = TokioExecutor;
+
+    type Serializer = BincodeSerializer;
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 struct TestMessage;
 
 impl Message for TestMessage {
     type Response = ();
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct TestFederated;
-
-impl Message for TestFederated {
-    type Response = ();
-}
-
-
 struct TestActor;
 
 #[async_trait::async_trait]
-impl Actor for TestActor {
-    /// Called upon actor initialization, when the supervisor begins to run.
-    async fn initialize<F: Message, N: Notification>(
-        &mut self,
-        _context: &mut ActorContext<F, N>,
-    ) -> Result<(), ActorError> {
-        println!("initialize");
-        Ok(())
-    }
+impl<C: FluxionParams> Actor<C> for TestActor {
+    type Error = ();
+}
 
-    /// Called upon actor deinitialization, when the supervisor stops.
-    /// Note that this will not be called if the initialize function fails.
-    /// For handling cases of initialization failure, use [`Actor::cleanup`]
-    async fn deinitialize<F: Message, N: Notification>(
-        &mut self,
-        _context: &mut ActorContext<F, N>,
-    ) -> Result<(), ActorError> {
-        println!("deinitialize");
-        Ok(())
-    }
-
-    /// Called when the actor supervisor is killed, either as the result of a graceful shutdown
-    /// or if initialization fails.
-    async fn cleanup(&mut self) -> Result<(), ActorError> {
-        println!("cleanup");
+#[cfg_attr(async_trait, async_trait::async_trait)]
+impl<C: FluxionParams> Handler<C, ()> for TestActor {
+    async fn message(
+        &self,
+        _context: &ActorContext<C>,
+        message: &Event<()>
+    ) -> Result<(), ActorError<Self::Error>> {
+        println!("{} Received {:?} from {:?}", message.target, message.message, message.source);
         Ok(())
     }
 }
 
-#[async_trait::async_trait]
-impl HandleNotification<()> for TestActor {
-    async fn notified<F: Message>(
-        &mut self,
-        _context: &mut ActorContext<F, ()>,
-        _notification: (),
-    ) -> Result<(), ActorError> {
-        println!("notification");
+#[cfg_attr(async_trait, async_trait::async_trait)]
+impl<C: FluxionParams> Handler<C, TestMessage> for TestActor {
+    async fn message(
+        &self,
+        context: &ActorContext<C>,
+        message: &Event<TestMessage>,
+    ) -> Result<(), ActorError<Self::Error>> {
+        println!("{} Received {:?} from {:?}", message.target, message.message, message.source);
+        // Relay to the () handler
+        let ah = context.get::<Self, (), _>("foreign:test".into()).await.unwrap();
+        ah.request(()).await.unwrap();
         Ok(())
     }
 }
 
-#[async_trait::async_trait]
-impl HandleMessage<TestMessage> for TestActor {
-    async fn message<F: Message, N: Notification>(
-        &mut self,
-        context: &mut ActorContext<F, N>,
-        _message: TestMessage,
-    ) -> Result<(), ActorError> {
-        println!("message on {:?}", context.get_id());
-        Ok(())
-    }
-}
-
-#[async_trait::async_trait]
-impl HandleFederated<TestFederated> for TestActor {
-    async fn federated_message<N: Notification>(
-        &mut self,
-        context: &mut ActorContext<TestFederated, N>,
-        _message: TestFederated,
-    ) -> Result<(), ActorError> {
-        println!("federated message on {:?}", context.get_id());
-        let ar = context
-            .get_actor::<TestMessage>("other:test")
-            .await
-            .unwrap();
-        ar.request(TestMessage).await.unwrap();
-        Ok(())
-    }
-}
-
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() {
-    #[cfg(tracing)]
-    let collector = tracing_subscriber::fmt()
-        // filter spans/events with level TRACE or higher.
-        .with_max_level(Level::TRACE)
-        // build but do not install the subscriber.
-        .finish();
+    // Create a system
+    let system = Fluxion::<SystemConfig>::new("host");
 
-    #[cfg(tracing)]
-    tracing::subscriber::set_global_default(collector).unwrap();
+    // Create a system for our foreign example
+    let foreign = Fluxion::<SystemConfig>::new("foreign");
 
-    let host = system::new::<TestFederated, ()>("host");
-    let other = system::new::<TestFederated, ()>("other");
+    // Create a task which will relay foreign messages from system to foreign
+    let s1 = system.clone();
+    let f1 = foreign.clone();
+    tokio::spawn(async move {
+        let outbound = s1.outbound_foreign();
 
-    let mut foreign_host = host.get_foreign().await.unwrap();
-    let other2 = other.clone();
+        loop {
+            let m = outbound.recv().await;
 
-    let relay_host = tokio::task::spawn(async move {
-        while let Some(message) = foreign_host.recv().await {
-            other2.relay_foreign(message).await.unwrap();
+            // Relay the foreign message to f1. There would normally be some more logic in here,
+            // especially when sending a message over a network or between processes.
+            f1.relay_foreign(m).await.unwrap();
         }
     });
 
-    
-    let mut foreign_other = other.get_foreign().await.unwrap();
-    let host2 = host.clone();
+    let s2 = system.clone();
+    let f2 = foreign.clone();
+    tokio::spawn(async move {
+        let outbound = f2.outbound_foreign();
 
-    let relay_other = tokio::task::spawn(async move {
-        while let Some(message) = foreign_other.recv().await {
-            host2.relay_foreign(message).await.unwrap();
+        loop {
+            let m = outbound.recv().await;
+
+            // Relay the foreign message to f1. There would normally be some more logic in here,
+            // especially when sending a message over a network or between processes.
+            s2.relay_foreign(m).await.unwrap();
         }
     });
 
-    
-    host.add_actor(TestActor, "test", SupervisorErrorPolicy::default())
-        .await
-        .unwrap();
-    other
-        .add_actor(TestActor, "test", SupervisorErrorPolicy::default())
-        .await
-        .unwrap();
+    // Add an actor on the foreign system
+    foreign.add(TestActor, "test").await.unwrap();
+    foreign.foreign_proxy::<TestActor, (), ()>("test", "test").await;
 
-    
+    let ah = system.add(TestActor, "test").await.unwrap();
 
-    let ar = other.get_actor::<TestMessage>("host:test").await.unwrap();
-    ar.request_federated(TestFederated).await.unwrap();
+    ah.request(TestMessage).await.unwrap();
 
 
-    // Note that at this point, the task relaying foreign messages has a chance to relay the foreign message *after* the system has been shutdown.
-    // This may cause dropped messages.
-    // This can be negated by ensuring that the foreign recievers have drained before shutting down, or by simply using `request` instead of `send`
-    // for any critical messages.
-    // Additionally, a notification can be sent here and drained, which will await until all actors process the notification,
-    // allowing actors to finish handling the current message.
-    // This example just uses the method of using `request` instead of `send`, and aborting the relaying task, which prevents runtime panics due to the unwraps.
-    // All messages sent using `request` will block until they return, and all messages sent using `send` will not panic.
-    // Note however that a `request` made in response to a `send` may not block, and in this case the notification method is better.
-    // Fluxion does not mandate a specific behavior to handle this, as different implementations may prefer different behaviors.
-    relay_host.abort();
-    relay_other.abort();
 
-    other.shutdown().await;
-    host.shutdown().await;
+    // Shutdown both systems
+    system.shutdown().await;
+    foreign.shutdown().await;
 }
