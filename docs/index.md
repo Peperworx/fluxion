@@ -1,17 +1,18 @@
-# Welcome to MkDocs
+---
+title: Fluxion
+---
 
-For full documentation visit [mkdocs.org](https://www.mkdocs.org).
+![fluxion](assets/fluxion_wide.png)
 
-## Commands
+Fluxion is an actor framework, written in Rust, that allows communication between actors on different systems.
 
-* `mkdocs new [dir-name]` - Create a new project.
-* `mkdocs serve` - Start the live-reloading docs server.
-* `mkdocs build` - Build the documentation site.
-* `mkdocs -h` - Print help message and exit.
+# Why Fluxion?
+Fluxion is designed for a very specific usecase: creating apps that require extremely flexible plugin solutions and communication between different running instances of the app. If you do not need any of the specific features provided by Fluxion, you are probably best off using a different actor system. I personally recommend [Actix](https://github.com/actix/actix), which is battle tested and performant, neither of which describes Fluxion.
 
-## Project layout
+# Core Features
 
-    mkdocs.yml    # The configuration file.
-    docs/
-        index.md  # The documentation homepage.
-        ...       # Other markdown pages, images and other files.
+Fluxion embraces a few core features, and tries to keep an API that is as extensible as possible. Some of Fluxion's core features include
+
+## No-Std Support
+
+Fluxion and all of its dependencies only depend on 
