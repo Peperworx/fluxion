@@ -3,6 +3,7 @@ title: Getting Started
 ---
 
 Fluxion provides a very flexible and extensible API. This comes at the cost of much more verbose initialization logic, all of which is covered in this chapter.
+All of the code samples used in this chapter are contained in the `getting_started` example on GitHub.
 
 ## Adding Fluxion To Your Project
 
@@ -40,4 +41,4 @@ impl FluxionParams for FluxionConfig {
 }
 ```
 
-Here we define the executor and serialization mechanism that Fluxion should use. We will define these two types in the next chapters.
+Here we define the executor and serialization mechanism that Fluxion should use. We will define these two types in the next pages.

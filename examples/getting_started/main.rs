@@ -2,7 +2,7 @@ mod config;
 
 use config::FluxionConfig;
 
-use fluxion::{Fluxion, Actor, FluxionParams, Handler, ActorContext, Event, ActorError, Message};
+use fluxion::{Fluxion, Actor, FluxionParams, Handler, ActorContext, Event, ActorError, Message, System};
 
 
 /// Our actor, which can contain any data we want. For now we will leave it empty.
@@ -18,8 +18,8 @@ impl<C: FluxionParams> Handler<C, MyMessage> for  MyActor {
 
     async fn message(
         &self,
-        context: &ActorContext<C>,
-        message: &Event<MyMessage>
+        _context: &ActorContext<C>,
+        _message: &Event<MyMessage>
     ) -> Result<(), ActorError<Self::Error>> {
 
         // Handle the message here...

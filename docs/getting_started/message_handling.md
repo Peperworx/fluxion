@@ -14,8 +14,8 @@ impl<C: FluxionParams> Handler<C, MyMessage> for  MyActor {
 
     async fn message(
         &self,
-        context: &ActorContext<C>,
-        message: &Event<MyMessage>
+        _context: &ActorContext<C>,
+        _message: &Event<MyMessage>
     ) -> Result<(), ActorError<Self::Error>> {
 
         // Handle the message here...
@@ -50,8 +50,8 @@ impl<C: FluxionParams> Handler<C, MyMessage> for  MyActor {
 
     async fn message(
         &self,
-        context: &ActorContext<C>,
-        message: &Event<MyMessage>
+        _context: &ActorContext<C>,
+        _message: &Event<MyMessage>
     ) -> Result<(), ActorError<Self::Error>> {
 
         // Handle the message here...

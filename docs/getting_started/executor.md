@@ -80,4 +80,4 @@ impl FluxionParams for FluxionConfig {
 }
 ```
 
-In the next chapter, we will implementing a unit struct that uses bincode for serialization.
+On the next page, we will implementing a unit struct that uses bincode for serialization.

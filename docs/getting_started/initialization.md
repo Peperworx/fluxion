@@ -92,4 +92,4 @@ async fn main() {
 
 ```
 
-Now that we have defined a message and an actor, we need to implement message handling logic for the actor. We will do this in the next chapter.
+Now that we have defined a message and an actor, we need to implement message handling logic for the actor. We will do this in the next page.

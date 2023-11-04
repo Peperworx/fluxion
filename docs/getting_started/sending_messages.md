@@ -13,9 +13,11 @@ async fn main() {
 ```
 
 Here we have a value `system`, which contains the currently running Fluxion instance.
-For our actor to start receiving messages, we first need to start it:
+For our actor to start receiving messages, we first need to start it. This requires using the `System` trait.
 
 ```rust
+use fluxion::System;
+
 // Add MyActor to the system
 let ah = system.add(MyActor, "my_actor").await.unwrap();
 ```
@@ -58,7 +60,7 @@ mod config;
 
 use config::FluxionConfig;
 
-use fluxion::{Fluxion, Actor, FluxionParams, Handler, ActorContext, Event, ActorError, Message};
+use fluxion::{Fluxion, Actor, FluxionParams, Handler, ActorContext, Event, ActorError, Message, System};
 
 
 /// Our actor, which can contain any data we want. For now we will leave it empty.
@@ -74,8 +76,8 @@ impl<C: FluxionParams> Handler<C, MyMessage> for  MyActor {
 
     async fn message(
         &self,
-        context: &ActorContext<C>,
-        message: &Event<MyMessage>
+        _context: &ActorContext<C>,
+        _message: &Event<MyMessage>
     ) -> Result<(), ActorError<Self::Error>> {
 
         // Handle the message here...
