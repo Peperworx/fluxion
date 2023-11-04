@@ -7,13 +7,13 @@ theme:
   favicon: assets/fluxion_square.png
   palette:
     - scheme: slate
-      primary: deep orange
+      primary: black
       accent: orange
       toggle:
         icon: material/brightness-7 
         name: Switch to dark mode
     - scheme: default
-      primary: deep orange
+      primary: black
       accent: orange
       toggle:
         icon: material/brightness-4
@@ -49,4 +49,6 @@ nav:
     - 'Defining an Executor': 'getting_started/executor.md'
     - 'Defining a Message Serializer': 'getting_started/serialization.md'
     - 'Initializing Fluxion': 'getting_started/initialization.md'
+    - 'Handling Messages': 'getting_started/message_handling.md'
+    - 'Sending Messages': 'getting_started/sending_messages.md'
   - 'Api Reference': 'https://docs.rs/fluxion/latest/fluxion/'

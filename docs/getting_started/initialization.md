@@ -38,7 +38,7 @@ use fluxion::{Fluxion, Actor, FluxionParams};
 struct MyActor;
 
 #[async_trait::async_trait]
-impl<C: FluxionParams> Actor<C> for TestActor {
+impl<C: FluxionParams> Actor<C> for MyActor {
     type Error = ();
 }
 
@@ -65,13 +65,13 @@ mod config;
 
 use config::FluxionConfig;
 
-use fluxion::{Fluxion, Actor, FluxionParams};
+use fluxion::{Fluxion, Actor, FluxionParams, Message};
 
 /// Our actor, which can contain any data we want. For now we will leave it empty.
 struct MyActor;
 
 #[async_trait::async_trait]
-impl<C: FluxionParams> Actor<C> for TestActor {
+impl<C: FluxionParams> Actor<C> for MyActor {
     type Error = ();
 }
 

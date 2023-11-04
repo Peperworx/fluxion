@@ -1,47 +1,10 @@
----
-title: Defining a Message Serializer
----
-
-We will be using bincode for our serializer. Lets add that real quick:
-
-```sh
-cargo add bincode serde
-```
-
-And lets define our message serializer struct:
-
-```rust
-use serde::{Serialize, Deserialize};
-
-use fluxion::MessageSerializer;
-
-/// Define our serializer unit type
-struct BincodeSerializer;
-
-// And implement the serialization functions for it.
-impl MessageSerializer for BincodeSerializer {
-    fn deserialize<T: for<'a> Deserialize<'a>>(message: Vec<u8>) -> Option<T> {
-        bincode::deserialize(&message).ok()
-    }
-
-    fn serialize<T: Serialize>(message: T) -> Option<Vec<u8>> {
-        bincode::serialize(&message).ok()
-    }
-}
-```
-
-As you can see here, the `MessageSerializer` trait only requires two functions: one for serializing and another for deserializing. These should both return `None` in case of a failure.
-
-This should be our code now:
-
-```rust
 use serde::{Serialize, Deserialize};
 
 
 use fluxion::{FluxionParams, Executor, MessageSerializer};
 
 /// Define an executor to use
-struct TokioExecutor;
+pub struct TokioExecutor;
 
 /// Implement the executor trait
 impl Executor for TokioExecutor {
@@ -63,7 +26,7 @@ impl Executor for TokioExecutor {
 }
 
 /// Define our serializer unit type
-struct BincodeSerializer;
+pub struct BincodeSerializer;
 
 // And implement the serialization functions for it.
 impl MessageSerializer for BincodeSerializer {
@@ -77,7 +40,7 @@ impl MessageSerializer for BincodeSerializer {
 }
 
 /// Our Fluxion instance's configuration parameters
-struct FluxionConfig;
+pub struct FluxionConfig;
 
 /// The actual configuration parameters
 impl FluxionParams for FluxionConfig {
@@ -87,16 +50,3 @@ impl FluxionParams for FluxionConfig {
     /// The serialization mechanism that Fluxion should use for foreign messages.
     type Serializer = BincodeSerializer;
 }
-```
-
-Because this is so much code, we are going to move it into the file `config.rs`, and add a module declaration to our `main.rs` file:
-
-```rust
-
-mod config;
-
-fn main() {
-    println!("Hello, World!")
-}
-
-```
