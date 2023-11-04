@@ -12,7 +12,7 @@ use super::serialize::MessageSerializer;
 /// # [`FluxionParams`]
 /// Every configurable parameter used by Fluxion.
 /// This is used to greatly reduce the number of generic parameters passed to different structures.
-pub trait FluxionParams: Clone + Send + Sync + 'static {
+pub trait FluxionParams: Send + Sync + 'static {
 
     /// The async executor to use
     type Executor: Executor;
