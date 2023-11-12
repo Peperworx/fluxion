@@ -1,7 +1,7 @@
 
 
 
-use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message, types::serialize::MessageSerializer, Event};
+use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message, MessageSerializer, Event};
 use serde::{Serialize, Deserialize};
 
 
@@ -77,7 +77,7 @@ impl<C: FluxionParams> Handler<C, TestMessage> for TestActor {
     ) -> Result<(), ActorError<Self::Error>> {
         println!("{} Received {:?} from {:?}", message.target, message.message, message.source);
         // Relay to the () handler
-        let ah = context.get::<Self, (), _>("foreign:test".into()).await.unwrap();
+        let ah = context.get::<Self, ()>("foreign:test".into()).await.unwrap();
         ah.request(()).await.unwrap();
         Ok(())
     }
@@ -128,7 +128,7 @@ async fn main() {
 
     ah.request(TestMessage).await.unwrap();
 
-
+    
 
     // Shutdown both systems
     system.shutdown().await;

@@ -29,7 +29,7 @@ type ForeignMap = BTreeMap<Arc<str>, whisk::Channel<Option<ForeignMessage>>>;
 /// 
 /// Used `Arc` internally, so this can be cloned around, although it is not recommended.
 /// Immutable references can be used to do most things instead.
-#[derive(Clone)]
+
 pub struct Fluxion<C: FluxionParams> {
     /// The map of actors
     actors: Arc<RwLock<ActorMap>>,
@@ -43,6 +43,12 @@ pub struct Fluxion<C: FluxionParams> {
     outbound_foreign: whisk::Channel<ForeignMessage>,
     /// Phantom data associating the generics with this struct
     _phantom: PhantomData<C>,
+}
+
+impl<C: FluxionParams> Clone for Fluxion<C> {
+    fn clone(&self) -> Self {
+        Self { actors: self.actors.clone(), id: self.id.clone(), foreign: self.foreign.clone(), outbound_foreign: self.outbound_foreign.clone(), _phantom: PhantomData }
+    }
 }
 
 impl<C: FluxionParams> Fluxion<C> {
