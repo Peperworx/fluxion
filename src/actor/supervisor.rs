@@ -5,7 +5,7 @@ use alloc::{boxed::Box, sync::Arc};
 use async_oneshot::Sender;
 use maitake_sync::RwLock;
 
-use crate::{FluxionParams, Actor, InvertedHandler, ActorError, Executor, ActorContext, ActorId};
+use crate::{FluxionParams, Actor, InvertedHandler, ActorError, Executor, ActorContext, ActorId, handle_policy};
 use super::{handle::LocalHandle, ActorControlMessage};
 
 /// # [`Supervisor`]
@@ -69,9 +69,25 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
 
                     // Handle the message in a separate task
                     <C::Executor as Executor>::spawn(async move {
+                        // Lock the actor
                         let a = actor.read().await;
-                        if message.handle(&context, &a).await.is_err() {
-                            todo!("Error handling")
+
+                        // If error policies are disabled, simulate them failing on all errors
+                        #[cfg(not(error_policy))]
+                        let res = match  message.handle(&context, &a).await {
+                            Ok(v) => Ok(Ok(v)),
+                            Err(e) => Err(e),
+                        };
+                        #[cfg(error_policy)]
+                        let res = handle_policy!(
+                            message.handle(&context, &a).await, |_| { A::ErrorPolicy },
+                            (), ActorError<A::Error>
+                        ).await;
+
+                        // Handle errors
+                        match res {
+                            Ok(_) => todo!(),
+                            Err(_) => todo!(),
                         }
                     });
                 },

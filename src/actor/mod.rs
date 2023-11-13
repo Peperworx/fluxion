@@ -68,11 +68,11 @@ pub(crate) enum ActorControlMessage<M> {
 #[cfg_attr(async_trait, async_trait::async_trait)]
 pub trait Actor<C: FluxionParams>: Send + Sync + 'static {
     /// The error type returned by the actor
-    type Error: Send + Sync + 'static;
+    type Error: PartialEq + Send + Sync + 'static;
 
     /// The error policy to use
     #[cfg(error_policy)]
-    const ErrorPolicy: ErrorPolicy<Self::Error> = ErrorPolicy::default_policy();
+    const ErrorPolicy: ErrorPolicy<ActorError<Self::Error>> = ErrorPolicy::default_policy();
 
     /// The function run upon actor initialization
     async fn initialize(

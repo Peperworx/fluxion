@@ -45,8 +45,8 @@ impl<E> ErrorPolicy<E> {
 
     /// Returns the contained array of policies
     #[must_use]
-    pub fn contained(&self) -> &[ErrorPolicyCommand<E>] {
-        self.0.as_deref().unwrap_or(&Self::DEFAULT_POLICY)
+    pub fn contained(&mut self) -> Option<&mut [ErrorPolicyCommand<E>]> {
+        self.0.as_deref_mut()
     }
 
     /// Returns true if the default policy is implemented
@@ -103,7 +103,7 @@ macro_rules! handle_policy {
             let mut pos = 0;
 
             // Get the policy
-            let policy = $policy(res_err);
+            let mut policy = $policy(res_err);
 
             // If the default policy was used, ignore
             if policy.is_default() {
@@ -111,7 +111,9 @@ macro_rules! handle_policy {
             }
 
             // Get the internal commands
-            let mut coms = policy.contained().clone();
+            // We know this can be safely unwraped because of our
+            // previous check
+            let coms = policy.contained().unwrap();
 
             loop {
                 // If the operation was a success, then return
@@ -129,34 +131,34 @@ macro_rules! handle_policy {
 
                 // Handle the command
                 match com {
-                    $crate::error::policy::ErrorPolicyCommand::Run => {
+                    $crate::error_policy::ErrorPolicyCommand::Run => {
                         // Run the operation
                         prev = $checked;
                         
                     },
-                    $crate::error::policy::ErrorPolicyCommand::Fail => {
+                    $crate::error_policy::ErrorPolicyCommand::Fail => {
                         // If we should fail, then just return the error if there is one. This is also the default behavior if there
                         // are no more commands.
                         return Ok(Ok(prev?));
                     },
-                    $crate::error::policy::ErrorPolicyCommand::Ignore => {
+                    $crate::error_policy::ErrorPolicyCommand::Ignore => {
                         // If we should ignore, then return the result in an Ok
                         return Ok(prev);
                     },
-                    $crate::error::policy::ErrorPolicyCommand::FailIf(test) => {
+                    $crate::error_policy::ErrorPolicyCommand::FailIf(test) => {
                         // If an error was returned and matches test, then pass it along
                         if prev.as_ref().is_err_and(|e| e == test)  {
                             return Ok(Ok(prev?));
                         }
                     },
-                    $crate::error::policy::ErrorPolicyCommand::IgnoreIf(test) => {
+                    $crate::error_policy::ErrorPolicyCommand::IgnoreIf(test) => {
                         // If an error was returned and matches test, then ignore the error
                         // and return.
                         if prev.as_ref().is_err_and(|e| e == test)  {
                             return Ok(prev);
                         }
                     },
-                    $crate::error::policy::ErrorPolicyCommand::Loop(n, curr) => {
+                    $crate::error_policy::ErrorPolicyCommand::Loop(n, curr) => {
                         // Decrement curr and if it is larger than, 0 return to the beginning
                         *curr -= 1;
                         if *curr > 0 {
