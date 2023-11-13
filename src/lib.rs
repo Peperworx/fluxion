@@ -19,6 +19,9 @@ pub mod message;
 
 pub mod system;
 
+#[cfg(error_policy)]
+pub mod error_policy;
+
 mod fluxion;
 
 pub use fluxion::*;

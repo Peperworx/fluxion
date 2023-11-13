@@ -10,6 +10,9 @@ pub mod supervisor;
 
 use core::fmt::Display;
 
+#[cfg(error_policy)]
+use crate::error_policy::ErrorPolicy;
+
 // Needed by async_trait.
 #[cfg(async_trait)]
 use alloc::boxed::Box;
@@ -67,7 +70,9 @@ pub trait Actor<C: FluxionParams>: Send + Sync + 'static {
     /// The error type returned by the actor
     type Error: Send + Sync + 'static;
 
-
+    /// The error policy to use
+    #[cfg(error_policy)]
+    const ErrorPolicy: ErrorPolicy<Self::Error> = ErrorPolicy::default_policy();
 
     /// The function run upon actor initialization
     async fn initialize(

@@ -1,7 +1,7 @@
 
 
 
-use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message, MessageSerializer, Event};
+use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message, MessageSerializer, Event, error_policy::ErrorPolicy};
 use serde::{Serialize, Deserialize};
 
 
@@ -54,6 +54,8 @@ struct TestActor;
 #[async_trait::async_trait]
 impl<C: FluxionParams> Actor<C> for TestActor {
     type Error = ();
+
+    const ErrorPolicy: ErrorPolicy<Self::Error> = ErrorPolicy::default_policy();
 }
 
 #[cfg_attr(async_trait, async_trait::async_trait)]

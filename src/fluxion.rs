@@ -47,7 +47,7 @@ pub struct Fluxion<C: FluxionParams> {
 
 impl<C: FluxionParams> Clone for Fluxion<C> {
     fn clone(&self) -> Self {
-        Self { actors: self.actors.clone(), id: self.id.clone(), foreign: self.foreign.clone(), outbound_foreign: self.outbound_foreign.clone(), _phantom: PhantomData }
+        Self { actors: self.actors.clone(), id: self.id.clone(), #[cfg(foreign)] foreign: self.foreign.clone(), #[cfg(foreign)] outbound_foreign: self.outbound_foreign.clone(), _phantom: PhantomData }
     }
 }
 

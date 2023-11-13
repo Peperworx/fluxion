@@ -8,7 +8,6 @@ fn main() {
         // Features
         foreign: { feature = "foreign" },
         serde: { feature = "serde" },
-        federated: { feature = "federated" },
-        notification: { feature = "notification" },
+        error_policy: { feature = "error-policy" },
     }
 }

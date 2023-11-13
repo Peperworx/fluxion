@@ -33,13 +33,15 @@ maitake-sync = "0.1.0"
 
 
 [features]
-default = ["async-trait", "foreign"]
+default = ["async-trait", "foreign", "error-policy"]
 # Enables async-trait for async functions in traits. If disabled, requires nightly.
 async-trait = ["dep:async-trait"]
 # Enables foreign message support.
 foreign = ["serde"]
 # Enables serde support
 serde = ["dep:serde"]
+# Enables error policy support
+error-policy = []
 
 
 [build-dependencies]
