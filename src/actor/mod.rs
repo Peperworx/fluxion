@@ -72,7 +72,7 @@ pub trait Actor<C: FluxionParams>: Send + Sync + 'static {
 
     /// The error policy to use
     #[cfg(error_policy)]
-    const ErrorPolicy: ErrorPolicy<ActorError<Self::Error>> = ErrorPolicy::default_policy();
+    const ERROR_POLICY: ErrorPolicy<ActorError<Self::Error>> = ErrorPolicy::default_policy();
 
     /// The function run upon actor initialization
     async fn initialize(

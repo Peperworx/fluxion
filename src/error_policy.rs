@@ -5,8 +5,6 @@
 //! 
 
 use alloc::vec::Vec;
-use alloc::vec;
-
 
 /// # [`ErrorPolicyCommand`]
 /// An [`ErrorPolicyCommand`] represents one step in an [`ErrorPolicy`]
@@ -35,8 +33,7 @@ pub struct ErrorPolicy<E>(Option<Vec<ErrorPolicyCommand<E>>>);
 
 impl<E> ErrorPolicy<E> {
 
-    const DEFAULT_POLICY: [ErrorPolicyCommand<E>; 1] = [ErrorPolicyCommand::<E>::Ignore];
-
+    
     /// Creates a new [`ErrorPolicy`] from a [`Vec<ErrorPolicyCommand<E>>`]
     #[must_use]
     pub fn new(policy: Vec<ErrorPolicyCommand<E>>) -> Self {
@@ -250,10 +247,13 @@ macro_rules! _error_policy_resolve_single {
 #[macro_export]
 macro_rules! error_policy {
     ($command:ident $($arg:expr),*;) => {
+        use alloc::vec;
         ErrorPolicy::new(vec![$crate::_error_policy_resolve_single!{ $command $($arg),*; }])
     };
 
     ($command:ident $($arg:expr) *; $($commands:ident $($args:expr) *;)+) => {{
+        use alloc::vec;
+        use alloc::vec::Vec;
         let mut out = vec![$crate::_error_policy_resolve_single!{ $command $($arg),*; }];
         let cons: Vec<$crate::error::policy::ErrorPolicyCommand<_>> = $crate::error_policy!{ $($commands $($args) *;)+ }.contained().clone();
         out.extend(cons);

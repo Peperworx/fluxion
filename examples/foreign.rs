@@ -55,7 +55,7 @@ struct TestActor;
 impl<C: FluxionParams> Actor<C> for TestActor {
     type Error = ();
 
-    const ErrorPolicy: ErrorPolicy<ActorError<Self::Error>> = ErrorPolicy::default_policy();
+    const ERROR_POLICY: ErrorPolicy<ActorError<Self::Error>> = ErrorPolicy::default_policy();
 }
 
 #[cfg_attr(async_trait, async_trait::async_trait)]

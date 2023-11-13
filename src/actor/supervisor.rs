@@ -54,10 +54,26 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
     /// - Receiving a message fails
     /// - Handling a message fails
     async fn tick(&mut self) -> Result<Sender<()>, ActorError<A::Error>> {
+
+        // A channel for receiving errors
+        let error_channel = whisk::Channel::<ActorError<A::Error>>::new();
+
         loop {
 
             // Receive the next message
-            let next = self.messages.recv().await;
+            let next = futures::select_biased! {
+                err = futures::FutureExt::fuse(error_channel.recv()) => {
+                    // If an error, return the error.
+                    Err(err)
+                }
+                next = futures::FutureExt::fuse(self.messages.recv()) => {
+                    // If there is a message, return Ok
+                    Ok(next)
+                }
+            }?;
+
+            // Clone the error channel
+            let errors = error_channel.clone();
 
             match next {
                 ActorControlMessage::Message(mut message) => {
@@ -80,14 +96,24 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                         };
                         #[cfg(error_policy)]
                         let res = handle_policy!(
-                            message.handle(&context, &a).await, |_| { A::ErrorPolicy },
+                            message.handle(&context, &a).await, |_| { A::ERROR_POLICY },
                             (), ActorError<A::Error>
                         ).await;
 
                         // Handle errors
                         match res {
-                            Ok(_) => todo!(),
-                            Err(_) => todo!(),
+                            Ok(r) => {
+                                // If this is Ok, it means that either the handler was successful,
+                                // or that the error policy ignored the error.
+                                // If the later is the case, we should log it if tracing is enabled
+                                if let Err(e) = r {
+                                    //todo!("tracing")
+                                }
+                            },
+                            Err(e) => {
+                                // Any other errors should kill the actor
+                                errors.send(e).await;
+                            },
                         }
                     });
                 },

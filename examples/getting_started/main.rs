@@ -2,7 +2,7 @@ mod config;
 
 use config::FluxionConfig;
 
-use fluxion::{Fluxion, Actor, FluxionParams, Handler, ActorContext, Event, ActorError, Message, System};
+use fluxion::{Fluxion, Actor, FluxionParams, Handler, ActorContext, Event, ActorError, Message, System, error_policy::ErrorPolicy};
 
 
 /// Our actor, which can contain any data we want. For now we will leave it empty.
@@ -12,7 +12,7 @@ struct MyActor;
 impl<C: FluxionParams> Actor<C> for MyActor {
     type Error = ();
 
-    const ErrorPolicy: ErrorPolicy<ActorError<Self::Error>> = ErrorPolicy::default_policy();
+    const ERROR_POLICY: ErrorPolicy<ActorError<Self::Error>> = ErrorPolicy::default_policy();
 }
 
 #[cfg_attr(async_trait, async_trait::async_trait)]
