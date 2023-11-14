@@ -20,8 +20,6 @@ pub enum ErrorPolicyCommand<E: Send + Sync + 'static> {
     FailIf(E),
     /// Ignores the failure if a specific error was encountered
     IgnoreIf(E),
-    /// Restarts execution of the policy the contained number of times before continuing.
-    Loop(usize, usize),
 }
 
 /// # [`ErrorPolicy`]
@@ -29,21 +27,21 @@ pub enum ErrorPolicyCommand<E: Send + Sync + 'static> {
 /// An error policy is constructed from a [`Vec`] of [`ErrorPolicyCommand`]s,
 /// however users should use the [`crate::error_policy`] macro.
 #[derive(Clone, Debug)]
-pub struct ErrorPolicy<E: Send + Sync + 'static>(Option<Vec<ErrorPolicyCommand<E>>>);
+pub struct ErrorPolicy<E: Send + Sync + 'static>(Option<&'static [ErrorPolicyCommand<E>]>);
 
 impl<E: Send + Sync + 'static> ErrorPolicy<E> {
 
     
     /// Creates a new [`ErrorPolicy`] from a [`Vec<ErrorPolicyCommand<E>>`]
     #[must_use]
-    pub fn new(policy: Vec<ErrorPolicyCommand<E>>) -> Self {
+    pub const fn new(policy: &'static [ErrorPolicyCommand<E>]) -> Self {
         Self(Some(policy))
     }
 
     /// Returns the contained array of policies
     #[must_use]
-    pub fn contained(&mut self) -> Option<&mut [ErrorPolicyCommand<E>]> {
-        self.0.as_deref_mut()
+    pub fn contained(&mut self) -> Option<&[ErrorPolicyCommand<E>]> {
+        self.0
     }
 
     /// Returns true if the default policy is implemented
@@ -119,7 +117,7 @@ macro_rules! handle_policy {
                 }
 
                 // Extract the policy from the option
-                let Some(com) = coms.get_mut(pos) else {
+                let Some(com) = coms.get(pos) else {
                     return Ok(Ok(prev?));
                 };
 
@@ -155,17 +153,6 @@ macro_rules! handle_policy {
                             return Ok(prev);
                         }
                     },
-                    $crate::error_policy::ErrorPolicyCommand::Loop(n, curr) => {
-                        // Decrement curr and if it is larger than, 0 return to the beginning
-                        *curr -= 1;
-                        if *curr > 0 {
-                            pos = 0;
-                        } else {
-                            // Otherwise, reset curr to n
-                            *curr = *n;
-                        }
-
-                    },
 
                 };
             }
@@ -197,10 +184,6 @@ macro_rules! _error_policy_resolve_single {
     (ignore;) => {
         $crate::error_policy::ErrorPolicyCommand::Ignore
     };
-
-    (loop $e:expr;) => {
-        $crate::error_policy::ErrorPolicyCommand::Loop($e, $e)
-    };
 }
 
 /// # [`error_policy`]
@@ -231,14 +214,10 @@ macro_rules! _error_policy_resolve_single {
 /// If the operation has not been run yet, then it runs the operation. Ignores the same as `ignore` if the error is equal to the argument,
 /// or continues to the next operation if not.
 ///
-/// ## `loop`
-/// Restarts the policy the number of time in the argument. Multiple `loop`s are not supported yet.
-///
 /// ## Example
 /// ```
 /// error_policy! {
 ///     run; // Runs the operation
-///     loop 10; // If the operation failed, restart at the beginning 10 times, which will run the operation again
 ///     failif ActorError::MessageReceiveError; // If the error is an ActorError::MessageReceiveError, then fail. Otherwise continue on.
 ///     ignoreif ActorError::InvalidMessageType; // If the error is an ActorError::ForeignSendFail, then fail. Otherwise continue.
 ///     ignore; // Ignore all other errors.
@@ -247,16 +226,10 @@ macro_rules! _error_policy_resolve_single {
 #[macro_export]
 macro_rules! error_policy {
     ($command:ident $($arg:expr),*;) => {
-        use alloc::vec;
-        ErrorPolicy::new(vec![$crate::_error_policy_resolve_single!{ $command $($arg),*; }])
+        ErrorPolicy::new(&[$crate::_error_policy_resolve_single!{ $command $($arg),*; }])
     };
 
-    ($command:ident $($arg:expr) *; $($commands:ident $($args:expr) *;)+) => {{
-        use alloc::vec;
-        use alloc::vec::Vec;
-        let mut out = vec![$crate::_error_policy_resolve_single!{ $command $($arg),*; }];
-        let cons: Vec<$crate::error::policy::ErrorPolicyCommand<_>> = $crate::error_policy!{ $($commands $($args) *;)+ }.contained().clone();
-        out.extend(cons);
-        ErrorPolicy::new(out)
+    ($($commands:ident $($args:expr) *;)+) => {{
+        ErrorPolicy::new(&[$( $crate::_error_policy_resolve_single!{ $commands $($args)*; } ),*])
     }};
 }

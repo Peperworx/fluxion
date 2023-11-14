@@ -35,7 +35,7 @@ maitake-sync = "0.1.0"
 futures = { version = "0.3.29", default-features = false, features = ["async-await"] }
 
 # Tracing
-tracing = { version = "0.1.40", default-features = false, optional = true }
+tracing = { version = "0.1.40", default-features = false, features = ["attributes"], optional = true }
 
 
 [features]

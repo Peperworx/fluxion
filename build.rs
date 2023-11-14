@@ -12,6 +12,6 @@ fn main() {
         // Tracing support
         tracing: { feature = "tracing" },
         // Disable various traces on release versions
-        tracing_debug: { all(tracing, debug_assertions) }
+        debug_tracing: { all(tracing, debug_assertions) }
     }
 }

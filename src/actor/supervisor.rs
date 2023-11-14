@@ -54,6 +54,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
     /// This function errors whenever one of the following occurs:
     /// - Receiving a message fails
     /// - Handling a message fails
+    #[cfg_attr(tracing, tracing::instrument(skip(self)))]
     async fn tick(&mut self) -> Result<Sender<()>, ActorError<A::Error>> {
 
         // A channel for receiving errors
@@ -115,11 +116,15 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                                 // If this is Ok, it means that either the handler was successful,
                                 // or that the error policy ignored the error.
                                 // If the later is the case, we should log it if tracing is enabled
+                                #[cfg(tracing)]
                                 if let Err(e) = r {
                                     crate::event!(tracing::Level::WARN, actor=id.as_ref().to_string(), error=e.to_string(), "Error while handling message. Error ignored by policy.");
                                 }
                             },
                             Err(e) => {
+                                // Log this
+                                crate::event!(tracing::Level::ERROR, actor=id.as_ref().to_string(), error=e.to_string(), "Error while handling messages. Policy dictates actor to be killed.");
+
                                 // Any other errors should kill the actor
                                 errors.send(e).await;
                             },
