@@ -19,6 +19,20 @@ pub mod message;
 
 pub mod system;
 
+#[cfg(error_policy)]
+pub mod error_policy;
+
+// Quick and dirty method to remove requirement for a cfg macro before every tracing event
+#[cfg(tracing)]
+pub(crate) use tracing::event;
+#[cfg(not(tracing))]
+#[macro_export]
+macro_rules! event {
+    ($($t:expr),*) => {
+        
+    };
+}
+
 mod fluxion;
 
 pub use fluxion::*;

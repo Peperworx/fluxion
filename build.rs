@@ -8,7 +8,10 @@ fn main() {
         // Features
         foreign: { feature = "foreign" },
         serde: { feature = "serde" },
-        federated: { feature = "federated" },
-        notification: { feature = "notification" },
+        error_policy: { feature = "error-policy" },
+        // Tracing support
+        tracing: { feature = "tracing" },
+        // Disable various traces on release versions
+        debug_tracing: { all(tracing, debug_assertions) }
     }
 }

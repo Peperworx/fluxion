@@ -57,7 +57,10 @@ impl<S: MessageSerializer> ForeignHandle<S> {
 impl<S: MessageSerializer, M: Message<Response = R> + Serialize, R: for<'a> Deserialize<'a>> MessageSender<M> for ForeignHandle<S> {
     /// Serializes, sends, and awaits a response for a message targeted at a foreign actor.
     /// See [`MessageSender::request`] for more info.
+    #[cfg_attr(tracing, tracing::instrument(skip(self, message)))]
     async fn request(&self, message: M) -> Result<M::Response, crate::types::errors::SendError> {
+
+        crate::event!(tracing::Level::TRACE, "[{}] Making request to `{}` from foreign handle.", self.owner, self.target);
 
         // Serialize the message
         let Some(message) = S::serialize(message) else {
@@ -86,6 +89,8 @@ impl<S: MessageSerializer, M: Message<Response = R> + Serialize, R: for<'a> Dese
         let Some(res) = S::deserialize::<R>(res) else {
             return Err(SendError::NoResponse);
         };
+
+        crate::event!(tracing::Level::TRACE, "[{}] Foreign handle received response from `{}`.", self.owner, self.target);
 
         Ok(res)
     }

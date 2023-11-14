@@ -1,9 +1,11 @@
 
 
 
+use std::fmt::{Display, Debug};
+
 use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message, MessageSerializer, Event};
 use serde::{Serialize, Deserialize};
-
+use color_eyre::eyre::Result;
 
 /// Define an executor to use
 struct TokioExecutor;
@@ -83,8 +85,22 @@ impl<C: FluxionParams> Handler<C, TestMessage> for TestActor {
     }
 }
 
+
+#[derive(Debug)]
+struct WrapErr<E: Debug + Display>(E);
+
+impl<E: Debug + Display> Display for WrapErr<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
+    }
+}
+
+impl<E: Debug + Display> std::error::Error for WrapErr<E> {
+
+}
+
 #[tokio::main(flavor = "current_thread")]
-async fn main() {
+async fn main() -> Result<()> {
     // Create a system
     let system = Fluxion::<SystemConfig>::new("host");
 
@@ -126,11 +142,13 @@ async fn main() {
 
     let ah = system.add(TestActor, "test").await.unwrap();
 
-    ah.request(TestMessage).await.unwrap();
+    ah.request(TestMessage).await.map_err(|v| WrapErr(v.to_string()))?;
 
     
 
     // Shutdown both systems
     system.shutdown().await;
     foreign.shutdown().await;
+
+    Ok(())
 }
