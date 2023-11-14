@@ -56,11 +56,7 @@ struct TestActor;
 
 #[async_trait::async_trait]
 impl<C: FluxionParams> Actor<C> for TestActor {
-    type Error = std::io::ErrorKind;
-
-    const ERROR_POLICY: ErrorPolicy<ActorError<Self::Error>> = fluxion::error_policy! {
-        fail;
-    };
+    type Error = ();
 }
 
 #[cfg_attr(async_trait, async_trait::async_trait)]
@@ -71,7 +67,6 @@ impl<C: FluxionParams> Handler<C, ()> for TestActor {
         message: &Event<()>
     ) -> Result<(), ActorError<Self::Error>> {
         println!("{} Received {:?} from {:?}", message.target, message.message, message.source);
-        //Err(ActorError::CustomError(std::io::ErrorKind::Other))
         Ok(())
     }
 }
@@ -107,14 +102,6 @@ impl<E: Debug + Display> std::error::Error for WrapErr<E> {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
-    color_eyre::install()?;
-    let stdout_log = tracing_subscriber::fmt::layer()
-        .pretty();
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::filter::LevelFilter::TRACE)
-        .with(stdout_log)
-        .init();
-
     // Create a system
     let system = Fluxion::<SystemConfig>::new("host");
 
