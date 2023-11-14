@@ -59,8 +59,7 @@ impl<C: FluxionParams> Actor<C> for TestActor {
     type Error = std::io::ErrorKind;
 
     const ERROR_POLICY: ErrorPolicy<ActorError<Self::Error>> = fluxion::error_policy! {
-        run;
-        ignore;
+        fail;
     };
 }
 
@@ -72,7 +71,7 @@ impl<C: FluxionParams> Handler<C, ()> for TestActor {
         message: &Event<()>
     ) -> Result<(), ActorError<Self::Error>> {
         println!("{} Received {:?} from {:?}", message.target, message.message, message.source);
-        Ok(())
+        Err(ActorError::CustomError(std::io::ErrorKind::Other))
     }
 }
 
@@ -87,7 +86,7 @@ impl<C: FluxionParams> Handler<C, TestMessage> for TestActor {
         // Relay to the () handler
         let ah = context.get::<Self, ()>("foreign:test".into()).await.unwrap();
         ah.request(()).await.unwrap();
-        Err(ActorError::CustomError(std::io::ErrorKind::Other))
+        Ok(())
     }
 }
 

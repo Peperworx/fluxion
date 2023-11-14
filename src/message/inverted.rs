@@ -2,7 +2,7 @@
 //! Inverted message handlers allow the `handle` function to be called on the messages themselves, instead of the actor.
 //! This allows various generics to be removed, and enables many different message types to be sent to the same actor.
 
-use crate::{FluxionParams, Actor, ActorError, Message, SendError, Handler, ActorContext, Event};
+use crate::{FluxionParams, Actor, ActorError, Message, SendError, Handler, ActorContext, Event, ActorId};
 
 #[cfg(async_trait)]
 use alloc::boxed::Box;
@@ -15,6 +15,9 @@ pub trait InvertedHandler<C: FluxionParams, A: Actor<C>>: Send + Sync {
     /// Removes the requirement of knowing a message's type by having the message dispatch itself
     ///  (using a trait) to an actor with a given context.
     async fn handle(&mut self, context: &ActorContext<C>, actor: &A) -> Result<(), ActorError<A::Error>>;
+
+    /// Gets the id of the message's sender or None if the message was sent from outside of any actor's context.
+    fn sender(&self) -> Option<ActorId>;
 }
 
 /// # [`InvertedMessage`]
@@ -54,5 +57,9 @@ impl<C: FluxionParams, A: Handler<C, M>, M: Message> InvertedHandler<C, A> for I
         self.responder.send(res).or(Err(SendError::ResponseFailed))?;
 
         Ok(())
+    }
+
+    fn sender(&self) -> Option<ActorId> {
+        self.message.source.clone()
     }
 }

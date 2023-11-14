@@ -4,8 +4,6 @@
 //! Error policies may be run in one of three places: when actor initialization fails, when an actor fails to handle a message, and when actor deinitialization or cleanup fail.
 //! 
 
-use alloc::vec::Vec;
-
 /// # [`ErrorPolicyCommand`]
 /// An [`ErrorPolicyCommand`] represents one step in an [`ErrorPolicy`]
 #[derive(Debug, Clone)]
