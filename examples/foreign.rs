@@ -111,6 +111,7 @@ async fn main() -> Result<()> {
     let stdout_log = tracing_subscriber::fmt::layer()
         .pretty();
     tracing_subscriber::registry()
+        .with(tracing_subscriber::filter::LevelFilter::TRACE)
         .with(stdout_log)
         .init();
 

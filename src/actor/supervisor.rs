@@ -147,7 +147,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                 ActorControlMessage::Shutdown(s) => {
                     // If we should shutdown, return the acknowledgement channel
                     // so that we only acknowledge after all deinitialization has been run
-                    crate::event!(tracing::Level::DEBUG, "[{id}] Recieved (and fulfilling) shutdown request.");
+                    crate::event!(tracing::Level::TRACE, "[{id}] Recieved (and fulfilling) shutdown request.");
                     return Ok(s);
                 },
             }
@@ -171,7 +171,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         
         // Initialize the actor, handling error policy
         match {
-            crate::event!(tracing::Level::DEBUG, "[{id}] Running initialization.");
+            crate::event!(tracing::Level::TRACE, "[{id}] Running initialization.");
 
             let mut actor = self.actor.write().await;
 
@@ -205,17 +205,17 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
 
         
         // Tick the actor's main loop
-        crate::event!(tracing::Level::DEBUG, actor=self.context.get_id().as_ref().to_string(), "[{id}] Entering main loop");
+        crate::event!(tracing::Level::TRACE, actor=self.context.get_id().as_ref().to_string(), "[{id}] Entering main loop");
         let res = self.tick().await;
 
         // If there was an error while ticking the main loop, log it
         if let Err(e) = &res {
-            crate::event!(tracing::Level::INFO, error=e.to_string(), "[{id}] Error while ticking. Deinitialization will be run.");
+            crate::event!(tracing::Level::DEBUG, error=e.to_string(), "[{id}] Error while ticking. Deinitialization will be run.");
         }
 
         // Deinitialize the actor, handling error policy
         match {
-            crate::event!(tracing::Level::DEBUG, "[{id}] Running deinitialization.");
+            crate::event!(tracing::Level::TRACE, "[{id}] Running deinitialization.");
 
             let mut actor = self.actor.write().await;
 
@@ -271,13 +271,13 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         match res {
             Err(e) => {
                 // When there is an error, make sure to borrow it.
-                crate::event!(tracing::Level::WARN, error=e.to_string(), "[{id}] Exited with error. Running cleanup.");
+                crate::event!(tracing::Level::DEBUG, error=e.to_string(), "[{id}] Exited with error. Running cleanup.");
                 self.actor.write().await.cleanup(&self.context, Some(&e)).await?;
                 Err(e)
             },
             Ok(mut s) => {
                 // Cleanup with no errors
-                crate::event!(tracing::Level::DEBUG, "[{id}] Exited gracefully. Running cleanup with no errors.");
+                crate::event!(tracing::Level::TRACE, "[{id}] Exited gracefully. Running cleanup with no errors.");
                 self.actor.write().await.cleanup(&self.context, None).await?;
 
                 // Acknowledge shutdown, ignoring the result (too late to do anything now.)

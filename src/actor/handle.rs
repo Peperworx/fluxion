@@ -119,7 +119,7 @@ impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
     #[cfg_attr(tracing, tracing::instrument(skip(self)))]
     pub async fn shutdown(&self) {
         if let Some(id) = &self.owner {
-            crate::event!(tracing::Level::DEBUG, "[{}] Shutting down actor from local handle.", id);
+            crate::event!(tracing::Level::TRACE, "[{}] Shutting down actor from local handle.", id);
         } else {
             crate::event!(tracing::Level::TRACE, "[system] Shutting down actor from local handle.");
         }
