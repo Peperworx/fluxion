@@ -164,6 +164,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
     /// 
     /// # Errors
     /// Passes along any errors from a failure to receive messages or any errors returned by the actor.
+    #[cfg_attr(tracing, tracing::instrument(skip(self)))]
     async fn run_internal(&mut self) -> Result<Sender<()>, ActorError<A::Error>> {
 
         // Get the actor's id
@@ -260,6 +261,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
     /// - Receiving a message fails
     /// - Handling a message fails
     /// - Initialization, deinitialization, or cleanup errors.
+    #[cfg_attr(tracing, tracing::instrument(skip(self)))]
     pub async fn run(&mut self) -> Result<(), ActorError<A::Error>> {
 
         // Run the application

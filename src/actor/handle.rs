@@ -3,6 +3,7 @@
 //! Provides traits and structs for directly interacting with specific actors.
 
 use core::any::Any;
+use crate::alloc::string::ToString;
 
 use crate::{FluxionParams, Actor, InvertedHandler, Message, SendError, Handler, InvertedMessage, MessageSender, Event, ActorId};
 
@@ -60,6 +61,7 @@ impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
     /// 
     /// # Errors
     /// Returns a [`SendError::NoResponse`] if no response was received from the actor.
+    #[cfg_attr(tracing, tracing::instrument(skip(self, message)))]
     pub(crate) async fn request_internal<M: Message>(&self, message: Event<M>) -> Result<M::Response, SendError>
     where
         A: Handler<C, M> {
@@ -70,21 +72,37 @@ impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
 
         // Send the handler
         self.sender.send(ActorControlMessage::Message(Box::new(mh))).await;
+        
+        crate::event!(tracing::Level::INFO, actor=match &self.owner {
+            Some(a) => a.to_string(),
+            None => "None".to_string()
+        }, "Request sent from local handle. Awaiting response.");
 
         // Wait for a response
-        rx.await.or(Err(SendError::NoResponse))
-        // Create the Event wrapping the message
+        let res = rx.await.or(Err(SendError::NoResponse));
         
+        crate::event!(tracing::Level::INFO, actor=match &self.owner {
+            Some(a) => a.to_string(),
+            None => "None".to_string()
+        }, "Message response received");
+
+        res
     }
 
     /// Sends a message to the actor and waits for a response
     /// 
     /// # Errors
     /// Returns a [`SendError::NoResponse`] if no response was received from the actor.
+    #[cfg_attr(tracing, tracing::instrument(skip(self, message)))]
     pub async fn request<M: Message>(&self, message: M) -> Result<M::Response, SendError>
     where
         A: Handler<C, M> {
         
+        crate::event!(tracing::Level::INFO, actor=match &self.owner {
+            Some(a) => a.to_string(),
+            None => "None".to_string()
+        }, "Sending request from local handle.");
+
         let event = Event {
             message,
             source: self.owner.clone(),
@@ -96,7 +114,13 @@ impl<C: FluxionParams, A: Actor<C>> LocalHandle<C, A> {
 
 
     /// Shutdown the actor, and wait for the actor to either acknowledge shutdown or drop the channel.
+    #[cfg_attr(tracing, tracing::instrument(skip(self)))]
     pub async fn shutdown(&self) {
+        crate::event!(tracing::Level::DEBUG, actor=match &self.owner {
+            Some(a) => a.to_string(),
+            None => "None".to_string()
+        }, "Shutdown actor from handle.");
+
         // Create a channel for the actor to acknowledge the shutdown on
         let (tx, rx) = async_oneshot::oneshot();
 
@@ -128,7 +152,13 @@ impl<C: FluxionParams, A: Actor<C>> ActorHandle for LocalHandle<C, A> {
     }
 
     /// See [`ActorHandle::begin_shutdown`] for more info.
+    #[cfg_attr(tracing, tracing::instrument(skip(self)))]
     async fn begin_shutdown(&self) -> Option<async_oneshot::Receiver<()>> {
+        crate::event!(tracing::Level::DEBUG, actor=match &self.owner {
+            Some(a) => a.to_string(),
+            None => "None".to_string()
+        }, "Began actor shutdown from handle.");
+
         // Create a channel for the actor to acknowledge the shutdown on
         let (tx, rx) = async_oneshot::oneshot();
 
