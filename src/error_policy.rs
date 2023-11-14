@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 /// # [`ErrorPolicyCommand`]
 /// An [`ErrorPolicyCommand`] represents one step in an [`ErrorPolicy`]
 #[derive(Debug, Clone)]
-pub enum ErrorPolicyCommand<E> {
+pub enum ErrorPolicyCommand<E: Send + Sync + 'static> {
     /// Runs the operation
     Run,
     /// Fails the operation, returning the last error
@@ -29,9 +29,9 @@ pub enum ErrorPolicyCommand<E> {
 /// An error policy is constructed from a [`Vec`] of [`ErrorPolicyCommand`]s,
 /// however users should use the [`crate::error_policy`] macro.
 #[derive(Clone, Debug)]
-pub struct ErrorPolicy<E>(Option<Vec<ErrorPolicyCommand<E>>>);
+pub struct ErrorPolicy<E: Send + Sync + 'static>(Option<Vec<ErrorPolicyCommand<E>>>);
 
-impl<E> ErrorPolicy<E> {
+impl<E: Send + Sync + 'static> ErrorPolicy<E> {
 
     
     /// Creates a new [`ErrorPolicy`] from a [`Vec<ErrorPolicyCommand<E>>`]
@@ -59,7 +59,7 @@ impl<E> ErrorPolicy<E> {
     }
 }
 
-impl<E> Default for ErrorPolicy<E> {
+impl<E: Send + Sync + 'static> Default for ErrorPolicy<E> {
     fn default() -> Self {
         Self::default_policy()
     }
