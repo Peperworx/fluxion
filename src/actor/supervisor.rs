@@ -64,7 +64,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         // Get the ID as an owned type so we can use it from other tasks when needed.
         let id = self.context.get_id().0;
 
-        crate::event!(tracing::Level::DEBUG, actor=id.as_ref().to_string(), "Actor began ticking.");
+        crate::event!(tracing::Level::DEBUG, "[{id}] Began ticking.");
 
         loop {
 
@@ -72,12 +72,12 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
             let next = futures::select_biased! {
                 err = futures::FutureExt::fuse(error_channel.recv()) => {
                     // If an error, log and return the error.
-                    crate::event!(tracing::Level::INFO, actor=id.as_ref().to_string(), error=err.to_string(), "Actor received kill message.");
+                    crate::event!(tracing::Level::INFO, error=err.to_string(), "[{id}] Received kill message. ");
                     Err(err)
                 }
                 next = futures::FutureExt::fuse(self.messages.recv()) => {
                     // If there is a message, log and return Ok
-                    crate::event!(tracing::Level::TRACE, actor=id.as_ref().to_string(), "Received actor control message.");
+                    crate::event!(tracing::Level::TRACE, "[{id}] Received control message.");
                     Ok(next)
                 }
             }?;
@@ -90,10 +90,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
             match next {
                 ActorControlMessage::Message(mut message) => {
 
-                    crate::event!(tracing::Level::DEBUG, actor=id.as_ref().to_string(), from = match message.sender() {
-                        Some(a) => a.as_ref().to_string(),
-                        None => "None".to_string(),
-                    }, "Actor received message.");
+                    crate::event!(tracing::Level::TRACE, "[{id}] Received message from {:?}", message.sender());
 
                     // Clone the actor as an Arc, allowing us to send it between threads
                     let actor = self.actor.clone();
@@ -109,7 +106,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                         // Lock the actor
                         let a = actor.read().await;
 
-                        crate::event!(tracing::Level::TRACE, actor=id.as_ref().to_string(), "Message handler spawned.");
+                        crate::event!(tracing::Level::TRACE, "[{id}] Spawned message handler.");
 
                         // If error policies are disabled, simulate them failing on all errors
                         #[cfg(not(error_policy))]
@@ -120,7 +117,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                         #[cfg(error_policy)]
                         let res = handle_policy!(
                             async {
-                                crate::event!(tracing::Level::TRACE, actor=id.as_ref().to_string(), "Running handle in error policy.");
+                                crate::event!(tracing::Level::TRACE, "[{id}] Running handle in error policy.");
                                 message.handle(&context, &a).await
                             }.await, |_| { A::ERROR_POLICY },
                             (), ActorError<A::Error>
@@ -134,12 +131,12 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                                 // If the later is the case, we should log it if tracing is enabled
                                 #[cfg(tracing)]
                                 if let Err(e) = r {
-                                    crate::event!(tracing::Level::WARN, actor=id.as_ref().to_string(), error=e.to_string(), "Error while handling message. Error ignored by policy.");
+                                    crate::event!(tracing::Level::WARN, error=e.to_string(), "[{id}] Error while handling message. Error ignored by policy.");
                                 }
                             },
                             Err(e) => {
                                 // Log this
-                                crate::event!(tracing::Level::ERROR, actor=id.as_ref().to_string(), error=e.to_string(), "Error while handling messages. Policy dictates actor to be killed.");
+                                crate::event!(tracing::Level::ERROR, error=e.to_string(), "[{id}] Error while handling messages. Policy dictates actor to be killed.");
 
                                 // Any other errors should kill the actor
                                 errors.send(e).await;
@@ -150,7 +147,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                 ActorControlMessage::Shutdown(s) => {
                     // If we should shutdown, return the acknowledgement channel
                     // so that we only acknowledge after all deinitialization has been run
-                    crate::event!(tracing::Level::INFO, actor=id.as_ref().to_string(), "Actor has recieved (and is fulfilling) shutdown request.");
+                    crate::event!(tracing::Level::DEBUG, "[{id}] Recieved (and fulfilling) shutdown request.");
                     return Ok(s);
                 },
             }
@@ -170,11 +167,11 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         // Get the actor's id
         let id = self.context.get_id().0;
 
-        crate::event!(tracing::Level::INFO, actor=id.to_string(), "Actor starting.");
+        crate::event!(tracing::Level::INFO, "[{id}] Starting.");
         
         // Initialize the actor, handling error policy
         match {
-            crate::event!(tracing::Level::DEBUG, actor=id.to_string(), "Running actor initialization.");
+            crate::event!(tracing::Level::DEBUG, "[{id}] Running initialization.");
 
             let mut actor = self.actor.write().await;
 
@@ -186,7 +183,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
             #[cfg(error_policy)]
             handle_policy!(
                 async {
-                    crate::event!(tracing::Level::TRACE, actor=id.to_string(), "Running initialization in error policy.");
+                    crate::event!(tracing::Level::TRACE, "[{id}] Running initialization in error policy.");
                     actor.initialize(&self.context).await
                 }.await, |_| { A::ERROR_POLICY },
                 (), ActorError<A::Error>
@@ -196,29 +193,29 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                 // If the contained result is an error, we should log it.
                 #[cfg(tracing)]
                 if let Err(e) = res {
-                    crate::event!(tracing::Level::WARN, actor=id.as_ref().to_string(), error=e.to_string(), "Error during actor initialization. Error ignored by policy.");
+                    crate::event!(tracing::Level::WARN, error=e.to_string(), "[{id}] Error during initialization. Error ignored by policy.");
                 }
             },
             Err(e) => {
                 // Log and error
-                crate::event!(tracing::Level::ERROR, actor=id.as_ref().to_string(), error=e.to_string(), "Error during actor initialization. Policy dictates actor to be killed.");
+                crate::event!(tracing::Level::ERROR, error=e.to_string(), "[{id}] Error during initialization. Policy dictates actor to be killed.");
                 return Err(e);
             }
         };
 
         
         // Tick the actor's main loop
-        crate::event!(tracing::Level::DEBUG, actor=self.context.get_id().as_ref().to_string(), "Entering actor's main loop");
+        crate::event!(tracing::Level::DEBUG, actor=self.context.get_id().as_ref().to_string(), "[{id}] Entering main loop");
         let res = self.tick().await;
 
         // If there was an error while ticking the main loop, log it
         if let Err(e) = &res {
-            crate::event!(tracing::Level::INFO, actor=id.as_ref().to_string(), error=e.to_string(), "Error while actor ticking. Deinitialization will be run.");
+            crate::event!(tracing::Level::INFO, error=e.to_string(), "[{id}] Error while ticking. Deinitialization will be run.");
         }
 
         // Deinitialize the actor, handling error policy
         match {
-            crate::event!(tracing::Level::DEBUG, actor=id.to_string(), "Running actor deinitialization.");
+            crate::event!(tracing::Level::DEBUG, "[{id}] Running deinitialization.");
 
             let mut actor = self.actor.write().await;
 
@@ -230,7 +227,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
             #[cfg(error_policy)]
             handle_policy!(
                 async {
-                    crate::event!(tracing::Level::TRACE, actor=id.to_string(), "Running deinitialization in error policy.");
+                    crate::event!(tracing::Level::TRACE, "[{id}] Running deinitialization in error policy.");
                     actor.deinitialize(&self.context).await
                 }.await, |_| { A::ERROR_POLICY },
                 (), ActorError<A::Error>
@@ -240,12 +237,12 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                 // If the contained result is an error, we should log it.
                 #[cfg(tracing)]
                 if let Err(e) = res {
-                    crate::event!(tracing::Level::WARN, actor=id.as_ref().to_string(), error=e.to_string(), "Error during actor deinitialization. Error ignored by policy.");
+                    crate::event!(tracing::Level::WARN, error=e.to_string(), "[{id}] Error during deinitialization. Error ignored by policy.");
                 }
             },
             Err(e) => {
                 // Log and error
-                crate::event!(tracing::Level::ERROR, actor=id.as_ref().to_string(), error=e.to_string(), "Error during actor deinitialization. Policy dictates actor to be killed.");
+                crate::event!(tracing::Level::ERROR, error=e.to_string(), "[{id}] Error during deinitialization. Policy dictates actor to be killed.");
                 return Err(e);
             }
         };
@@ -264,6 +261,9 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
     #[cfg_attr(tracing, tracing::instrument(skip(self)))]
     pub async fn run(&mut self) -> Result<(), ActorError<A::Error>> {
 
+        // Get the actor's id
+        let id = self.context.get_id().0;
+
         // Run the application
         let res = self.run_internal().await;
 
@@ -271,13 +271,13 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         match res {
             Err(e) => {
                 // When there is an error, make sure to borrow it.
-                crate::event!(tracing::Level::INFO, actor=self.context.get_id().as_ref().to_string(), error=e.to_string(), "Actor exited with error. Running cleanup.");
+                crate::event!(tracing::Level::WARN, error=e.to_string(), "[{id}] Exited with error. Running cleanup.");
                 self.actor.write().await.cleanup(&self.context, Some(&e)).await?;
                 Err(e)
             },
             Ok(mut s) => {
                 // Cleanup with no errors
-                crate::event!(tracing::Level::DEBUG, actor=self.context.get_id().as_ref().to_string(), "Actor exited gracefully. Running cleanup with no error.");
+                crate::event!(tracing::Level::DEBUG, "[{id}] Exited gracefully. Running cleanup with no errors.");
                 self.actor.write().await.cleanup(&self.context, None).await?;
 
                 // Acknowledge shutdown, ignoring the result (too late to do anything now.)

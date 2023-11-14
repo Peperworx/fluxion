@@ -71,7 +71,8 @@ impl<C: FluxionParams> Handler<C, ()> for TestActor {
         message: &Event<()>
     ) -> Result<(), ActorError<Self::Error>> {
         println!("{} Received {:?} from {:?}", message.target, message.message, message.source);
-        Err(ActorError::CustomError(std::io::ErrorKind::Other))
+        //Err(ActorError::CustomError(std::io::ErrorKind::Other))
+        Ok(())
     }
 }
 
