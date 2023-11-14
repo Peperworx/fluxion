@@ -3,7 +3,7 @@
 
 use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message, MessageSerializer, Event, error_policy::ErrorPolicy};
 use serde::{Serialize, Deserialize};
-
+use tracing_subscriber::prelude::*;
 
 /// Define an executor to use
 struct TokioExecutor;
@@ -81,12 +81,19 @@ impl<C: FluxionParams> Handler<C, TestMessage> for TestActor {
         // Relay to the () handler
         let ah = context.get::<Self, ()>("foreign:test".into()).await.unwrap();
         ah.request(()).await.unwrap();
-        Ok(())
+        Err(ActorError::CustomError(()))
     }
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
+
+    let stdout_log = tracing_subscriber::fmt::layer()
+        .pretty();
+    tracing_subscriber::registry()
+        .with(stdout_log)
+        .init();
+
     // Create a system
     let system = Fluxion::<SystemConfig>::new("host");
 

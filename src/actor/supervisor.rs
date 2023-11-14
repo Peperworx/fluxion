@@ -4,6 +4,7 @@
 use alloc::{boxed::Box, sync::Arc};
 use async_oneshot::Sender;
 use maitake_sync::RwLock;
+use crate::alloc::string::ToString;
 
 use crate::{FluxionParams, Actor, InvertedHandler, ActorError, Executor, ActorContext, ActorId, handle_policy};
 use super::{handle::LocalHandle, ActorControlMessage};
@@ -57,6 +58,9 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
 
         // A channel for receiving errors
         let error_channel = whisk::Channel::<ActorError<A::Error>>::new();
+        
+        // Get the ID as an owned type so we can use it from other tasks when needed.
+        let id = self.context.get_id().0;
 
         loop {
 
@@ -75,6 +79,8 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
             // Clone the error channel
             let errors = error_channel.clone();
 
+            
+
             match next {
                 ActorControlMessage::Message(mut message) => {
                     // Clone the actor as an Arc, allowing us to send it between threads
@@ -82,6 +88,9 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                     
                     // Clone the context as an arc too
                     let context = self.context.clone();
+
+                    // Clone the id to use in the task
+                    let id = id.clone();
 
                     // Handle the message in a separate task
                     <C::Executor as Executor>::spawn(async move {
@@ -107,7 +116,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                                 // or that the error policy ignored the error.
                                 // If the later is the case, we should log it if tracing is enabled
                                 if let Err(e) = r {
-                                    //todo!("tracing")
+                                    crate::event!(tracing::Level::WARN, actor=id.as_ref().to_string(), error=e.to_string(), "Error while handling message ignored by policy.");
                                 }
                             },
                             Err(e) => {

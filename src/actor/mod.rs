@@ -138,6 +138,12 @@ where
     }
 }
 
+impl AsRef<str> for ActorId {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 impl Display for ActorId {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str(&self.0)

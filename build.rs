@@ -9,5 +9,9 @@ fn main() {
         foreign: { feature = "foreign" },
         serde: { feature = "serde" },
         error_policy: { feature = "error-policy" },
+        // Tracing support
+        tracing: { feature = "tracing" },
+        // Disable various traces on release versions
+        tracing_debug: { all(tracing, debug_assertions) }
     }
 }
