@@ -9,6 +9,7 @@ use crate::{
     message::{foreign::ForeignMessage, foreign::ForeignHandle},
 };
 
+#[cfg(tracing)]
 use crate::alloc::string::ToString;
 
 use core::marker::PhantomData;
@@ -158,6 +159,7 @@ impl<C: FluxionParams> Fluxion<C> {
     #[cfg_attr(tracing, tracing::instrument(skip(self, actor)))]
     pub(crate) async fn add_internal<A: Actor<C>>(&self, actor: A, id: &str, owner: Option<ActorId>) -> Option<LocalHandle<C, A>> {
 
+        #[cfg(tracing)]
         if let Some(owner) = &owner {
             crate::event!(tracing::Level::TRACE, "[{owner}] Adding actor `{id}` to `{}`", self.id);
         } else {
@@ -188,12 +190,16 @@ impl<C: FluxionParams> Fluxion<C> {
         let handle = supervisor.handle(owner);
 
         // Clone ID for the supervisor
+        #[cfg(tracing)]
         let aid = id.clone();
 
         // Start a task for the supervisor
         <C::Executor as Executor>::spawn(async move {
             // Run the supervisor
-            if let Err(e) = supervisor.run().await {
+            let _res = supervisor.run().await;
+            #[cfg(tracing)]
+            #[allow(clippy::used_underscore_binding)]
+            if let Err(e) = _res {
                 crate::event!(tracing::Level::ERROR, error=e.to_string(), "[{aid}] Exited with error.");
             }
         });
@@ -212,6 +218,7 @@ impl<C: FluxionParams> Fluxion<C> {
     #[cfg_attr(tracing, tracing::instrument(skip(self)))]
     pub(crate) async fn get_local_internal<A: Actor<C>>(&self, id: &str, owner: Option<ActorId>) -> Option<LocalHandle<C, A>> {
         
+        #[cfg(tracing)]
         if let Some(owner) = &owner {
             crate::event!(tracing::Level::TRACE, "[{owner}] Retreiving actor `{id}` as LocalHandle");
         } else {
@@ -244,6 +251,7 @@ impl<C: FluxionParams> Fluxion<C> {
     where
         M::Response: for<'a> Deserialize<'a>
     {
+        #[cfg(tracing)]
         if let Some(owner) = &owner {
             crate::event!(tracing::Level::TRACE, "[{owner}] Retreiving actor `{id}` as `dyn MessageSender`");
         } else {
@@ -266,6 +274,7 @@ impl<C: FluxionParams> Fluxion<C> {
             // Clone and box the handle
             let mut handle = Box::new(actor.clone());
 
+            #[cfg(tracing)]
             if let Some(owner) = &owner {
                 crate::event!(tracing::Level::TRACE, "[{owner}] Found `{id}` as local handle.");
             } else {
@@ -279,7 +288,7 @@ impl<C: FluxionParams> Fluxion<C> {
             // Return it
             Some(handle)
         } else {
-
+            #[cfg(tracing)]
             if let Some(owner) = &owner {
                 crate::event!(tracing::Level::TRACE, "[{owner}] `{id}` must be foreign.");
             } else {

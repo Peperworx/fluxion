@@ -51,4 +51,8 @@ nav:
     - 'Initializing Fluxion': 'getting_started/initialization.md'
     - 'Handling Messages': 'getting_started/message_handling.md'
     - 'Sending Messages': 'getting_started/sending_messages.md'
+  - 'Advanced Usage':
+    - 'advanced/index.md'
+    - 'Tracing': 'advanced/tracing.md'
+    - 'Error Policies': 'advanced/error_policy.nd'
   - 'Api Reference': 'https://docs.rs/fluxion/latest/fluxion/'

@@ -4,6 +4,8 @@
 use alloc::{boxed::Box, sync::Arc};
 use async_oneshot::Sender;
 use maitake_sync::RwLock;
+
+#[cfg(tracing)]
 use crate::alloc::string::ToString;
 
 use crate::{FluxionParams, Actor, InvertedHandler, ActorError, Executor, ActorContext, ActorId};
@@ -65,6 +67,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         let error_channel = whisk::Channel::<ActorError<A::Error>>::new();
         
         // Get the ID as an owned type so we can use it from other tasks when needed.
+        #[cfg(tracing)]
         let id = self.context.get_id().0;
 
         crate::event!(tracing::Level::DEBUG, "[{id}] Began ticking.");
@@ -102,6 +105,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                     let context = self.context.clone();
 
                     // Clone the id to use in the task
+                    #[cfg(tracing)]
                     let id = id.clone();
 
                     // Handle the message in a separate task
@@ -128,12 +132,13 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
 
                         // Handle errors
                         match res {
-                            Ok(r) => {
+                            Ok(_res) => {
                                 // If this is Ok, it means that either the handler was successful,
                                 // or that the error policy ignored the error.
                                 // If the later is the case, we should log it if tracing is enabled
                                 #[cfg(tracing)]
-                                if let Err(e) = r {
+                                #[allow(clippy::used_underscore_binding)]
+                                if let Err(e) = _res {
                                     crate::event!(tracing::Level::WARN, error=e.to_string(), "[{id}] Error while handling message. Error ignored by policy.");
                                 }
                             },
@@ -168,6 +173,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
     async fn run_internal(&mut self) -> Result<Sender<()>, ActorError<A::Error>> {
 
         // Get the actor's id
+        #[cfg(tracing)]
         let id = self.context.get_id().0;
 
         crate::event!(tracing::Level::INFO, "[{id}] Starting.");
@@ -192,10 +198,11 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                 (), ActorError<A::Error>
             ).await
         } {
-            Ok(res) => {
+            Ok(_res) => {
                 // If the contained result is an error, we should log it.
                 #[cfg(tracing)]
-                if let Err(e) = res {
+                #[allow(clippy::used_underscore_binding)]
+                if let Err(e) = _res {
                     crate::event!(tracing::Level::WARN, error=e.to_string(), "[{id}] Error during initialization. Error ignored by policy.");
                 }
             },
@@ -212,6 +219,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
         let res = self.tick().await;
 
         // If there was an error while ticking the main loop, log it
+        #[cfg(tracing)]
         if let Err(e) = &res {
             crate::event!(tracing::Level::DEBUG, error=e.to_string(), "[{id}] Error while ticking. Deinitialization will be run.");
         }
@@ -236,10 +244,11 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                 (), ActorError<A::Error>
             ).await
         } {
-            Ok(res) => {
+            Ok(_res) => {
                 // If the contained result is an error, we should log it.
                 #[cfg(tracing)]
-                if let Err(e) = res {
+                #[allow(clippy::used_underscore_binding)]
+                if let Err(e) = _res {
                     crate::event!(tracing::Level::WARN, error=e.to_string(), "[{id}] Error during deinitialization. Error ignored by policy.");
                 }
             },
@@ -265,6 +274,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
     pub async fn run(&mut self) -> Result<(), ActorError<A::Error>> {
 
         // Get the actor's id
+        #[cfg(tracing)]
         let id = self.context.get_id().0;
 
         // Run the application

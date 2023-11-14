@@ -39,7 +39,7 @@ tracing = { version = "0.1.40", default-features = false, features = ["attribute
 
 
 [features]
-default = ["async-trait", "foreign", "tracing"]
+default = ["async-trait", "foreign"]
 # Enables async-trait for async functions in traits. If disabled, requires nightly.
 async-trait = ["dep:async-trait"]
 # Enables foreign message support.

@@ -26,8 +26,9 @@ pub mod error_policy;
 #[cfg(tracing)]
 pub(crate) use tracing::event;
 #[cfg(not(tracing))]
+#[macro_export]
 macro_rules! event {
-    ($t:tt) => {
+    ($($t:expr),*) => {
         
     };
 }
