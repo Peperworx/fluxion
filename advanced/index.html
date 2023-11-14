@@ -9,10 +9,8 @@
       
       
       
-        <link rel="prev" href="..">
+        <link rel="prev" href="../getting_started/sending_messages/">
       
-      
-        <link rel="next" href="executor/">
       
       
       <link rel="icon" href="../assets/fluxion_square.png">
@@ -20,7 +18,7 @@
     
     
       
-        <title>Getting Started - Fluxion</title>
+        <title>Advanced Usage - Fluxion</title>
       
     
     
@@ -75,7 +73,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#adding-fluxion-to-your-project" class="md-skip">
+        <a href="#tracing" class="md-skip">
           Skip to content
         </a>
       
@@ -110,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Getting Started
+              Advanced Usage
             
           </span>
         </div>
@@ -223,13 +221,11 @@
         
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../getting_started/" class="md-tabs__link">
           
   
     
@@ -245,9 +241,11 @@
         
   
   
+    
   
-    <li class="md-tabs__item">
-      <a href="../advanced/" class="md-tabs__link">
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
         
   
     
@@ -349,8 +347,6 @@
       
   
   
-    
-  
   
     
     
@@ -376,17 +372,19 @@
       
       
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
         
           
           
           <div class="md-nav__link md-nav__container">
-            <a href="./" class="md-nav__link md-nav__link--active">
+            <a href="../getting_started/" class="md-nav__link ">
               
   
   <span class="md-ellipsis">
@@ -397,13 +395,13 @@
             </a>
             
               
-              <label class="md-nav__link md-nav__link--active" for="__nav_2" id="__nav_2_label" tabindex="">
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             Getting Started
@@ -418,7 +416,7 @@
   
   
     <li class="md-nav__item">
-      <a href="executor/" class="md-nav__link">
+      <a href="../getting_started/executor/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -438,7 +436,7 @@
   
   
     <li class="md-nav__item">
-      <a href="serialization/" class="md-nav__link">
+      <a href="../getting_started/serialization/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -458,7 +456,7 @@
   
   
     <li class="md-nav__item">
-      <a href="initialization/" class="md-nav__link">
+      <a href="../getting_started/initialization/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -478,7 +476,7 @@
   
   
     <li class="md-nav__item">
-      <a href="message_handling/" class="md-nav__link">
+      <a href="../getting_started/message_handling/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -498,7 +496,7 @@
   
   
     <li class="md-nav__item">
-      <a href="sending_messages/" class="md-nav__link">
+      <a href="../getting_started/sending_messages/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -523,9 +521,27 @@
       
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../advanced/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Advanced Usage
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -534,6 +550,38 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tracing" class="md-nav__link">
+    Tracing
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-policies" class="md-nav__link">
+    Error Policies
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -582,15 +630,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#adding-fluxion-to-your-project" class="md-nav__link">
-    Adding Fluxion To Your Project
+  <a href="#tracing" class="md-nav__link">
+    Tracing
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#basic-configuration" class="md-nav__link">
-    Basic Configuration
+  <a href="#error-policies" class="md-nav__link">
+    Error Policies
   </a>
   
 </li>
@@ -613,36 +661,22 @@
   
 
 
-  <h1>Getting Started</h1>
+  <h1>Advanced Usage</h1>
 
-<p>Fluxion provides a very flexible and extensible API. This comes at the cost of much more verbose initialization logic, all of which is covered in this chapter.
-All of the code samples used in this chapter are contained in the <code>getting_started</code> example on GitHub.</p>
-<h2 id="adding-fluxion-to-your-project">Adding Fluxion To Your Project<a class="headerlink" href="#adding-fluxion-to-your-project" title="Permanent link">&para;</a></h2>
-<p>Fluxion is available on <a href="https://crates.io/crates/fluxion">crates.io</a>.</p>
-<p>You can add Fluxion to your crate by running the following command:
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>cargo<span class="w"> </span>add<span class="w"> </span>fluxion
-</span></code></pre></div></p>
-<p>Or by adding the following to your <code>Cargo.toml</code>:
-<div class="language-toml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">fluxion</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;0.8&quot;</span>
-</span></code></pre></div></p>
-<h2 id="basic-configuration">Basic Configuration<a class="headerlink" href="#basic-configuration" title="Permanent link">&para;</a></h2>
-<p>Fluxion needs to pass around several types via generics to many different structs at runtime. Instead of having many different generics everywhere, Fluxion uses different associated types on a single trait, which is then passed around as a single generic (<code>C</code>, for Configuration).</p>
-<p>Lets create a new unit struct that implements this trait:</p>
-<div class="language-rust highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">use</span><span class="w"> </span><span class="n">fluxion</span>::<span class="n">FluxionParams</span><span class="p">;</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="sd">/// Our Fluxion instance&#39;s configuration parameters</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">struct</span> <span class="nc">FluxionConfig</span><span class="p">;</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="sd">/// The actual configuration parameters</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="k">impl</span><span class="w"> </span><span class="n">FluxionParams</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">FluxionConfig</span><span class="w"> </span><span class="p">{</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="sd">/// The async executor that Fluxion should use</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="k">type</span> <span class="nc">Executor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TokioExecutor</span><span class="p">;</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="sd">/// The serialization mechanism that Fluxion should use for foreign messages.</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="k">type</span> <span class="nc">Serializer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BincodeSerializer</span><span class="p">;</span>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="p">}</span>
+<p>Fluxion has a few advanced features that may be useful in some cases. If you find any of these features lacking, pull requests and issues are especially welcome for these features.</p>
+<h2 id="tracing">Tracing<a class="headerlink" href="#tracing" title="Permanent link">&para;</a></h2>
+<p>Fluxion provides support for <a href="https://github.com/tokio-rs/tracing">tracing</a>.
+This can be enabled using the <code>tracing</code> feature flag, with no changes needed to your code other than to register a tracing subscriber. </p>
+<h2 id="error-policies">Error Policies<a class="headerlink" href="#error-policies" title="Permanent link">&para;</a></h2>
+<p>Sometimes you may want to ignore certain errors that may crop up, or maybe retry an operation before failing.
+Fluxion implements a very simple error policy system that allows custom error handling logic to be implemented.
+After enabling the <code>error-policy</code> feature flag, you should make sure that all of your error types implement at least <code>Debug</code> and <code>Display</code>. Because Fluxion is <code>no_std</code>, we do not require <code>std::error::Error</code> to be implemented, and our error types do not implement it either. To fix this solution until the <code>Error</code> trait is added to <code>core</code>, check out <a href="https://github.com/peperworx/dispair">dispair</a>.</p>
+<p>Once the feature flag is enabled and your error types implement the required traits, the default error policy is to ignore errors, logging them (if tracing is enabled) and continuing on with execution. This is the same behaviour if <code>error-policy</code> is not enabled. To define a custom error policy, you can define an associated <code>const</code> in your <code>Actor</code>'s trait implementation:</p>
+<div class="language-rust highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">const</span><span class="w"> </span><span class="n">ERROR_POLICY</span>: <span class="nc">ErrorPolicy</span><span class="o">&lt;</span><span class="n">ActorError</span><span class="o">&lt;</span><span class="bp">Self</span>::<span class="n">Error</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">error_policy</span><span class="o">!</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="n">ignore</span><span class="p">;</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">};</span>
 </span></code></pre></div>
-<p>Here we define the executor and serialization mechanism that Fluxion should use. We will define these two types in the next pages.</p>
+<p>A simple DSL is provided by the <code>error_policy</code> macro. See the API documentation for details.</p>
 
 
 
