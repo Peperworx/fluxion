@@ -1,9 +1,12 @@
 
 
 
+use std::fmt::{Display, Debug};
+
 use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message, MessageSerializer, Event, error_policy::ErrorPolicy};
 use serde::{Serialize, Deserialize};
 use tracing_subscriber::prelude::*;
+use color_eyre::eyre::Result;
 
 /// Define an executor to use
 struct TokioExecutor;
@@ -53,7 +56,7 @@ struct TestActor;
 
 #[async_trait::async_trait]
 impl<C: FluxionParams> Actor<C> for TestActor {
-    type Error = ();
+    type Error = std::io::ErrorKind;
 
     const ERROR_POLICY: ErrorPolicy<ActorError<Self::Error>> = ErrorPolicy::default_policy();
 }
@@ -81,13 +84,27 @@ impl<C: FluxionParams> Handler<C, TestMessage> for TestActor {
         // Relay to the () handler
         let ah = context.get::<Self, ()>("foreign:test".into()).await.unwrap();
         ah.request(()).await.unwrap();
-        Err(ActorError::CustomError(()))
+        Err(ActorError::CustomError(std::io::ErrorKind::Other))
     }
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() {
 
+#[derive(Debug)]
+struct WrapErr<E: Debug + Display>(E);
+
+impl<E: Debug + Display> Display for WrapErr<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
+    }
+}
+
+impl<E: Debug + Display> std::error::Error for WrapErr<E> {
+
+}
+
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
+    color_eyre::install()?;
     let stdout_log = tracing_subscriber::fmt::layer()
         .pretty();
     tracing_subscriber::registry()
@@ -135,11 +152,13 @@ async fn main() {
 
     let ah = system.add(TestActor, "test").await.unwrap();
 
-    ah.request(TestMessage).await.unwrap();
+    ah.request(TestMessage).await.map_err(|v| WrapErr(v.to_string()))?;
 
     
 
     // Shutdown both systems
     system.shutdown().await;
     foreign.shutdown().await;
+
+    Ok(())
 }

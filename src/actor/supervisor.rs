@@ -116,7 +116,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                                 // or that the error policy ignored the error.
                                 // If the later is the case, we should log it if tracing is enabled
                                 if let Err(e) = r {
-                                    crate::event!(tracing::Level::WARN, actor=id.as_ref().to_string(), error=e.to_string(), "Error while handling message ignored by policy.");
+                                    crate::event!(tracing::Level::WARN, actor=id.as_ref().to_string(), error=e.to_string(), "Error while handling message. Error ignored by policy.");
                                 }
                             },
                             Err(e) => {
