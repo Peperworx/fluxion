@@ -96,6 +96,7 @@ macro_rules! handle_policy {
             let mut pos = 0;
 
             // Get the policy
+            #[allow(clippy::redundant_closure_call)]
             let mut policy = $policy(res_err);
 
             // If the default policy was used, ignore

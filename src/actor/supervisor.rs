@@ -6,8 +6,11 @@ use async_oneshot::Sender;
 use maitake_sync::RwLock;
 use crate::alloc::string::ToString;
 
-use crate::{FluxionParams, Actor, InvertedHandler, ActorError, Executor, ActorContext, ActorId, handle_policy};
+use crate::{FluxionParams, Actor, InvertedHandler, ActorError, Executor, ActorContext, ActorId};
 use super::{handle::LocalHandle, ActorControlMessage};
+
+#[cfg(error_policy)]
+use crate::handle_policy;
 
 /// # [`Supervisor`]
 /// This struct wraps an actor, and is owned by a task which constantly receives messages over an asynchronous mpsc channel.
@@ -111,7 +114,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
                         // If error policies are disabled, simulate them failing on all errors
                         #[cfg(not(error_policy))]
                         let res = match  message.handle(&context, &a).await {
-                            Ok(v) => Ok(Ok(v)),
+                            Ok(v) => Ok(Ok::<_, ActorError<A::Error>>(v)),
                             Err(e) => Err(e),
                         };
                         #[cfg(error_policy)]
@@ -177,7 +180,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
 
             #[cfg(not(error_policy))]
             match actor.initialize(&self.context).await {
-                Ok(v) => Ok(Ok(v)),
+                Ok(v) => Ok(Ok::<_, ActorError<A::Error>>(v)),
                 Err(e) => Err(e),
             }
             #[cfg(error_policy)]
@@ -221,7 +224,7 @@ impl<C: FluxionParams, A: Actor<C>> Supervisor<C, A> {
 
             #[cfg(not(error_policy))]
             match actor.deinitialize(&self.context).await {
-                Ok(v) => Ok(Ok(v)),
+                Ok(v) => Ok(Ok::<_, ActorError<A::Error>>(v)),
                 Err(e) => Err(e),
             }
             #[cfg(error_policy)]

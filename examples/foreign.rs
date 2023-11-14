@@ -3,9 +3,8 @@
 
 use std::fmt::{Display, Debug};
 
-use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message, MessageSerializer, Event, error_policy::ErrorPolicy};
+use fluxion::{Executor, FluxionParams, Actor, Handler, ActorError, Fluxion, System, ActorContext, Message, MessageSerializer, Event};
 use serde::{Serialize, Deserialize};
-use tracing_subscriber::prelude::*;
 use color_eyre::eyre::Result;
 
 /// Define an executor to use

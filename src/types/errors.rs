@@ -9,7 +9,7 @@ use serde::{Serialize, Deserialize};
 /// The error type returned by [`Actor`]s, which allows for a custom error type via generics.
 #[derive(Error, Debug, PartialEq)]
 #[cfg_attr(foreign, derive(Serialize, Deserialize))]
-pub enum ActorError<E: core::fmt::Display + Send + Sync + 'static> {
+pub enum ActorError<E: Send + Sync + 'static> {
     #[error("CustomError: `{0:?}`")]
     CustomError(E),
     #[error("actor supervisor failed to receive a message")]

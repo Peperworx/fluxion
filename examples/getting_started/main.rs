@@ -2,7 +2,7 @@ mod config;
 
 use config::FluxionConfig;
 
-use fluxion::{Fluxion, Actor, FluxionParams, Handler, ActorContext, Event, ActorError, Message, System, error_policy::ErrorPolicy};
+use fluxion::{Fluxion, Actor, FluxionParams, Handler, ActorContext, Event, ActorError, Message, System};
 
 
 /// Our actor, which can contain any data we want. For now we will leave it empty.
