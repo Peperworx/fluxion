@@ -12,6 +12,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+maitake-sync = "0.1.1"
+slacktor = { version = "0.1.0", features = ["async"] }
 
 
 [features]
