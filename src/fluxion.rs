@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use maitake_sync::RwLock;
 use slacktor::Slacktor;
 
-use crate::{Actor, ActorWrapper};
+use crate::{Actor, ActorRef, ActorWrapper, Identifier, LocalRef};
 
 
 
@@ -47,7 +47,7 @@ impl Fluxion {
     /// # Errors
     /// Returns an error if the actor failed to initialize.
     /// On an error, the actor will not be spawned.
-    pub async fn spawn<A: Actor>(&self, mut actor: A) -> Result<usize, A::Error> {
+    pub async fn spawn<A: Actor>(&self, mut actor: A) -> Result<u64, A::Error> {
 
         // Run the actor's initialization code
         actor.initialize().await?;
@@ -59,14 +59,48 @@ impl Fluxion {
         let id = self.slacktor.write().await.spawn(actor);
 
         // Return the actor's id.
-        Ok(id)
+        Ok(id as u64)
     }
 
     /// # [`kill`]
     /// Given an actor's id, kills the actor
-    pub async fn kill<A: Actor>(&self, id: usize) {
+    pub async fn kill<A: Actor>(&self, id: u64) {
+        // Realistically, it should not be possible for this conversion to ever fail.
+        // If the input id is more than usize::MAX, it is most likely an error on the caller's part,
+        // as it should be impossible to allocate over usize::MAX actors at all, because
+        // each actor has an overhead of more than one byte.
+        // We just fail silently here, as it is the same case as the actor not existing.
+        let Ok(id) = id.try_into() else {
+            return;
+        };
+
         // Lock the underylying slacktor instance as write and kill the actor
         self.slacktor.write().await.kill::<ActorWrapper<A>>(id).await;
     }
 
+
+    /// # [`get`]
+    /// Retrieves an actor reference from the given actor id
+    pub async fn get<'a, A: Actor, ID: Into<Identifier<'a>>>(&self, id: ID) -> Option<impl ActorRef> {
+        match id.into() {
+            Identifier::Local(id) => {
+
+                // If the id refers to a local actor, lock the slacktor
+                // instance as read, and retrieve the handle.
+                // The handle is then cloned and returned
+                let handle = self.slacktor.read().await.get::<ActorWrapper<A>>(
+                    id.try_into().ok()? // If overflow, then the actor does not exist.
+                ).cloned()?;
+
+                // Wrap the slacktor handle in a LocalReference and return
+                Some(LocalRef(handle))
+            },
+            Identifier::Foreign(_, _) => {
+                // Foreign actors not implemented yet.
+                // This will involve asking a "ForeignHandler" for an implementor of
+                // ActorRef.
+                None
+            }
+        }
+    }
 }

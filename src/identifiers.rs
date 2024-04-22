@@ -12,3 +12,9 @@ pub enum Identifier<'a> {
     /// Identifies an actor on a given foreign system. Contains first the actor's id, then the foreign system's id as a string.
     Foreign(u64, &'a str),
 }
+
+impl<'a> From<u64> for Identifier<'a> {
+    fn from(value: u64) -> Self {
+        Identifier::Local(value)
+    }
+}
