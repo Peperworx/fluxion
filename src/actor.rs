@@ -16,7 +16,6 @@ pub trait Actor: Send + Sync + 'static {
 
     /// # [`initialize`]
     /// Called immediately before the actor is added to the system.
-    /// If it fails, it shou
     fn initialize(&mut self) -> impl core::future::Future<Output = Result<(), Self::Error>> + Send {async {
         Ok(())
     }}
@@ -24,14 +23,19 @@ pub trait Actor: Send + Sync + 'static {
     /// # [`deinitialize`]
     /// Called immediately after the actor is shut down.
     /// This will be the last opportunity the actor has to execute any code in an async context.
-    fn deinitialize(&mut self) -> impl core::future::Future<Output = Result<(), Self::Error>> + Send {async {
-        Ok(())
+    fn deinitialize(&self) -> impl core::future::Future<Output = ()> + Send {async {
+        
     }}
 }
 
 
 /// Newtype pattern implementing Slacktor's actor trait
 /// for implementorrs of our [`Actor`] trait here.
+#[repr(transparent)]
 pub(crate) struct ActorWrapper<T: Actor>(pub T);
 
-impl<R: Actor> slacktor::Actor for ActorWrapper<R> {}
+impl<R: Actor> slacktor::Actor for ActorWrapper<R> {
+    fn destroy(&self) -> impl core::future::Future<Output = ()> + Send {
+        self.0.deinitialize()
+    }
+}

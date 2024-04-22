@@ -2,6 +2,8 @@ use alloc::sync::Arc;
 use maitake_sync::RwLock;
 use slacktor::Slacktor;
 
+use crate::{Actor, ActorWrapper};
+
 
 
 
@@ -36,13 +38,35 @@ impl Fluxion {
         &self.system_id
     }
 
-    /// # [`add`]
-    /// Adds an actor to the local instance.
+    /// # [`spawn`]
+    /// Spawns an actor on the local instance, returning its id.
     /// <div class = "info">
     /// Locks the underlying RwLock as write.
     /// </div>
-    pub async fn add<A>(&self, actor: A) {
-        todo!()
+    /// 
+    /// # Errors
+    /// Returns an error if the actor failed to initialize.
+    /// On an error, the actor will not be spawned.
+    pub async fn spawn<A: Actor>(&self, mut actor: A) -> Result<usize, A::Error> {
+
+        // Run the actor's initialization code
+        actor.initialize().await?;
+
+        // Wrap the actor
+        let actor = ActorWrapper(actor);
+
+        // Lock the underlying slacktor instance as write and add the actor
+        let id = self.slacktor.write().await.spawn(actor);
+
+        // Return the actor's id.
+        Ok(id)
+    }
+
+    /// # [`kill`]
+    /// Given an actor's id, kills the actor
+    pub async fn kill<A: Actor>(&self, id: usize) {
+        // Lock the underylying slacktor instance as write and kill the actor
+        self.slacktor.write().await.kill::<ActorWrapper<A>>(id).await;
     }
 
 }
