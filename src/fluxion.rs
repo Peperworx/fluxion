@@ -36,6 +36,13 @@ impl Fluxion {
         &self.system_id
     }
 
-    
+    /// # [`add`]
+    /// Adds an actor to the local instance.
+    /// <div class = "info">
+    /// Locks the underlying RwLock as write.
+    /// </div>
+    pub async fn add<A>(&self, actor: A) {
+        todo!()
+    }
 
 }

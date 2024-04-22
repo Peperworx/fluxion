@@ -12,10 +12,3 @@ pub enum Identifier<'a> {
     /// Identifies an actor on a given foreign system. Contains first the actor's id, then the foreign system's id as a string.
     Foreign(u64, &'a str),
 }
-
-/// # [`Identifiable`]
-/// A fun trick to allow using human-readable strings as identifiers
-pub enum Identifiable<'a> {
-    Identifier(Identifier<'a>),
-    Named(&'a str),
-}

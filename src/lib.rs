@@ -13,3 +13,6 @@ pub use fluxion::*;
 
 mod identifiers;
 pub use identifiers::*;
+
+mod actor;
+pub use actor::*;
