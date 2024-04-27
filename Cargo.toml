@@ -19,11 +19,13 @@ slacktor = { version = "0.2.2", features = ["async"] }
 
 
 [features]
-default = ["foreign", "serde"]
+default = []
 foreign = []
 serde = ["dep:serde"]
 
 [dev-dependencies]
+rand = "0.8.5"
+rayon = "1.10.0"
 serde = { version = "1.0.198", features = ["derive"] }
 tokio = { version = "1.37.0", features = ["full"] }
 

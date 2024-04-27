@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 use maitake_sync::RwLock;
-use slacktor::{Message, Slacktor};
+use slacktor::Slacktor;
 
 use crate::{Actor,  ActorWrapper, Handler, Identifier, LocalRef, MessageSender};
 
@@ -111,7 +111,7 @@ impl<D> Fluxion<D> {
     /// # [`Fluxion::get`]
     /// Retrieves an actor reference capable of communicating using the given message via the given ID.
     #[cfg(not(feature = "foreign"))]
-    pub async fn get<A: Handler<M>, M: Message>(&self, id: impl Into<Identifier>) -> Option<Arc<dyn MessageSender<M>>> {
+    pub async fn get<A: Handler<M>, M: crate::Message>(&self, id: impl Into<Identifier>) -> Option<Arc<dyn MessageSender<M>>> {
         match id.into() {
             Identifier::Local(id) => {
                 // Get the local ref and wrap in an arc
