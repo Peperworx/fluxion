@@ -19,3 +19,6 @@ pub use actor::*;
 
 mod references;
 pub use references::*;
+
+mod foreign;
+pub use foreign::*;

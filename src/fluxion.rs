@@ -21,7 +21,7 @@ pub struct Fluxion {
 }
 
 impl Fluxion {
-    /// # [`new`]
+    /// # [`Fluxion::new`]
     /// Creates a new [`Fluxion`] instance with the given system id
     #[must_use]
     pub fn new(id: &str) -> Self {
@@ -31,23 +31,24 @@ impl Fluxion {
         }
     }
 
-    /// # [`get_id`]
+    /// # [`Fluxion::get_id`]
     /// Gets the system's id
     #[must_use]
     pub fn get_id(&self) -> &str {
         &self.system_id
     }
 
-    /// # [`spawn`]
-    /// Spawns an actor on the local instance, returning its id.
+    /// # [`Fluxion::add`]
+    /// Adds an actor to the local instance, returning its id.
     /// <div class = "info">
-    /// Locks the underlying RwLock as write.
+    /// Locks the underlying RwLock as write. This will block "management" functionalities such as adding, removing, and retrieving actors, but
+    /// will not block any messages.
     /// </div>
     /// 
     /// # Errors
     /// Returns an error if the actor failed to initialize.
     /// On an error, the actor will not be spawned.
-    pub async fn spawn<A: Actor>(&self, mut actor: A) -> Result<u64, A::Error> {
+    pub async fn add<A: Actor>(&self, mut actor: A) -> Result<u64, A::Error> {
 
         // Run the actor's initialization code
         actor.initialize().await?;
@@ -62,8 +63,13 @@ impl Fluxion {
         Ok(id as u64)
     }
 
-    /// # [`kill`]
+    /// # [`Fluxion::kill`]
     /// Given an actor's id, kills the actor
+    /// 
+    /// <div class = "info">
+    /// Locks the underlying RwLock as write. This will block "management" functionalities such as adding, removing, and retrieving actors, but
+    /// will not block any messages.
+    /// </div>
     pub async fn kill<A: Actor>(&self, id: u64) {
         // Realistically, it should not be possible for this conversion to ever fail.
         // If the input id is more than usize::MAX, it is most likely an error on the caller's part,
@@ -79,7 +85,7 @@ impl Fluxion {
     }
 
 
-    /// # [`get`]
+    /// # [`Fluxion::get`]
     /// Retrieves an actor reference from the given actor id
     pub async fn get<'a, A: Actor, ID: Into<Identifier<'a>>>(&self, id: ID) -> Option<impl ActorRef> {
         match id.into() {
@@ -102,5 +108,16 @@ impl Fluxion {
                 None
             }
         }
+    }
+
+    /// # [`Fluxion::shutdown`]
+    /// Removes all actors from the system and deallocates the underlying slab.
+    /// 
+    /// <div class = "info">
+    /// Locks the underlying RwLock as write. This will block "management" functionalities such as adding, removing, and retrieving actors, but
+    /// will not block any messages.
+    /// </div>
+    pub async fn shutdown(&self) {
+        self.slacktor.write().await.shutdown().await;
     }
 }
