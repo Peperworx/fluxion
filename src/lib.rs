@@ -17,8 +17,17 @@ pub use identifiers::*;
 mod actor;
 pub use actor::*;
 
+mod message;
+pub use message::*;
+
 mod references;
 pub use references::*;
 
+#[cfg(feature = "foreign")]
 mod foreign;
+
+#[cfg(feature = "foreign")]
 pub use foreign::*;
+
+
+pub use slacktor::Message;

@@ -1,6 +1,9 @@
 //! # Actors
 //! This module contains traits and other types and implementations surrounding actors and how they interface with the system. 
 
+use crate::Message;
+
+
 
 /// # [`Actor`]
 /// This trait defines the interface between the system and the actor.
@@ -28,6 +31,13 @@ pub trait Actor: Send + Sync + 'static {
     }}
 }
 
+/// # [`Handler`]
+pub trait Handler<M: Message>: Actor {
+    fn handle_message(&self, message: M) -> impl core::future::Future<Output = M::Result> + Send;
+}
+
+
+
 
 /// Newtype pattern implementing Slacktor's actor trait
 /// for implementorrs of our [`Actor`] trait here.
@@ -39,3 +49,10 @@ impl<R: Actor> slacktor::Actor for ActorWrapper<R> {
         self.0.deinitialize()
     }
 }
+
+impl<R: Handler<M>, M: Message> slacktor::actor::Handler<M> for ActorWrapper<R> {
+    fn handle_message(&self, message: M) -> impl core::future::Future<Output = <M as Message>::Result> + Send {
+        self.0.handle_message(message)
+    }
+}
+

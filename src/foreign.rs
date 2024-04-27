@@ -1,7 +1,10 @@
 //! # Foreign Messages
 //! This module provides traits and utilities for implementing foreign message handlers.
 
-use crate::{Actor, ActorRef, Identifier};
+use alloc::sync::Arc;
+
+
+use crate::{Handler, Identifier, MessageSender, Message};
 
 
 
@@ -14,5 +17,14 @@ use crate::{Actor, ActorRef, Identifier};
 pub trait Delegate {
     /// # [`Delegate::get_actor`]
     /// Retrieves an [`ActorRef`] for the given foreign actor.
-    async fn get_actor<A: Actor>(id: Identifier) -> Option<impl ActorRef>;
+    fn get_actor<A: Handler<M>, M: Message>(&self, id: Identifier) -> impl core::future::Future<Output = Option<Arc<dyn MessageSender<M>>>> + Send;
 }
+
+// Delegate is implemented for () as a no-op
+impl Delegate for () {
+    async fn get_actor<A: Handler<M>, M: Message>(&self, id: Identifier<'_>) -> Option<Arc<dyn MessageSender<M>>> {
+        let _ = id;
+        None
+    }
+}
+
