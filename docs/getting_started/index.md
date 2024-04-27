@@ -2,8 +2,6 @@
 title: Getting Started
 ---
 
-Fluxion provides a very flexible and extensible API. This comes at the cost of much more verbose initialization logic, all of which is covered in this chapter.
-All of the code samples used in this chapter are contained in the `getting_started` example on GitHub.
 
 ## Adding Fluxion To Your Project
 
@@ -14,31 +12,56 @@ You can add Fluxion to your crate by running the following command:
 cargo add fluxion
 ```
 
-Or by adding the following to your `Cargo.toml`:
-``` toml
-fluxion = "0.8"
+## Fluxion's Architecture
+
+Fluxion has a simple architecture consisting of four main parts:
+- Systems
+- Actors
+- Messages
+- Delegates
+
+Systems are individual Fluxion instances.
+Actors consist of a piece of data and associated message handlers.
+Messages are data that is sent between actors and the responses to that data.
+Delegates handle communications between systems.
+
+## Creating a System
+
+Creating a Fluxion system is super easy:
+
+```rust
+use fluxion::Fluxion;
+
+let system = Fluxion::new("system id", ());
 ```
 
-## Basic Configuration
+The above code initializes a new Fluxion instance with the id "system id" and an empty delagate, which means that all attempts to retrieve foreign actors will return `None`. Later on we will create a simple delegate which will be able to send messages between multiple systems. Before we get to that point, however, we first need to add an actor to the system.
 
-Fluxion needs to pass around several types via generics to many different structs at runtime. Instead of having many different generics everywhere, Fluxion uses different associated types on a single trait, which is then passed around as a single generic (`C`, for Configuration).
+## Defining an Actor
 
-Lets create a new unit struct that implements this trait:
+All actors must implement the `Actor` trait, so we will include that at the top of our file:
+```rust
+use fluxion::Actor;
+```
 
-``` rust
-use fluxion::FluxionParams;
+An actor can be any type, but we will go with a unit struct for now
+```rust
+struct TestActor;
 
-/// Our Fluxion instance's configuration parameters
-struct FluxionConfig;
-
-/// The actual configuration parameters
-impl FluxionParams for FluxionConfig {
-    /// The async executor that Fluxion should use
-    type Executor = TokioExecutor;
-
-    /// The serialization mechanism that Fluxion should use for foreign messages.
-    type Serializer = BincodeSerializer;
+impl Actor for TestActor {
+    type Error = ();
 }
 ```
 
-Here we define the executor and serialization mechanism that Fluxion should use. We will define these two types in the next pages.
+Here we see that we are implementing the `Actor` trait for our struct. The `Actor` trait provides methods for initialization that can return errors, which are defined by the `Error` associated type. For now we will set it to `()`. These methods have default no-op implementations, so we do not need to worry about them unless we have a need.
+
+## Adding an Actor to The System
+
+Adding an actor to the system is easy:
+```rust
+let id = system.add(TestActor).await.unwrap();
+```
+
+This function adds the given actor to the system and returns the actor's new id. Unlike previous versions of Fluxion, actor ids are automatically assigned by the system. 
+
+Before we can work with the actor further, we must first define a message and implemment a message handler, which we will do in the next chapter.
