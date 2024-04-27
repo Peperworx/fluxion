@@ -576,9 +576,9 @@ dependencies = [
 
 [[package]]
 name = "slacktor"
-version = "0.2.2"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6cb88f0d75285f006a572811000c585c307620692457f5878a54375deca3af5"
+checksum = "85049d774eb6404c978ac5235117bde9a3ba12807c83f0aafc43ce5bbe54bd99"
 dependencies = [
  "slab",
 ]

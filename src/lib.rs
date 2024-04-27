@@ -23,10 +23,7 @@ pub use message::*;
 mod references;
 pub use references::*;
 
-#[cfg(feature = "foreign")]
 mod foreign;
-
-#[cfg(feature = "foreign")]
 pub use foreign::*;
 
 

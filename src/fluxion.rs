@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use maitake_sync::RwLock;
 use slacktor::Slacktor;
 
-use crate::{Actor,  ActorWrapper, Handler, Identifier, LocalRef, MessageSender};
+use crate::{Actor, ActorContext, ActorWrapper, Delegate, Handler, Identifier, LocalRef, MessageSender};
 
 
 
@@ -28,7 +28,7 @@ impl<D> Clone for Fluxion<D> {
     }
 }
 
-impl<D> Fluxion<D> {
+impl<D: Delegate> Fluxion<D> {
     /// # [`Fluxion::new`]
     /// Creates a new [`Fluxion`] instance with the given system id and delegate
     #[must_use]
@@ -62,11 +62,19 @@ impl<D> Fluxion<D> {
         // Run the actor's initialization code
         actor.initialize().await?;
 
-        // Wrap the actor
-        let actor = ActorWrapper(actor);
+        // Lock the underlying slacktor instance as write
+        let mut system = self.slacktor.write().await;
 
-        // Lock the underlying slacktor instance as write and add the actor
-        let id = self.slacktor.write().await.spawn(actor);
+        // Wrap the actor
+        let actor = ActorWrapper(actor, Arc::new(
+            ActorContext {
+                system: self.clone(),
+                id: system.next_id()
+            }
+        ));
+
+        // Spawn the actor on the slacktor instance
+        let id = system.spawn(actor);
 
         // Return the actor's id.
         Ok(id as u64)
@@ -90,7 +98,7 @@ impl<D> Fluxion<D> {
         };
 
         // Lock the underylying slacktor instance as write and kill the actor
-        self.slacktor.write().await.kill::<ActorWrapper<A>>(id).await;
+        self.slacktor.write().await.kill::<ActorWrapper<A, D>>(id).await;
     }
 
 
@@ -98,11 +106,11 @@ impl<D> Fluxion<D> {
     /// Gets an actor that is known to reside on the local system.
     /// This allows messages that are not serializable to still be used even if Fluxion is compiled with foreign message support.
     /// This function also allows retrieving an actor handle that is capable of sending multiple different messages.
-    pub async fn get_local<A: Actor>(&self, id: u64) -> Option<LocalRef<A>> {
+    pub async fn get_local<A: Actor>(&self, id: u64) -> Option<LocalRef<A, D>> {
         // If the id refers to a local actor, lock the slacktor
         // instance as read, and retrieve the handle.
         // The handle is then cloned and returned
-        self.slacktor.read().await.get::<ActorWrapper<A>>(
+        self.slacktor.read().await.get::<ActorWrapper<A, D>>(
             id.try_into().ok()? // If overflow, then the actor does not exist.
         ).cloned()
         .map(|handle| LocalRef(handle))
@@ -110,14 +118,21 @@ impl<D> Fluxion<D> {
 
     /// # [`Fluxion::get`]
     /// Retrieves an actor reference capable of communicating using the given message via the given ID.
-    #[cfg(not(feature = "foreign"))]
-    pub async fn get<A: Handler<M>, M: crate::Message>(&self, id: impl Into<Identifier>) -> Option<Arc<dyn MessageSender<M>>> {
+    pub async fn get<'a, A: Handler<M>, M: crate::Message>(&self,
+            #[cfg(feature="foreign")] id: impl Into<Identifier<'a>>,
+            #[cfg(not(feature="foreign"))] id: impl Into<Identifier>
+        ) -> Option<Arc<dyn MessageSender<M>>> {
         match id.into() {
             Identifier::Local(id) => {
                 // Get the local ref and wrap in an arc
                 self.get_local::<A>(id).await
                     .map(|h| Arc::new(h) as Arc<dyn MessageSender<M>>)
             },
+            #[cfg(feature = "foreign")]
+            Identifier::Foreign(id, system) => {
+                // Send the request on to the delegate
+                self.delegate.get_actor::<A, M>(Identifier::Foreign(id, system)).await
+            }
         }
     }
 
@@ -130,26 +145,5 @@ impl<D> Fluxion<D> {
     /// </div>
     pub async fn shutdown(&self) {
         self.slacktor.write().await.shutdown().await;
-    }
-}
-
-#[cfg(feature = "foreign")]
-impl<D: crate::Delegate> Fluxion<D> {
-    /// # [`Fluxion::get`]
-    /// Retrieves an actor reference capable of communicating using the given message via the given ID.
-    pub async fn get<'a, A: Handler<M>, M: crate::Message>(&self, id: impl Into<Identifier<'a>>) -> Option<Arc<dyn MessageSender<M>>> {
-        match id.into() {
-            Identifier::Local(id) => {
-                // Get the local ref and wrap in an arc
-                self.get_local::<A>(id).await
-                    .map(|h| Arc::new(h) as Arc<dyn MessageSender<M>>)
-                    
-            },
-            #[cfg(feature = "foreign")]
-            Identifier::Foreign(id, system) => {
-                // Send the request on to the delegate
-                self.delegate.get_actor::<A, M>(Identifier::Foreign(id, system)).await
-            }
-        }
     }
 }

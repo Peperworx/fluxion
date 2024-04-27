@@ -1,4 +1,6 @@
-use fluxion::{Actor, Fluxion, Handler, Identifier, Message, MessageSender};
+use std::sync::Arc;
+
+use fluxion::{Actor, ActorContext, Delegate, Fluxion, Handler, Identifier, Message, MessageSender};
 use serde::{Deserialize, Serialize};
 
 
@@ -24,14 +26,17 @@ impl Message for SerializedMessage {
 }
 
 impl Handler<TestMessage> for TestActor {
-    async fn handle_message(&self, message: TestMessage) {
+    async fn handle_message<D: Delegate>(&self, _message: TestMessage, _context: &ActorContext<D>) {
         println!("Test message");
+        
     }
 }
 
 impl Handler<SerializedMessage> for TestActor {
-    async fn handle_message(&self, message: SerializedMessage) {
-        println!("Test serialized message");
+    async fn handle_message<D: Delegate>(&self, _message: SerializedMessage, context: &ActorContext<D>) {
+        let s = context.system().get::<Self, TestMessage>(context.get_id()).await.unwrap();
+        println!("Test serialized message on {}", context.get_id());
+        s.send(TestMessage).await;
     }
 }
 
@@ -46,5 +51,5 @@ async fn main() {
     let id = system1.add(TestActor).await.unwrap();
 
     let actor = system1.get_local::<TestActor>(id).await.unwrap();
-    actor.send(TestMessage).await;
+    actor.send(SerializedMessage).await;
 }

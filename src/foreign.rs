@@ -1,9 +1,10 @@
 //! # Foreign Messages
 //! This module provides traits and utilities for implementing foreign message handlers.
 
+#[cfg(feature="foreign")]
 use alloc::sync::Arc;
 
-
+#[cfg(feature="foreign")]
 use crate::{Handler, Identifier, MessageSender, Message};
 
 
@@ -14,14 +15,16 @@ use crate::{Handler, Identifier, MessageSender, Message};
 /// This implementation of [`ActorRef`] may wrap a channel, network connection, or simply another [`ActorRef`].
 /// All that matters is that this [`ActorRef`] refers to a foreign actor on the given system with the given id.
 /// The [`Delegate`] should return [`None`] if no actor with the given ID can be found or is local.
-pub trait Delegate {
+pub trait Delegate: Send + Sync + 'static {
     /// # [`Delegate::get_actor`]
     /// Retrieves an [`ActorRef`] for the given foreign actor.
+    #[cfg(feature="foreign")]
     fn get_actor<A: Handler<M>, M: Message>(&self, id: Identifier) -> impl core::future::Future<Output = Option<Arc<dyn MessageSender<M>>>> + Send;
 }
 
 // Delegate is implemented for () as a no-op
 impl Delegate for () {
+    #[cfg(feature="foreign")]
     async fn get_actor<A: Handler<M>, M: Message>(&self, id: Identifier<'_>) -> Option<Arc<dyn MessageSender<M>>> {
         let _ = id;
         None

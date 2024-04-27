@@ -15,7 +15,7 @@ edition = "2021"
 async-trait = "0.1.80"
 maitake-sync = "0.1.1"
 serde = { version = "1.0.198", default-features = false, optional = true }
-slacktor = { version = "0.2.2", features = ["async"] }
+slacktor = { version = "0.3.0", features = ["async"] }
 
 
 [features]

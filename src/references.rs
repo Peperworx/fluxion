@@ -3,7 +3,7 @@
 
 
 
-use crate::{Actor, ActorWrapper, Handler, Message};
+use crate::{Actor, ActorWrapper, Delegate, Handler, Message};
 use alloc::boxed::Box;
 
 /// # [`ActorRef`]
@@ -16,18 +16,18 @@ pub trait ActorRef<A: Actor> {}
 /// and we need a way to be generic over multiple types of [`ActorRef`] at once.
 /// Sadly, [`async_trait`] is also required for this trait as async fns in traits are not yet object safe either.
 #[async_trait::async_trait]
-pub trait MessageSender<M: Message> {
+pub trait MessageSender<M: Message>: Send + Sync + 'static {
     /// Sends the given message and waits for a response
     async fn send(&self, message: M) -> M::Result;
 }
 
 #[repr(transparent)]
-pub struct LocalRef<A: Actor>(pub(crate) slacktor::ActorHandle<ActorWrapper<A>>);
+pub struct LocalRef<A: Actor, D: Delegate>(pub(crate) slacktor::ActorHandle<ActorWrapper<A, D>>);
 
 
 
 #[async_trait::async_trait]
-impl<A: Handler<M>, M: Message> MessageSender<M> for LocalRef<A> {
+impl<A: Handler<M>, M: Message, D: Delegate> MessageSender<M> for LocalRef<A, D> {
     async fn send(&self, message: M) -> M::Result {
         self.0.send(message).await
     }

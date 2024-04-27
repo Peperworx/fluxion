@@ -1,7 +1,9 @@
 //! # Actors
 //! This module contains traits and other types and implementations surrounding actors and how they interface with the system. 
 
-use crate::Message;
+use alloc::sync::Arc;
+
+use crate::{Delegate, Fluxion, Message};
 
 
 
@@ -31,9 +33,34 @@ pub trait Actor: Send + Sync + 'static {
     }}
 }
 
+/// # [`ActorContext`]
+/// Provides an actor with access to the system and to metadata about itself
+pub struct ActorContext<D> {
+    /// The underlying system
+    pub(crate) system: Fluxion<D>,
+    /// The actor's id
+    pub(crate) id: u64,
+}
+
+impl<D: Delegate> ActorContext<D> {
+    /// # [`ActorContext::get_id`]
+    /// Returns the id of the actor
+    #[must_use]
+    pub fn get_id(&self) -> u64 {
+        self.id
+    }
+
+    /// # [`ActorContext::system`]
+    /// Returns the Fluxion instance that this actor is running on
+    #[must_use]
+    pub fn system(&self) -> &Fluxion<D> {
+        &self.system
+    }
+}
+
 /// # [`Handler`]
 pub trait Handler<M: Message>: Actor {
-    fn handle_message(&self, message: M) -> impl core::future::Future<Output = M::Result> + Send;
+    fn handle_message<D: Delegate>(&self, message: M, context: &ActorContext<D>) -> impl core::future::Future<Output = M::Result> + Send;
 }
 
 
@@ -41,18 +68,17 @@ pub trait Handler<M: Message>: Actor {
 
 /// Newtype pattern implementing Slacktor's actor trait
 /// for implementorrs of our [`Actor`] trait here.
-#[repr(transparent)]
-pub(crate) struct ActorWrapper<T: Actor>(pub T);
+pub(crate) struct ActorWrapper<T: Actor, D: Delegate>(pub T, pub Arc<ActorContext<D>>);
 
-impl<R: Actor> slacktor::Actor for ActorWrapper<R> {
+impl<R: Actor, D: Delegate> slacktor::Actor for ActorWrapper<R, D> {
     fn destroy(&self) -> impl core::future::Future<Output = ()> + Send {
         self.0.deinitialize()
     }
 }
 
-impl<R: Handler<M>, M: Message> slacktor::actor::Handler<M> for ActorWrapper<R> {
+impl<R: Handler<M>, M: Message, D: Delegate> slacktor::actor::Handler<M> for ActorWrapper<R, D> {
     fn handle_message(&self, message: M) -> impl core::future::Future<Output = <M as Message>::Result> + Send {
-        self.0.handle_message(message)
+        self.0.handle_message(message, &self.1)
     }
 }
 
