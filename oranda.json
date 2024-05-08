@@ -1,10 +1,6 @@
 {
     "project": {
-        "name": "",
-        "readme_path": "./README.md",
-        "license": "MIT or Apache-2.0",
-        "repository": "https://github.com/peperworx/fluxion",
-        "homepage": "fluxion.peperworx.com"
+        "name": ""
     },
     "styles": {
         "logo": "site/images/fluxion_wide.png",
@@ -14,7 +10,12 @@
     },
     "components": {
         "mdbook": {
-            "path": "site/book"
+            "path": "site/docs",
+            "theme": false
+        },
+        "artifacts": false,
+        "changelog": {
+            "read_changelog_file": true
         }
     }
 }
