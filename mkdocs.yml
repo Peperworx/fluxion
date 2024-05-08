@@ -46,8 +46,8 @@ nav:
   - 'index.md'
   - 'Getting Started':
     - 'getting_started/index.md'
-    - 'Defining an Executor': 'getting_started/executor.md'
-    - 'Defining a Message Serializer': 'getting_started/serialization.md'
+    - 'Defining Actors': 'getting_started/actors.md'
+    - 'Creating Messages and Handlers': 'getting_started/messages.md'
     - 'Initializing Fluxion': 'getting_started/initialization.md'
     - 'Handling Messages': 'getting_started/message_handling.md'
     - 'Sending Messages': 'getting_started/sending_messages.md'
