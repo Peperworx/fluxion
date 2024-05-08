@@ -1,12 +1,12 @@
-<div align="center">
+<div align="center" id="centered">
 
-<img style="width: 80%" src="docs/assets/fluxion_wide.png" alt = "Fluxion">
+<img style="width: 80%" src="docs/assets/fluxion_wide.png" alt = "Fluxion" class="oranda-hide">
 
 [![crates.io](https://img.shields.io/crates/l/fluxion?style=for-the-badge)](https://crates.io/crates/fluxion)
 [![crates.io](https://img.shields.io/crates/v/fluxion?style=for-the-badge)](https://crates.io/crates/fluxion)
 [![docs.rs](https://img.shields.io/docsrs/fluxion?style=for-the-badge)](https://docs.rs/fluxion)
 
-Distributed actor framework written in rust.
+Distributed actor framework written in Rust.
 </div>
 
 

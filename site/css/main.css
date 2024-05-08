@@ -1,0 +1,32 @@
+header {
+    width: 100%;
+}
+
+.logo {
+    width: 80%;
+    max-width: none;
+    margin: auto!important;
+    display: block!important;
+}
+
+#centered {
+    display: flex;
+    flex-flow: column nowrap;
+    align-items: center;
+}
+
+#centered p {
+    display: block;
+}
+
+.title {
+    display: none!important;
+}
+
+.nav ul {
+    justify-content: center!important;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: #dddddd!important;
+}
