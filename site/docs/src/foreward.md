@@ -1,0 +1,9 @@
+# Foreward
+
+Fluxion exists to fulfill a very specific usecase: provide an actor system that can send messages between systems. How systems are connected does not matter. Be it through IPC, the internet, or even something like UART, Fluxion will provide the same interface. Fluxion is different from many traditional actor systems in that it does not provide actors mutable access to themselves, and it does not provide "fire and forget" messages.
+
+Why does Fluxion make these two restrictions? If Fluxion were to provide actors mutable access to themselves, then message handlers would be unable to run concurrently. By definition, Fluxion would no longer be an actor system. By not providing "fire and forget" messages, Fluxion enables an optimization by which messages can be simulated via function calls. If "fire and forget" messages are required, then a user can simply spawn a new async task to send the message from.
+
+That being said, Fluxion is *not* an actor framework. Fluxion is an actor *library*. Fluxion will not try to get in your way, and does not attempt to provide a system to build your entire application around. Instead, Fluxion is designed to be used a little bit, just where actors are actually needed: maybe for a plugin system, or maybe just to represent multiple different database connections with the same exact interface.
+
+Due to Fluxion's limited scope, it is also *very* performant. On an I9-13900H with 32Gb of RAM, the `benchmark` example outputs ~16 million messages per second when compiled on release mode. Even when compiled using the `dev` profile, Fluxion still benchmarks ~6 million messages per second.
