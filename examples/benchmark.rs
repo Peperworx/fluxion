@@ -1,6 +1,6 @@
 /// # Benchmark
 /// Extremely simple benchmark for Fluxion's message passing speed.
-
+/// May not be entirely representitive of real usecases.
 
 
 // Imports from Fluxion that are needed for this example
