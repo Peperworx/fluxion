@@ -28,6 +28,7 @@ pub struct LocalRef<A: Actor, D: Delegate>(pub(crate) slacktor::ActorHandle<Acto
 
 #[async_trait::async_trait]
 impl<A: Handler<M>, M: Message, D: Delegate> MessageSender<M> for LocalRef<A, D> {
+    #[inline]
     async fn send(&self, message: M) -> M::Result {
         self.0.send(message).await
     }

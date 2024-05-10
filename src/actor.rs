@@ -77,6 +77,7 @@ impl<R: Actor, D: Delegate> slacktor::Actor for ActorWrapper<R, D> {
 }
 
 impl<R: Handler<M>, M: Message, D: Delegate> slacktor::actor::Handler<M> for ActorWrapper<R, D> {
+    #[inline]
     fn handle_message(&self, message: M) -> impl core::future::Future<Output = <M as Message>::Result> + Send {
         self.0.handle_message(message, &self.1)
     }
