@@ -2,7 +2,7 @@ use alloc::sync::Arc;
 use maitake_sync::RwLock;
 use slacktor::Slacktor;
 
-use crate::{Actor, ActorContext, ActorWrapper, Delegate, Handler, Identifier, LocalRef, MessageSender};
+use crate::{Actor, ActorContext, ActorWrapper, Delegate, Handler, Identifier, IndeterminateMessage, LocalRef, MessageSender};
 
 
 
@@ -118,10 +118,35 @@ impl<D: Delegate> Fluxion<D> {
 
     /// # [`Fluxion::get`]
     /// Retrieves an actor reference capable of communicating using the given message via the given ID.
-    pub async fn get<'a, A: Handler<M>, M: crate::Message>(&self,
+    #[cfg(feature = "serde")]
+    pub async fn get<'a, A: Handler<M>, M: IndeterminateMessage>(&self,
+            #[cfg(feature="foreign")] id: impl Into<Identifier<'a>>,
+            #[cfg(not(feature="foreign"))] id: impl Into<Identifier>
+        ) -> Option<Arc<dyn MessageSender<M>>>
+        where M::Result: serde::Serialize + for<'d> serde::Deserialize<'d> {
+
+        match id.into() {
+            Identifier::Local(id) => {
+                // Get the local ref and wrap in an arc
+                self.get_local::<A>(id).await
+                    .map(|h| Arc::new(h) as Arc<dyn MessageSender<M>>)
+            },
+            #[cfg(feature = "foreign")]
+            Identifier::Foreign(id, system) => {
+                // Send the request on to the delegate
+                self.delegate.get_actor::<A, M>(Identifier::Foreign(id, system)).await
+            }
+        }
+    }
+
+    /// # [`Fluxion::get`]
+    /// Retrieves an actor reference capable of communicating using the given message via the given ID.
+    #[cfg(not(feature = "serde"))]
+    pub async fn get<'a, A: Handler<M>, M: IndeterminateMessage>(&self,
             #[cfg(feature="foreign")] id: impl Into<Identifier<'a>>,
             #[cfg(not(feature="foreign"))] id: impl Into<Identifier>
         ) -> Option<Arc<dyn MessageSender<M>>> {
+
         match id.into() {
             Identifier::Local(id) => {
                 // Get the local ref and wrap in an arc

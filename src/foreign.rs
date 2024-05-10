@@ -5,7 +5,7 @@
 use alloc::sync::Arc;
 
 #[cfg(feature="foreign")]
-use crate::{Handler, Identifier, MessageSender, Message};
+use crate::{Handler, Identifier, MessageSender, IndeterminateMessage};
 
 
 
@@ -18,16 +18,30 @@ use crate::{Handler, Identifier, MessageSender, Message};
 pub trait Delegate: Send + Sync + 'static {
     /// # [`Delegate::get_actor`]
     /// Retrieves an [`ActorRef`] for the given foreign actor.
-    #[cfg(feature="foreign")]
-    fn get_actor<A: Handler<M>, M: Message>(&self, id: Identifier) -> impl core::future::Future<Output = Option<Arc<dyn MessageSender<M>>>> + Send;
+    #[cfg(all(feature="foreign", not(feature="serde")))]
+    fn get_actor<A: Handler<M>, M: IndeterminateMessage>(&self, id: Identifier) -> impl core::future::Future<Output = Option<Arc<dyn MessageSender<M>>>> + Send;
+
+    /// # [`Delegate::get_actor`]
+    /// Retrieves an [`ActorRef`] for the given foreign actor.
+    #[cfg(all(feature="foreign", feature="serde"))]
+    fn get_actor<A: Handler<M>, M: IndeterminateMessage>(&self, id: Identifier) -> impl core::future::Future<Output = Option<Arc<dyn MessageSender<M>>>> + Send
+        where M::Result: serde::Serialize + for<'a> serde::Deserialize<'a>;
 }
 
 // Delegate is implemented for () as a no-op
 impl Delegate for () {
-    #[cfg(feature="foreign")]
-    async fn get_actor<A: Handler<M>, M: Message>(&self, id: Identifier<'_>) -> Option<Arc<dyn MessageSender<M>>> {
+    #[cfg(all(feature="foreign", not(feature="serde")))]
+    async fn get_actor<A: Handler<M>, M: IndeterminateMessage>(&self, id: Identifier<'_>) -> Option<Arc<dyn MessageSender<M>>> {
         let _ = id;
         None
+    }
+
+
+    #[cfg(all(feature="foreign", feature="serde"))]
+    async fn get_actor<A: Handler<M>, M: IndeterminateMessage>(&self, id: Identifier<'_>) -> Option<Arc<dyn MessageSender<M>>>
+        where M::Result: serde::Serialize + for<'a> serde::Deserialize<'a> {
+            let _ = id;
+            None
     }
 }
 
