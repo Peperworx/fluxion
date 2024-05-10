@@ -6,7 +6,7 @@ Version 0.10 is intended to be the final complete overhaul of Fluxion. The only 
 
 This version replaces Fluxion's entire messaging/supervisor backend with raw function calls via [Slacktor](https://github.com/peperworx/slacktor). This provides a very similar API to the channel based backend, and comes with a variety of benefits. First and foremost is that Fluxion is now completely, 100%, executor agnostic. No boilerplate code or trait implementations are required anymore. Additionally, Fluxion is now orders of magnitude faster.
 
-Version 1.10 also completely overhauls the idea of foreign messages. All data serialization and message passing is now handled by a "delegate", and actors no longer need to create a "foreign proxy" to handle foreign messages. Additionally, Fluxion is now much more flexible in requiring the Serialize and Deserialize traits.
+Version 1.10 also completely overhauls the idea of foreign messages. All data serialization and message passing is now handled by a "delegate". Additionally, Fluxion is now much more flexible in requiring the Serialize and Deserialize traits.
 
 Here are some bullet points of the core changes:
 
