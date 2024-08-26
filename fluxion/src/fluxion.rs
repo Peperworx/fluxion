@@ -12,7 +12,7 @@ use crate::{Actor, ActorContext, ActorWrapper, Delegate, Handler, Identifier, In
 /// Contains the core actor management functionality of fluxion
 pub struct Fluxion<D> {
     /// The underlying slacktor instance.
-    /// This is wrapped in an [`Arc`]` and [`RwLock`]` to allow concurrent access from different tasks.
+    /// This is wrapped in an [`Arc`] and [`RwLock`] to allow concurrent access from different tasks.
     /// The [`RwLock`] is used instead of a mutex because it can be assumed that actor references
     /// will be retrieved more often than actors are created.
     slacktor: Arc<RwLock<Slacktor>>,

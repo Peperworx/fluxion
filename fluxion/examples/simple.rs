@@ -1,5 +1,5 @@
 // Imports from Fluxion that are needed for this example
-use fluxion::{Actor, ActorContext, Delegate, Fluxion, Handler, Message, MessageSender};
+use fluxion::{message, Actor, ActorContext, Delegate, Fluxion, Handler, MessageSender};
 
 
 
@@ -28,16 +28,10 @@ impl Actor for TestActor {
 /// If the `serde` feature is enabled, messages that wish to be able to be sent to foreign actors,
 /// as well as use the [`Fluxion::get`] method, must implemment `Serialize` and `Deserialize`.
 /// Actors that do not implemment this can be accessed with [`Fluxion::get_local`].
+#[message]
 struct TestMessage;
 
-// The only thing other than the previously stated bounds that messages need is to implement the `Message` trait.
-impl Message for TestMessage {
 
-    // The only required field to implement `Message` is the `Result` type.
-    // This is the type of the value that is sent in response to the message.
-    // For now we will make this a unit type, but it can support any type that is [`Send`] + [`Sync`] + `'static`.
-    type Result = ();
-}
 
 
 // Message handlers are also pretty simple

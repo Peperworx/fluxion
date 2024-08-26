@@ -4,7 +4,7 @@
 
 
 // Imports from Fluxion that are needed for this example
-use fluxion::{Actor, ActorContext, Delegate, Fluxion, Handler, Message, MessageSender};
+use fluxion::{message, Actor, ActorContext, Delegate, Fluxion, Handler, Message, MessageID, MessageSender};
 use std::time::Instant;
 
 
@@ -19,13 +19,9 @@ impl Actor for TestActor {
 
 /// # [`TestMessage`]
 /// The 64-bit integer sent to the actor.
+#[message(u64)]
 struct TestMessage(pub u64);
 
-
-impl Message for TestMessage {
-    /// Send back the xored value
-    type Result = u64;
-}
 
 
 impl Handler<TestMessage> for TestActor {
@@ -41,7 +37,6 @@ impl Handler<TestMessage> for TestActor {
 
 #[tokio::main]
 async fn main() {
-
     // Create the system
     let system = Fluxion::new("system", ());
     

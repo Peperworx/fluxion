@@ -27,3 +27,10 @@ impl From<u64> for Identifier {
         Identifier::Local(value)
     }
 }
+
+/// # [`MessageID`]
+/// Every foreign message is required to have a unique ID.
+/// This is automatically populated by the `message` proc macro.
+pub trait MessageID {
+    const ID: &'static str;
+}
