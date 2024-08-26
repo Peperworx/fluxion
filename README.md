@@ -1,6 +1,6 @@
 <div align="center" id="centered">
 
-<img style="width: 80%" src="docs/assets/fluxion_wide.png" alt = "Fluxion" class="oranda-hide">
+<img style="width: 80%" src="site/images/fluxion_wide.png" alt = "Fluxion" class="oranda-hide">
 
 [![crates.io](https://img.shields.io/crates/l/fluxion?style=for-the-badge)](https://crates.io/crates/fluxion)
 [![crates.io](https://img.shields.io/crates/v/fluxion?style=for-the-badge)](https://crates.io/crates/fluxion)
