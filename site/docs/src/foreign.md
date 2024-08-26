@@ -1,0 +1,3 @@
+# Foreign Messages
+
+This section has not yet been developed. A (still rather rough) example of foreign messages can be found in the `foreign` example. It requires both the `serde` and the `foreign` feature flags to compile. The example just uses `slacktor` as a basic method to communicate between two delegates, however any other mechanism will work (IPC pipes, sockets, even a serial port), as long as you can implement request/response semantics on top of it.

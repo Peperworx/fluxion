@@ -1,5 +1,5 @@
 // Imports from Fluxion that are needed for this example
-use fluxion::{message, Actor, ActorContext, Delegate, Fluxion, Handler, MessageSender};
+use fluxion::{actor, message, ActorContext, Delegate, Fluxion, Handler, MessageSender};
 
 
 
@@ -8,17 +8,13 @@ use fluxion::{message, Actor, ActorContext, Delegate, Fluxion, Handler, MessageS
 /// Fluxion doesn't actually care what type you use as an actor.
 /// You can use a unit struct like this, a regular struct, tuple struct, or an enum.
 /// You can even use generics, and as long as they satisfy [`Send`] + [`Sync`] + `'static` then they will work.
+/// 
+/// All that actors require is that the `Actor` trait be implemented for them
+/// Unless you define custom initialization or deinitialization logic for your actor,
+/// the following macro should be used. Otherwise, the [`fluxion::Actor`] trait must
+/// be manually implemented.
+#[actor]
 struct TestActor;
-
-// All that actors require is that the `Actor` trait be implemented for them
-impl Actor for TestActor {
-    
-    // The only required field to implement the `Actor` trait is the `Error` type.
-    // Unless you define custom initialization or deinitialization logic for your actor,
-    // then this should just be the unit type. Once associated type defaults are stabilized,
-    // Fluxion will set this to the unit type by default.
-    type Error = ();
-}
 
 
 /// # [`TestMessage`]
@@ -27,8 +23,12 @@ impl Actor for TestActor {
 /// They just need to satisfy [`Send`] + [`Sync`] + `'static`
 /// If the `serde` feature is enabled, messages that wish to be able to be sent to foreign actors,
 /// as well as use the [`Fluxion::get`] method, must implemment `Serialize` and `Deserialize`.
-/// Actors that do not implemment this can be accessed with [`Fluxion::get_local`].
-#[message]
+/// Actors that do not implement these traits can still be accessed with [`Fluxion::get_local`].
+/// 
+/// Optionally, the message's response type may be provided. The actor's ID may also be provided.
+/// Here we use the full syntax, but it can be reduced to simply `#[message]`, and the effect will be the same. 
+/// The default response type is `()` and the default ID for a message is it's full module path.
+#[message((), "simple::TestMessage")]
 struct TestMessage;
 
 
@@ -40,7 +40,8 @@ impl Handler<TestMessage> for TestActor {
     /// The only real complex bit is this function signature.
     /// Even with foreign messages disabled, Fluxion still requies the [`Delegate`]
     /// generic so that enabling and disabling the `foreign` feature doesn't completely mess up the API.
-    /// That is, actors and messages that support foreign messages should always support regular messages.
+    /// That is, the only implementation detail that should differentiate foreign and local messages
+    /// is if they implement serialization (or with no `serde` feature flag, there should be no difference).
     async fn handle_message<D: Delegate>(&self, _message: TestMessage, context: &ActorContext<D>) {
         // Both the contents of the message and the `context` are available here.
         // The context allows the handler to access this actor's ID, as well as a reference to the system.

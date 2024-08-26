@@ -4,7 +4,7 @@
 
 
 // Imports from Fluxion that are needed for this example
-use fluxion::{message, Actor, ActorContext, Delegate, Fluxion, Handler, Message, MessageID, MessageSender};
+use fluxion::{message, Actor, ActorContext, Delegate, Fluxion, Handler, MessageSender};
 use std::time::Instant;
 
 

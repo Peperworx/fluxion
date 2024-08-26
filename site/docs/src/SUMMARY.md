@@ -2,5 +2,6 @@
 
 - [Foreward](./foreward.md)
 - [First Steps](./first_steps.md)
-  - [Defining and Adding an Actor](./first_actor.md)
-  - [Defining and Sending Messages](./first_message.md)
+  - [Defining Actors and Messages](./actors_and_messages.md)
+  - [Handling Messages](./handling_messages.md)
+- [Foreign Messages](./foreign.md)
