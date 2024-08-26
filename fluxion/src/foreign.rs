@@ -45,3 +45,12 @@ impl Delegate for () {
     }
 }
 
+
+// Delegate is automatially implemented for any Arc of an existing delegate
+impl<D: Delegate> Delegate for Arc<D> {
+    fn get_actor<A: Handler<M>, M: IndeterminateMessage>(&self, id: Identifier) -> impl core::future::Future<Output = Option<Arc<dyn MessageSender<M>>>> + Send
+        where M::Result: serde::Serialize + for<'a> serde::Deserialize<'a> {
+        D::get_actor::<A, M>(self, id)
+    }
+}
+

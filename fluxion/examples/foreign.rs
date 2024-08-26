@@ -1,9 +1,11 @@
-use std::{borrow::BorrowMut, collections::HashMap, sync::Arc};
+use std::{borrow::BorrowMut, collections::HashMap, marker::PhantomData, sync::Arc};
 
-use fluxion::{actor, message, Delegate, Handler, Identifier, LocalRef, Message, MessageID, MessageSender};
+use bincode::serialize;
+use fluxion::{actor, message, Delegate, Handler, Identifier, IndeterminateMessage, LocalRef, Message, MessageID, MessageSender};
 use maitake_sync::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use slacktor::{ActorHandle, Slacktor};
+use tokio::sync::{mpsc::{self, Receiver, Sender}, oneshot};
 
 
 #[actor]
@@ -45,36 +47,79 @@ struct MessageA;
 struct MessageB;
 
 
-struct DelegateMessageHandler {
+struct DelegateSender<M: Message + MessageID> {
+    actor_id: u64,
+    system_id: String,
+    other_delegate: ActorHandle<DelegateActor>,
+    _phantom: PhantomData<M>,
+}
 
+#[async_trait::async_trait]
+impl<M: Message + MessageID + Serialize> fluxion::MessageSender<M> for DelegateSender<M>
+where M::Result: for<'de> Deserialize<'de> {
+   
+    async fn send(&self,message:M) -> M::Result {
+        // Send the message
+        let res = self.other_delegate.send(DelegateMessage(self.actor_id, M::ID.to_string(), bincode::serialize(&message).unwrap())).await;
+
+        // Deserialize the response
+        bincode::deserialize(&res).unwrap()
+    }
+}
+
+struct DelegateActor(Arc<SerdeDelegate>);
+
+impl slacktor::Actor for DelegateActor {}
+
+impl slacktor::actor::Handler<DelegateMessage> for DelegateActor {
+    async fn handle_message(&self, message: DelegateMessage) -> <DelegateMessage as Message>::Result  {
+        
+        // Get the channel
+        let handlers = self.0.actor_handlers.read().await;
+        let channels = handlers.get(&(message.0, message.1)).unwrap();
+
+        // Construct the response oneshot
+        let (response_sender, response) = oneshot::channel();
+
+        // Send the message
+        channels.send((message.2, response_sender)).await.unwrap();
+
+        // Wait for the response and return
+        response.await.unwrap()
+    }
+}
+
+struct DelegateMessage(u64, String, Vec<u8>);
+
+impl slacktor::Message for DelegateMessage {
+    type Result = Vec<u8>;
 }
 
 struct SerdeDelegate {
     // The system's id
     system_id: &'static str,
-    // Channel for sending serialized data to the other half of the delegate
-    // This is connected to the other delegate's `receiver`
-    sender: Sender<Vec<u8>>,
-    // Channel for receiving serialized data to the other half of the delegate
-    // This is connected to the other delegate's `sender`
-    receiver: Mutex<Receiver<Vec<u8>>>,
+    // Backing slacktor instance
+    slacktor: Arc<RwLock<Slacktor>>,
+    // The other delegate's id,
+    other_id: usize,
     // Hashmap of message handling channels for actors
-    actor_handlers: Mutex<HashMap<(u64, String), (mpsc::Sender<Vec<u8>>, mpsc::Receiver<Vec<u8>>)>>
+    actor_handlers: RwLock<HashMap<(u64, String), mpsc::Sender<(Vec<u8>, oneshot::Sender<Vec<u8>>)>>>
 }
 
+
 impl SerdeDelegate {
-    pub fn new(system_id: &'static str, sender: Sender<Vec<u8>>, receiver: Receiver<Vec<u8>>) -> Self {
+    pub fn new(system_id: &'static str, slacktor: Arc<RwLock<Slacktor>>, other_id: usize) -> Self {
         Self {
             system_id,
-            sender,
-            receiver: Mutex::new(receiver),
+            slacktor,
+            other_id,
             actor_handlers: Default::default()
         }
     }
 
 
     /// Registers an actor as being able to receive a specific message type.
-    pub async fn register_actor_message<A: Handler<M>, M: fluxion::IndeterminateMessage>(&self, actor: LocalRef<A, Self>)
+    pub async fn register_actor_message<A: Handler<M>, M: fluxion::IndeterminateMessage, S: Delegate + AsRef<Self>>(&self, actor: LocalRef<A, S>)
         where M::Result: serde::Serialize + for<'de> serde::Deserialize<'de>{
         
         let id = actor.get_id();
@@ -82,65 +127,30 @@ impl SerdeDelegate {
         println!("{} is registering actor with id {} to handle message {}", self.system_id, id, M::ID);
 
         // Create channels
-        let (send_message, mut receive_message) = mpsc::channel::<Vec<u8>>(64);
-        let (send_response, receive_response) = mpsc::channel::<Vec<u8>>(64);
+        let (send_message, mut receive_message) = mpsc::channel::<(Vec<u8>,_)>(64);
 
         // Spawn task
         tokio::spawn(async move {
             loop {
-                let Some(next_message) = receive_message.recv().await else {
+                let Some(next_message): Option<(Vec<u8>, oneshot::Sender<Vec<u8>>)> = receive_message.recv().await else {
                     println!("Message handler {}/{} stopped recieving messages.", actor.get_id() ,M::ID);
                     break;
                 };
 
                 // Decode the message
-                let decoded: M = bincode::deserialize(&next_message).unwrap();
+                let decoded: M = bincode::deserialize(&next_message.0).unwrap();
 
                 // Handle the message
                 let res = actor.send(decoded).await;
 
                 // Send the response
-                send_response.send(bincode::serialize(&res).unwrap()).await.unwrap();
-                
+                next_message.1.send(bincode::serialize(&res).unwrap()).unwrap();
             }
         });
 
         // Add the handler
-        self.actor_handlers.lock().await.insert((id, M::ID.to_string()), (send_message, receive_response));
+        self.actor_handlers.write().await.insert((id, M::ID.to_string()), send_message);
 
-    }
-
-    /// Runs the delegate
-    pub async fn run(&self) {
-
-        // In an actual implementation, there will need to be more synchronization between message/response pairs, as each
-        // delegate may actually be handling more than one message in parallel. This will most likely be done by
-        // using a separate connection per message, over a protocol like QUIC that can handle the multiplexing for us.
-
-        let mut receiver = self.receiver.lock().await;
-        loop {
-            // Wait for data
-            let Some(next_data) = receiver.recv().await else {
-                println!("Delegate disconnected");
-                return;
-            };
-
-            // Deserialize the data
-            let (actor_id, message_id, data): (u64, String, Vec<u8>) = bincode::deserialize(&next_data).unwrap();
-
-            // Get the actor's message handler
-            let mut handlers = self.actor_handlers.lock().await;
-            let channels = handlers.get_mut(&(actor_id, message_id.to_string())).unwrap();
-
-            // Send the message data
-            channels.0.send(data).await.unwrap();
-
-            // Wait for the response
-            let res = channels.1.recv().await.unwrap();
-
-            // Send the response
-            self.sender.send(res).await.unwrap();
-        }
     }
 }
 
@@ -155,30 +165,52 @@ impl Delegate for SerdeDelegate {
         
         println!("{} is requesting a foreign actor on system {} with id {} that can handle message {}", self.system_id, system, id, M::ID);
 
-        // Create a channel 
-
-        todo!()
+        // Get the other actor on the slacktor system
+        let slacktor = self.slacktor.read().await;
+        let other = slacktor.get::<DelegateActor>(self.other_id)?;
+        
+        // Wrap with a message sender and return
+        Some(Arc::new(DelegateSender {
+            actor_id: id,
+            system_id: system.to_string(),
+            other_delegate: other.clone(),
+            _phantom: PhantomData,
+        }))
     }
 }
 
 #[tokio::main]
 async fn main() {
 
-    let a_to_b = mpsc::channel(64);
-    let b_to_a = mpsc::channel(64);
+    // This basic example just uses slacktor as the communication medium between delegates.
+    // In practice, any system that can provide request/response semantics can be used to create a delegate.
+    let delegate_backplane = Arc::new(RwLock::new(Slacktor::new()));
+    let backplane = delegate_backplane.clone();
+    let mut backplane = backplane.write().await;
+
+    let delegate_a = Arc::new(SerdeDelegate::new("system_a", delegate_backplane.clone(), 1));
+    let delegate_b = Arc::new(SerdeDelegate::new("system_a", delegate_backplane, 0));
+
+    backplane.spawn(DelegateActor(delegate_a.clone()));
+    backplane.spawn(DelegateActor(delegate_b.clone()));
+
+    // Drop slacktor, or else the delegates will hang forever.
+    drop(backplane);
 
 
     // Initialize the two systems
-    let system_a = fluxion::Fluxion::new("system_a", SerdeDelegate::new("system_a", a_to_b.0, b_to_a.1));
-    let system_b = fluxion::Fluxion::new("system_b", SerdeDelegate::new("system_b", b_to_a.0, a_to_b.1));
+    let system_a = fluxion::Fluxion::new("system_a", delegate_a);
+    let system_b = fluxion::Fluxion::new("system_b", delegate_b);
 
     // Create both actors on system a
     let actor_a = system_a.add(ActorA).await.unwrap();
-    system_a.get_delegate().register_actor_message::<ActorA, MessageA>(system_a.get_local(actor_a).await.unwrap()).await;
-    system_a.get_delegate().register_actor_message::<ActorA, MessageB>(system_a.get_local(actor_a).await.unwrap()).await;
+    system_a.get_delegate().register_actor_message::<ActorA, MessageA, _>(system_a.get_local(actor_a).await.unwrap()).await;
+    system_a.get_delegate().register_actor_message::<ActorA, MessageB, _>(system_a.get_local(actor_a).await.unwrap()).await;
     let actor_b = system_a.add(ActorB).await.unwrap();
-    system_a.get_delegate().register_actor_message::<ActorB, MessageA>(system_a.get_local(actor_b).await.unwrap()).await;
-    system_a.get_delegate().register_actor_message::<ActorB, MessageB>(system_a.get_local(actor_b).await.unwrap()).await;
+    system_a.get_delegate().register_actor_message::<ActorB, MessageA, _>(system_a.get_local(actor_b).await.unwrap()).await;
+    system_a.get_delegate().register_actor_message::<ActorB, MessageB, _>(system_a.get_local(actor_b).await.unwrap()).await;
+
+    
    
     // Get both actors on system b
     let foreign_a = system_b.get::<ActorA, MessageB>(Identifier::Foreign(actor_a, "system_a")).await.unwrap();
