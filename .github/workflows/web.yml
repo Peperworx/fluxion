@@ -46,6 +46,8 @@ on:
     workflows: [ "Release" ]
     types:
       - completed
+  
+  workflow_dispatch:
 
 # Alright, let's do it!
 jobs:
