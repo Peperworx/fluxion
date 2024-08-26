@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.10.0
+## 0.10.0 -- 2024-8-26
 
 Version 0.10 is intended to be the final complete overhaul of Fluxion. The only scenario in which another rewrite should be expected is if this version has major usability issues. Otherwise, all future minor versions, as well as version 1.0.0, should just be bug fixes and minor feature updates.
 
@@ -19,6 +19,7 @@ Here are some bullet points of the core changes:
   - As a consequence of this, error policies are also gone. In the future, error policies may be moved into their own crate, as they were useful in their own right.
 - Foreign messages are now entirely handled by "delegates"
   - This includes serialization and deserialization of methods.
+  - Messages also now have IDs that represent the message type. These are, by default, the full path of the message's type.
 - Actor initialization and deinitialization logic has been greatly simplified.
   - Only the `initialize` and `deinitialize` functions are provided.
   - Due to being unable to verify if all references to the actor have been destroyed, only `initialize` provides mutable access to the actor.
