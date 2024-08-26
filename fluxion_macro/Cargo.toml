@@ -1,0 +1,18 @@
+[package]
+name = "fluxion_macro"
+license = "MIT OR Apache-2.0"
+description = "Proc-macro crate for fluxion."
+repository = "https://github.com/peperworx/fluxion"
+categories = ["concurrency"]
+keywords = ["actor", "distributed", "async", "fluxion"]
+readme = "../README.md"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+proc-macro2 = "1.0.86"
+quote = "1.0.37"
+syn = { version = "2.0.76", features=["extra-traits"] }
+
+[lib]
+proc-macro = true

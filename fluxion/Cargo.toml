@@ -1,0 +1,35 @@
+[package]
+name = "fluxion"
+license = "MIT OR Apache-2.0"
+description = "Fluxion is an actor framework written in rust and designed for distributed systems."
+repository = "https://github.com/peperworx/fluxion"
+homepage = "fluxion.peperworx.com"
+categories = ["concurrency"]
+keywords = ["actor", "distributed", "async", "fluxion"]
+readme = "../README.md"
+version = "0.10.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1.80"
+maitake-sync = "0.1.1"
+serde = { version = "1.0.198", default-features = false, optional = true }
+slacktor = { version = "0.3.0", features = ["async"] }
+fluxion_macro = "0.1.0"
+const_format = "0.2.32"
+
+
+[features]
+default = []
+foreign = []
+serde = ["dep:serde"]
+
+[dev-dependencies]
+bincode = "1.3.3"
+rand = "0.8.5"
+rayon = "1.10.0"
+serde = { version = "1.0.198", features = ["derive"] }
+tokio = { version = "1.37.0", features = ["full"] }
+

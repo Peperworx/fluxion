@@ -1,0 +1,12 @@
+[book]
+authors = ["Riley Wilton"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Fluxion"
+
+[rust]
+edition = "2021"
+
+[output.html.playground]
+runnable = false

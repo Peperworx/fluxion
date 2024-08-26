@@ -1,0 +1,22 @@
+{
+    "project": {
+        "name": "fluxion",
+        "readme_path": "./README.md"
+    },
+    "styles": {
+        "logo": "site/images/fluxion_wide.png",
+        "theme": "hacker",
+        "favicon": "site/images/fluxion_square.png",
+        "additional_css": ["site/css/main.css"]
+    },
+    "components": {
+        "mdbook": {
+            "path": "site/docs",
+            "theme": false
+        },
+        "artifacts": false,
+        "changelog": {
+            "read_changelog_file": true
+        }
+    }
+}
