@@ -1,6 +1,7 @@
 {
     "project": {
-        "name": ""
+        "name": "fluxion",
+        "readme_path": "./README.md"
     },
     "styles": {
         "logo": "site/images/fluxion_wide.png",
