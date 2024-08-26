@@ -1,5 +1,10 @@
 [package]
 name = "ensure_fluxion_no_std"
+description = "If this package compiles, then Fluxion works in a no-std context."
+license = "MIT or Apache-2.0"
+repository = "https://github.com/peperworx/fluxion"
+keywords = []
+categories = []
 version = "0.1.0"
 edition = "2021"
 

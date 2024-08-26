@@ -5,6 +5,7 @@ description = "Proc-macro crate for fluxion."
 repository = "https://github.com/peperworx/fluxion"
 categories = ["concurrency"]
 keywords = ["actor", "distributed", "async", "fluxion"]
+readme = "../README.md"
 version = "0.1.0"
 edition = "2021"
 
