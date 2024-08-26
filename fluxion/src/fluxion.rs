@@ -40,6 +40,13 @@ impl<D: Delegate> Fluxion<D> {
         }
     }
 
+    /// # [`Fluxion::get_delegate`]
+    /// Gets a reference to the delegate.
+    #[must_use]
+    pub fn get_delegate(&self) -> &D {
+        &self.delegate
+    }
+
     /// # [`Fluxion::get_id`]
     /// Gets the system's id
     #[must_use]

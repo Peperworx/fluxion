@@ -84,3 +84,31 @@ pub fn message(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     }.into()
 }
+
+
+#[proc_macro_attribute]
+pub fn actor(attr: TokenStream, item: TokenStream) -> TokenStream {
+    // Get the item's name
+    let item_name = item.clone();
+    let item_name = syn::parse_macro_input!(item_name as DeriveInput).ident;
+
+    // Get the optional error type, defaulting to ()
+    let error_type = if attr.is_empty() {
+        Type::Tuple(syn::TypeTuple {
+            paren_token: syn::token::Paren(Span::call_site()),
+            elems: Punctuated::new()
+        })
+    } else {
+        syn::parse_macro_input!(attr as Type)
+    };
+
+    let item: TokenStream2 = item.into();
+
+    quote! {
+        #item
+
+        impl fluxion::Actor for #item_name {
+            type Error = #error_type;
+        }
+    }.into()
+}

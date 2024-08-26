@@ -6,6 +6,7 @@
 /// # [`Identifier`]
 /// Identifies an individual actor on a given system. There are two variants: one for actors on the current system, and one on a foreign system.
 /// These are called [`Identifier::Local`] and [`Identifier::Foreign`] respectively.
+#[derive(Debug)]
 pub enum Identifier<#[cfg(feature = "foreign")] 'a> {
     /// Identifies an actor on the current system. Contains the actor's id as a 64-bit integer.
     Local(u64),
