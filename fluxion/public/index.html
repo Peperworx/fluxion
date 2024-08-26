@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en" id="oranda" class="hacker">
+  <head>
+    <title></title>
+    
+    
+      <link rel="icon" href="&#x2f;favicon.ico" />
+    
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+      <meta name="description" content="Fluxion is an actor framework written in rust and designed for distributed systems." />
+      <meta property="og:description" content="Fluxion is an actor framework written in rust and designed for distributed systems." />
+    
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="" />
+    
+    
+    
+    <meta http-equiv="Permissions-Policy" content="interest-cohort=()" />
+    <link rel="stylesheet" href="&#x2f;oranda-v0.6.1.css" />
+    
+      <link rel="stylesheet" href="&#x2f;custom.css" />
+    
+    
+  </head>
+  <body>
+    <div class="container">
+      <div class="page-body">
+        
+          <div class="repo_banner">
+            <a href="https:&#x2f;&#x2f;github.com&#x2f;peperworx&#x2f;fluxion">
+              <div class="github-icon" aria-hidden="true"></div>
+              Check out our GitHub!
+            </a>
+          </div>
+        
+
+        <main>
+          <header>
+            
+              <img src="&#x2f;fluxion_wide.png" alt="" class="logo" />
+            
+            <h1 class="title"></h1>
+            
+  <nav class="nav">
+    <ul>
+      <li><a href="&#x2f;">Home</a></li>
+
+      
+
+      
+
+      
+        <li><a href="&#x2f;book&#x2f;">Docs</a></li>
+      
+
+      
+
+      
+        <li><a href="&#x2f;changelog&#x2f;">Changelog</a></li>
+      
+    </ul>
+  </nav>
+
+          </header>
+
+          
+
+
+    &lt;div id=&quot;centered&quot;&gt;
+&lt;img style=&quot;width: 80%&quot; src=&quot;docs&#x2f;assets&#x2f;fluxion_wide.png&quot; alt=&quot;Fluxion&quot; class=&quot;oranda-hide&quot;&gt;
+&lt;p&gt;&lt;a href=&quot;https:&#x2f;&#x2f;crates.io&#x2f;crates&#x2f;fluxion&quot; rel=&quot;noopener noreferrer&quot;&gt;&lt;img src=&quot;https:&#x2f;&#x2f;img.shields.io&#x2f;crates&#x2f;l&#x2f;fluxion?style=for-the-badge&quot; alt=&quot;crates.io&quot;&gt;&lt;&#x2f;a&gt;
+&lt;a href=&quot;https:&#x2f;&#x2f;crates.io&#x2f;crates&#x2f;fluxion&quot; rel=&quot;noopener noreferrer&quot;&gt;&lt;img src=&quot;https:&#x2f;&#x2f;img.shields.io&#x2f;crates&#x2f;v&#x2f;fluxion?style=for-the-badge&quot; alt=&quot;crates.io&quot;&gt;&lt;&#x2f;a&gt;
+&lt;a href=&quot;https:&#x2f;&#x2f;docs.rs&#x2f;fluxion&quot; rel=&quot;noopener noreferrer&quot;&gt;&lt;img src=&quot;https:&#x2f;&#x2f;img.shields.io&#x2f;docsrs&#x2f;fluxion?style=for-the-badge&quot; alt=&quot;docs.rs&quot;&gt;&lt;&#x2f;a&gt;&lt;&#x2f;p&gt;
+&lt;p&gt;Distributed actor framework written in Rust.&lt;&#x2f;p&gt;
+&lt;&#x2f;div&gt;
+&lt;h1&gt;About&lt;&#x2f;h1&gt;
+&lt;p&gt;Fluxion is an actor framework designed with distributed systems in mind, namely sending messages not just between actors, but also between systems.&lt;&#x2f;p&gt;
+&lt;h2&gt;Why Fluxion?&lt;&#x2f;h2&gt;
+&lt;p&gt;Fluxion is designed for a very specific usecase: creating applications that require extremely flexible plugin solutions and communication between different running instances. If you do not need any of the specific features provided by Fluxion, you are probably best off using a different actor system. Fluxion uses &lt;a href=&quot;https:&#x2f;&#x2f;github.com&#x2f;peperworx&#x2f;slacktor&quot; rel=&quot;noopener noreferrer&quot;&gt;Slacktor&lt;&#x2f;a&gt; as a backend to provide &quot;simulated messages&quot; and a core actor system to work off of. Slacktor was purpose built for use in Fluxion, and is provided separately from Fluxion for higher-performance usecases, as well as those that do not need Fluxion&#x27;s features.&lt;&#x2f;p&gt;
+&lt;h2&gt;Core Features&lt;&#x2f;h2&gt;
+&lt;p&gt;Fluxion embraces a few core features, and tries to keep an API that is as as simple and extensible as possible.
+Descriptions about Fluxion&#x27;s few core features as well as any rationale behind their implementation follows.&lt;&#x2f;p&gt;
+&lt;h3&gt;No-Std Support&lt;&#x2f;h3&gt;
+&lt;p&gt;Fluxion and its dependencies only depend on &lt;code&gt;core&lt;&#x2f;code&gt; and &lt;code&gt;alloc&lt;&#x2f;code&gt;. This means that Fluxion can be used in &lt;code&gt;no-std&lt;&#x2f;code&gt; environments, as long as an allocator is available.&lt;&#x2f;p&gt;
+&lt;h3&gt;Executor Agnosticism&lt;&#x2f;h3&gt;
+&lt;p&gt;Fluxion is structured such that it never needs to spawn any tasks. This means that Fluxion does not need to access any specific executor library and is completely executor agnostic with no boilerplate required. You can use Tokio, async_std, Smol, or even write your own executor and Fluxion will not care.&lt;&#x2f;p&gt;
+&lt;h3&gt;Foreign Messages&lt;&#x2f;h3&gt;
+&lt;p&gt;Fluxion&#x27;s core feature is being able to send messages between systems, and is conditional on the &lt;code&gt;foreign&lt;&#x2f;code&gt; feature. Fluxion accomplishes this by allowing the user to define a &quot;delegate&quot; that responds to requests for specific foreign actors. The delegate returns an implementor of a trait that enables sending messages of a specific type. If the &lt;code&gt;serde&lt;&#x2f;code&gt; feature is enabled, then messages will be required to implement serialization functionality to be foreign messages.&lt;&#x2f;p&gt;
+&lt;h2&gt;Getting Started&lt;&#x2f;h2&gt;
+&lt;p&gt;The best way to get started right now is to take a look at the &lt;code&gt;simple&lt;&#x2f;code&gt; example. It contains the most bare bones possible example for using Fluxion as an actor system with no special features. For more advanced usage, take a look at &lt;a href=&quot;https:&#x2f;&#x2f;fluxion.peperworx.com&#x2f;book&#x2f;&quot; rel=&quot;noopener noreferrer&quot;&gt;the book&lt;&#x2f;a&gt;.&lt;&#x2f;p&gt;
+&lt;h2&gt;License&lt;&#x2f;h2&gt;
+&lt;p&gt;Fluxion is Dual-Licensed under Apache 2.0 and MIT.&lt;&#x2f;p&gt;
+
+
+
+        </main>
+      </div>
+
+      <footer>
+        
+          <a href="https:&#x2f;&#x2f;github.com&#x2f;peperworx&#x2f;fluxion"><div class="github-icon" aria-hidden="true"></div></a>
+        
+        <span>
+          , MIT OR Apache-2.0
+        </span>
+      </footer>
+    </div>
+
+    
+    
+
+    
+
+
+  </body>
+</html>

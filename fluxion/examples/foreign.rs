@@ -1,11 +1,15 @@
-use std::{borrow::BorrowMut, collections::HashMap, marker::PhantomData, sync::Arc};
+//! # Foreign messages
+//! This is a rather convoluted example of using foreign messages. It really only exists to show that it can be done.
+//! To run this example, make sure to enable the serde and foreign features.
 
-use bincode::serialize;
-use fluxion::{actor, message, Delegate, Handler, Identifier, IndeterminateMessage, LocalRef, Message, MessageID, MessageSender};
-use maitake_sync::{Mutex, RwLock};
+use std::{collections::HashMap, marker::PhantomData, sync::Arc};
+
+
+use fluxion::{actor, message, Delegate, Handler, Identifier, LocalRef, Message, MessageID, MessageSender};
+use maitake_sync::RwLock;
 use serde::{Deserialize, Serialize};
 use slacktor::{ActorHandle, Slacktor};
-use tokio::sync::{mpsc::{self, Receiver, Sender}, oneshot};
+use tokio::sync::{mpsc, oneshot};
 
 
 #[actor]
@@ -49,7 +53,6 @@ struct MessageB;
 
 struct DelegateSender<M: Message + MessageID> {
     actor_id: u64,
-    system_id: String,
     other_delegate: ActorHandle<DelegateActor>,
     _phantom: PhantomData<M>,
 }
@@ -172,7 +175,6 @@ impl Delegate for SerdeDelegate {
         // Wrap with a message sender and return
         Some(Arc::new(DelegateSender {
             actor_id: id,
-            system_id: system.to_string(),
             other_delegate: other.clone(),
             _phantom: PhantomData,
         }))

@@ -47,9 +47,15 @@ impl Delegate for () {
 
 
 // Delegate is automatially implemented for any Arc of an existing delegate
-impl<D: Delegate> Delegate for Arc<D> {
+impl<D: Delegate> Delegate for alloc::sync::Arc<D> {
+    #[cfg(all(feature="foreign", feature="serde"))]
     fn get_actor<A: Handler<M>, M: IndeterminateMessage>(&self, id: Identifier) -> impl core::future::Future<Output = Option<Arc<dyn MessageSender<M>>>> + Send
         where M::Result: serde::Serialize + for<'a> serde::Deserialize<'a> {
+        D::get_actor::<A, M>(self, id)
+    }
+
+    #[cfg(all(feature="foreign", not(feature="serde")))]
+    fn get_actor<A: Handler<M>, M: IndeterminateMessage>(&self, id: Identifier) -> impl core::future::Future<Output = Option<Arc<dyn MessageSender<M>>>> + Send {
         D::get_actor::<A, M>(self, id)
     }
 }

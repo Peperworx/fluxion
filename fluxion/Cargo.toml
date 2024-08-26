@@ -5,7 +5,7 @@ description = "Fluxion is an actor framework written in rust and designed for di
 repository = "https://github.com/peperworx/fluxion"
 categories = ["concurrency"]
 keywords = ["actor", "distributed", "async", "fluxion"]
-readme = "README.md"
+readme = "../README.md"
 version = "0.9.0"
 edition = "2021"
 
@@ -21,7 +21,7 @@ const_format = "0.2.32"
 
 
 [features]
-default = ["foreign", "serde"]
+default = []
 foreign = []
 serde = ["dep:serde"]
 
