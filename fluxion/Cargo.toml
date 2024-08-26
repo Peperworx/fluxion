@@ -6,7 +6,7 @@ repository = "https://github.com/peperworx/fluxion"
 homepage = "fluxion.peperworx.com"
 categories = ["concurrency"]
 keywords = ["actor", "distributed", "async", "fluxion"]
-readme = "../README.md"
+readme = "./README.md"
 version = "0.10.0"
 edition = "2021"
 
