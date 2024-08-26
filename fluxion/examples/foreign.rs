@@ -1,7 +1,7 @@
 use std::{borrow::BorrowMut, collections::HashMap, sync::Arc};
 
 use fluxion::{actor, message, Delegate, Handler, Identifier, LocalRef, Message, MessageID, MessageSender};
-use maitake_sync::RwLock;
+use maitake_sync::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{self, Receiver, Sender};
 
@@ -57,9 +57,9 @@ struct SerdeDelegate {
     sender: Sender<Vec<u8>>,
     // Channel for receiving serialized data to the other half of the delegate
     // This is connected to the other delegate's `sender`
-    receiver: Receiver<Vec<u8>>,
+    receiver: Mutex<Receiver<Vec<u8>>>,
     // Hashmap of message handling channels for actors
-    actor_handlers: RwLock<HashMap<(u64, &'static str), (mpsc::Sender<Vec<u8>>, mpsc::Receiver<Vec<u8>>)>>
+    actor_handlers: Mutex<HashMap<(u64, String), (mpsc::Sender<Vec<u8>>, mpsc::Receiver<Vec<u8>>)>>
 }
 
 impl SerdeDelegate {
@@ -67,7 +67,7 @@ impl SerdeDelegate {
         Self {
             system_id,
             sender,
-            receiver,
+            receiver: Mutex::new(receiver),
             actor_handlers: Default::default()
         }
     }
@@ -77,17 +77,19 @@ impl SerdeDelegate {
     pub async fn register_actor_message<A: Handler<M>, M: fluxion::IndeterminateMessage>(&self, actor: LocalRef<A, Self>)
         where M::Result: serde::Serialize + for<'de> serde::Deserialize<'de>{
         
-        println!("{} is registering actor with id {} to handle message {}", self.system_id, actor, M::ID);
+        let id = actor.get_id();
+
+        println!("{} is registering actor with id {} to handle message {}", self.system_id, id, M::ID);
 
         // Create channels
-        let (send_message, mut receive_message) = mpsc::channel(64);
-        let (send_response, receive_response) = mpsc::channel(64);
+        let (send_message, mut receive_message) = mpsc::channel::<Vec<u8>>(64);
+        let (send_response, receive_response) = mpsc::channel::<Vec<u8>>(64);
 
         // Spawn task
         tokio::spawn(async move {
             loop {
                 let Some(next_message) = receive_message.recv().await else {
-                    println!("Message handler {}/{} stopped recieving messages.", id,M::ID);
+                    println!("Message handler {}/{} stopped recieving messages.", actor.get_id() ,M::ID);
                     break;
                 };
 
@@ -95,14 +97,50 @@ impl SerdeDelegate {
                 let decoded: M = bincode::deserialize(&next_message).unwrap();
 
                 // Handle the message
+                let res = actor.send(decoded).await;
 
+                // Send the response
+                send_response.send(bincode::serialize(&res).unwrap()).await.unwrap();
                 
             }
         });
 
         // Add the handler
-        self.actor_handlers.write().await.insert((id, M::ID), (send_message, receive_response));
+        self.actor_handlers.lock().await.insert((id, M::ID.to_string()), (send_message, receive_response));
 
+    }
+
+    /// Runs the delegate
+    pub async fn run(&self) {
+
+        // In an actual implementation, there will need to be more synchronization between message/response pairs, as each
+        // delegate may actually be handling more than one message in parallel. This will most likely be done by
+        // using a separate connection per message, over a protocol like QUIC that can handle the multiplexing for us.
+
+        let mut receiver = self.receiver.lock().await;
+        loop {
+            // Wait for data
+            let Some(next_data) = receiver.recv().await else {
+                println!("Delegate disconnected");
+                return;
+            };
+
+            // Deserialize the data
+            let (actor_id, message_id, data): (u64, String, Vec<u8>) = bincode::deserialize(&next_data).unwrap();
+
+            // Get the actor's message handler
+            let mut handlers = self.actor_handlers.lock().await;
+            let channels = handlers.get_mut(&(actor_id, message_id.to_string())).unwrap();
+
+            // Send the message data
+            channels.0.send(data).await.unwrap();
+
+            // Wait for the response
+            let res = channels.1.recv().await.unwrap();
+
+            // Send the response
+            self.sender.send(res).await.unwrap();
+        }
     }
 }
 
@@ -116,6 +154,9 @@ impl Delegate for SerdeDelegate {
         };
         
         println!("{} is requesting a foreign actor on system {} with id {} that can handle message {}", self.system_id, system, id, M::ID);
+
+        // Create a channel 
+
         todo!()
     }
 }
@@ -134,10 +175,10 @@ async fn main() {
     // Create both actors on system a
     let actor_a = system_a.add(ActorA).await.unwrap();
     system_a.get_delegate().register_actor_message::<ActorA, MessageA>(system_a.get_local(actor_a).await.unwrap()).await;
-    system_a.get_delegate().register_actor_message::<ActorA, MessageB>(asystem_a.get_local(actor_a).await.unwrap()).await;
+    system_a.get_delegate().register_actor_message::<ActorA, MessageB>(system_a.get_local(actor_a).await.unwrap()).await;
     let actor_b = system_a.add(ActorB).await.unwrap();
-    system_a.get_delegate().register_actor_message::<ActorB, MessageA>(actor_b).await;
-    system_a.get_delegate().register_actor_message::<ActorB, MessageB>(actor_b).await;
+    system_a.get_delegate().register_actor_message::<ActorB, MessageA>(system_a.get_local(actor_b).await.unwrap()).await;
+    system_a.get_delegate().register_actor_message::<ActorB, MessageB>(system_a.get_local(actor_b).await.unwrap()).await;
    
     // Get both actors on system b
     let foreign_a = system_b.get::<ActorA, MessageB>(Identifier::Foreign(actor_a, "system_a")).await.unwrap();
