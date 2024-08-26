@@ -21,9 +21,17 @@ pub trait MessageSender<M: Message>: Send + Sync + 'static {
     async fn send(&self, message: M) -> M::Result;
 }
 
-#[repr(transparent)]
-pub struct LocalRef<A: Actor, D: Delegate>(pub(crate) slacktor::ActorHandle<ActorWrapper<A, D>>);
 
+pub struct LocalRef<A: Actor, D: Delegate>(pub(crate) slacktor::ActorHandle<ActorWrapper<A, D>>, pub(crate) u64);
+
+impl<A: Actor, D: Delegate> LocalRef<A, D> {
+    /// # [`LocalRef::get_id`]
+    /// Retrieves the actor's ID
+    #[must_use]
+    pub fn get_id(&self) -> u64 {
+        self.1
+    }
+}
 
 
 #[async_trait::async_trait]

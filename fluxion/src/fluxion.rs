@@ -120,7 +120,7 @@ impl<D: Delegate> Fluxion<D> {
         self.slacktor.read().await.get::<ActorWrapper<A, D>>(
             id.try_into().ok()? // If overflow, then the actor does not exist.
         ).cloned()
-        .map(|handle| LocalRef(handle))
+        .map(|handle| LocalRef(handle, id))
     }
 
     /// # [`Fluxion::get`]

@@ -1,6 +1,6 @@
-use std::sync::Arc;
+use std::{borrow::BorrowMut, collections::HashMap, sync::Arc};
 
-use fluxion::{actor, message, Delegate, Handler, Identifier, Message, MessageID, MessageSender};
+use fluxion::{actor, message, Delegate, Handler, Identifier, LocalRef, Message, MessageID, MessageSender};
 use maitake_sync::RwLock;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::{self, Receiver, Sender};
@@ -58,7 +58,8 @@ struct SerdeDelegate {
     // Channel for receiving serialized data to the other half of the delegate
     // This is connected to the other delegate's `sender`
     receiver: Receiver<Vec<u8>>,
-    // Hashm
+    // Hashmap of message handling channels for actors
+    actor_handlers: RwLock<HashMap<(u64, &'static str), (mpsc::Sender<Vec<u8>>, mpsc::Receiver<Vec<u8>>)>>
 }
 
 impl SerdeDelegate {
@@ -66,15 +67,42 @@ impl SerdeDelegate {
         Self {
             system_id,
             sender,
-            receiver: receiver,
+            receiver,
+            actor_handlers: Default::default()
         }
     }
 
 
     /// Registers an actor as being able to receive a specific message type.
-    pub async fn register_actor_message<A: Handler<M>, M: fluxion::IndeterminateMessage>(&self, id: u64)
+    pub async fn register_actor_message<A: Handler<M>, M: fluxion::IndeterminateMessage>(&self, actor: LocalRef<A, Self>)
         where M::Result: serde::Serialize + for<'de> serde::Deserialize<'de>{
-        println!("{} is registering actor with id {} to handle message {}", self.system_id, id, M::ID);
+        
+        println!("{} is registering actor with id {} to handle message {}", self.system_id, actor, M::ID);
+
+        // Create channels
+        let (send_message, mut receive_message) = mpsc::channel(64);
+        let (send_response, receive_response) = mpsc::channel(64);
+
+        // Spawn task
+        tokio::spawn(async move {
+            loop {
+                let Some(next_message) = receive_message.recv().await else {
+                    println!("Message handler {}/{} stopped recieving messages.", id,M::ID);
+                    break;
+                };
+
+                // Decode the message
+                let decoded: M = bincode::deserialize(&next_message).unwrap();
+
+                // Handle the message
+
+                
+            }
+        });
+
+        // Add the handler
+        self.actor_handlers.write().await.insert((id, M::ID), (send_message, receive_response));
+
     }
 }
 
@@ -105,8 +133,8 @@ async fn main() {
 
     // Create both actors on system a
     let actor_a = system_a.add(ActorA).await.unwrap();
-    system_a.get_delegate().register_actor_message::<ActorA, MessageA>(actor_a).await;
-    system_a.get_delegate().register_actor_message::<ActorA, MessageB>(actor_a).await;
+    system_a.get_delegate().register_actor_message::<ActorA, MessageA>(system_a.get_local(actor_a).await.unwrap()).await;
+    system_a.get_delegate().register_actor_message::<ActorA, MessageB>(asystem_a.get_local(actor_a).await.unwrap()).await;
     let actor_b = system_a.add(ActorB).await.unwrap();
     system_a.get_delegate().register_actor_message::<ActorB, MessageA>(actor_b).await;
     system_a.get_delegate().register_actor_message::<ActorB, MessageB>(actor_b).await;
