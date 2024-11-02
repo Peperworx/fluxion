@@ -206,10 +206,10 @@ async fn main() {
     let system_b = fluxion::Fluxion::new("system_b", delegate_b);
 
     // Create both actors on system a
-    let actor_a = system_a.add("actor_a", ActorA).await.unwrap();
+    let actor_a = system_a.add(ActorA).await.unwrap();
     system_a.get_delegate().register_actor_message::<ActorA, MessageA, _>(system_a.get_local(actor_a).await.unwrap()).await;
     system_a.get_delegate().register_actor_message::<ActorA, MessageB, _>(system_a.get_local(actor_a).await.unwrap()).await;
-    let actor_b = system_a.add("actor_b", ActorB).await.unwrap();
+    let actor_b = system_a.add(ActorB).await.unwrap();
     system_a.get_delegate().register_actor_message::<ActorB, MessageA, _>(system_a.get_local(actor_b).await.unwrap()).await;
     system_a.get_delegate().register_actor_message::<ActorB, MessageB, _>(system_a.get_local(actor_b).await.unwrap()).await;
 

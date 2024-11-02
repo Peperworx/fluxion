@@ -41,7 +41,7 @@ async fn main() {
     let system = Fluxion::new("system", ());
     
     // Add the actor, returning the ID
-    let id = system.add("test", TestActor(rand::random())).await.unwrap();
+    let id = system.add(TestActor(rand::random())).await.unwrap();
 
     // Get a local reference to the actor
     let actor = system.get_local::<TestActor>(id).await.unwrap();

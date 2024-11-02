@@ -64,8 +64,11 @@ impl<D: Delegate> Fluxion<D> {
     pub async fn get_actor_id(&self, name: &str) -> Option<u64> {
         self.actor_ids.read().await.get(name).copied()
     }
-    /// # [`Fluxion::add`]
-    /// Adds an actor to the local instance, returning its id.
+
+    /// # [`Fluxion::add_named`]
+    /// Adds an actor to the local instance, returning its id and assigning
+    /// the given name to it for retrieval by [`Fluxion::get_actor_id`].
+    /// This is handy when using actors with static names on a foreign system.
     /// <div class = "info">
     /// Locks the underlying RwLock as write. This will block "management" functionalities such as adding, removing, and retrieving actors, but
     /// will not block any messages.
@@ -77,8 +80,30 @@ impl<D: Delegate> Fluxion<D> {
     /// 
     /// # Errors
     /// Returns an error if the actor failed to initialize.
+    /// On an error, the actor will not be spawned, and the name will not be assigned.
+    pub async fn add_named<A: Actor>(&self, name: &str, actor: A) -> Result<u64, A::Error> {
+        // Add the actor, assigning an id
+        let id = self.add(actor).await?;
+
+        // Store the actor's name in the actor_ids map
+        let mut actor_ids = self.actor_ids.write().await;
+        actor_ids.insert(String::from(name), id as u64);
+
+        // Return the actor's id.
+        Ok(id)
+    }
+
+    /// # [`Fluxion::add`]
+    /// Adds an actor to the local instance, returning its id.
+    /// <div class = "info">
+    /// Locks the underlying RwLock as write. This will block "management" functionalities such as adding, removing, and retrieving actors, but
+    /// will not block any messages.
+    /// </div>
+    /// 
+    /// # Errors
+    /// Returns an error if the actor failed to initialize.
     /// On an error, the actor will not be spawned.
-    pub async fn add<A: Actor>(&self, name: &str, mut actor: A) -> Result<u64, A::Error> {
+    pub async fn add<A: Actor>(&self, mut actor: A) -> Result<u64, A::Error> {
 
         // Run the actor's initialization code
         actor.initialize().await?;
@@ -97,9 +122,6 @@ impl<D: Delegate> Fluxion<D> {
         // Spawn the actor on the slacktor instance
         let id = system.spawn(actor);
 
-        // Store the actor's name in the actor_ids map
-        let mut actor_ids = self.actor_ids.write().await;
-        actor_ids.insert(String::from(name), id as u64);
 
         // Return the actor's id.
         Ok(id as u64)
