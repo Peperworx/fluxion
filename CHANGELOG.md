@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.1 -- 2024-11-2
+
+Version 0.10.1 adds support for naming actors, which can be useful when communicating over a network where actor id's may not be guarenteed to be consistent.
+
 ## 0.10.0 -- 2024-8-26
 
 Version 0.10 is intended to be the final complete overhaul of Fluxion. The only scenario in which another rewrite should be expected is if this version has major usability issues. Otherwise, all future minor versions, as well as version 1.0.0, should just be bug fixes and minor feature updates.
