@@ -7,12 +7,17 @@
 /// Identifies an individual actor on a given system. There are two variants: one for actors on the current system, and one on a foreign system.
 /// These are called [`Identifier::Local`] and [`Identifier::Foreign`] respectively.
 #[derive(Debug)]
-pub enum Identifier<#[cfg(feature = "foreign")] 'a> {
+pub enum Identifier<'a> {
     /// Identifies an actor on the current system. Contains the actor's id as a 64-bit integer.
     Local(u64),
+    /// Identifies an actor on the current system. Contains the actor's name
+    LocalNamed(&'a str),
     /// Identifies an actor on a given foreign system. Contains first the actor's id, then the foreign system's id as a string.
     #[cfg(feature = "foreign")]
     Foreign(u64, &'a str),
+    /// Identifies an actor on a given foreign system. Contains first the actor's name, then the foreign system's id as a string.
+    #[cfg(feature = "foreign")]
+    ForeignNamed(&'a str, &'a str),
 }
 
 #[cfg(feature = "foreign")]
@@ -23,7 +28,7 @@ impl<'a> From<u64> for Identifier<'a> {
 }
 
 #[cfg(not(feature = "foreign"))]
-impl From<u64> for Identifier {
+impl From<u64> for Identifier<'_> {
     fn from(value: u64) -> Self {
         Identifier::Local(value)
     }

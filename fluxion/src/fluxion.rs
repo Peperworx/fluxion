@@ -1,10 +1,11 @@
+
 use alloc::sync::Arc;
 use maitake_sync::RwLock;
 use slacktor::Slacktor;
 
 use crate::{Actor, ActorContext, ActorWrapper, Delegate, Handler, Identifier, IndeterminateMessage, LocalRef, MessageSender};
-
-
+use alloc::string::String;
+use alloc::collections::BTreeMap;
 
 
 
@@ -16,6 +17,8 @@ pub struct Fluxion<D> {
     /// The [`RwLock`] is used instead of a mutex because it can be assumed that actor references
     /// will be retrieved more often than actors are created.
     slacktor: Arc<RwLock<Slacktor>>,
+    /// A mapping of string actor names to their slacktor ids.
+    actor_ids: Arc<RwLock<BTreeMap<String, u64>>>,
     /// The identifier of this system as a string
     system_id: Arc<str>,
     /// The foreign delegate of this system
@@ -24,7 +27,7 @@ pub struct Fluxion<D> {
 
 impl<D> Clone for Fluxion<D> {
     fn clone(&self) -> Self {
-        Self { slacktor: self.slacktor.clone(), system_id: self.system_id.clone(), delegate: self.delegate.clone() }
+        Self { slacktor: self.slacktor.clone(), system_id: self.system_id.clone(), delegate: self.delegate.clone(), actor_ids: self.actor_ids.clone() }
     }
 }
 
@@ -36,7 +39,8 @@ impl<D: Delegate> Fluxion<D> {
         Self {
             slacktor: Arc::new(RwLock::new(Slacktor::new())),
             system_id: id.into(),
-            delegate: Arc::new(delegate)
+            delegate: Arc::new(delegate),
+            actor_ids: Arc::default(),
         }
     }
 
@@ -54,17 +58,27 @@ impl<D: Delegate> Fluxion<D> {
         &self.system_id
     }
 
+    /// # [`Fluxion::get_actor_id`]
+    /// Retrieve's an actor's ID by its name
+    #[must_use]
+    pub async fn get_actor_id(&self, name: &str) -> Option<u64> {
+        self.actor_ids.read().await.get(name).copied()
+    }
     /// # [`Fluxion::add`]
     /// Adds an actor to the local instance, returning its id.
     /// <div class = "info">
     /// Locks the underlying RwLock as write. This will block "management" functionalities such as adding, removing, and retrieving actors, but
     /// will not block any messages.
     /// </div>
+    /// <div class = "warn">
+    ///     If an actor with a duplicate name is added, it will overwrite the original actor's name.
+    ///     The original actor won't be killed, but it may become inaccessible.
+    /// </div>
     /// 
     /// # Errors
     /// Returns an error if the actor failed to initialize.
     /// On an error, the actor will not be spawned.
-    pub async fn add<A: Actor>(&self, mut actor: A) -> Result<u64, A::Error> {
+    pub async fn add<A: Actor>(&self, name: &str, mut actor: A) -> Result<u64, A::Error> {
 
         // Run the actor's initialization code
         actor.initialize().await?;
@@ -82,6 +96,10 @@ impl<D: Delegate> Fluxion<D> {
 
         // Spawn the actor on the slacktor instance
         let id = system.spawn(actor);
+
+        // Store the actor's name in the actor_ids map
+        let mut actor_ids = self.actor_ids.write().await;
+        actor_ids.insert(String::from(name), id as u64);
 
         // Return the actor's id.
         Ok(id as u64)
@@ -106,6 +124,9 @@ impl<D: Delegate> Fluxion<D> {
 
         // Lock the underylying slacktor instance as write and kill the actor
         self.slacktor.write().await.kill::<ActorWrapper<A, D>>(id).await;
+
+        // Shrink the slacktor instance
+        self.slacktor.write().await.shrink();
     }
 
 
@@ -138,11 +159,19 @@ impl<D: Delegate> Fluxion<D> {
                 self.get_local::<A>(id).await
                     .map(|h| Arc::new(h) as Arc<dyn MessageSender<M>>)
             },
+            Identifier::LocalNamed(name) => {
+                // Get the actor's id by name
+                let id = self.get_actor_id(name).await?;
+
+                // Get the local ref and wrap in an arc
+                self.get_local::<A>(id).await
+                    .map(|h| Arc::new(h) as Arc<dyn MessageSender<M>>)
+            },
             #[cfg(feature = "foreign")]
-            Identifier::Foreign(id, system) => {
+            id => {
                 // Send the request on to the delegate
-                self.delegate.get_actor::<A, M>(Identifier::Foreign(id, system)).await
-            }
+                self.delegate.get_actor::<A, M>(id).await
+            },
         }
     }
 
@@ -150,8 +179,7 @@ impl<D: Delegate> Fluxion<D> {
     /// Retrieves an actor reference capable of communicating using the given message via the given ID.
     #[cfg(not(feature = "serde"))]
     pub async fn get<'a, A: Handler<M>, M: IndeterminateMessage>(&self,
-            #[cfg(feature="foreign")] id: impl Into<Identifier<'a>>,
-            #[cfg(not(feature="foreign"))] id: impl Into<Identifier>
+            id: impl Into<Identifier<'a>>,
         ) -> Option<Arc<dyn MessageSender<M>>> {
 
         match id.into() {
@@ -160,11 +188,19 @@ impl<D: Delegate> Fluxion<D> {
                 self.get_local::<A>(id).await
                     .map(|h| Arc::new(h) as Arc<dyn MessageSender<M>>)
             },
+            Identifier::LocalNamed(name) => {
+                // Get the actor's id by name
+                let id = self.get_actor_id(name).await?;
+
+                // Get the local ref and wrap in an arc
+                self.get_local::<A>(id).await
+                    .map(|h| Arc::new(h) as Arc<dyn MessageSender<M>>)
+            },
             #[cfg(feature = "foreign")]
-            Identifier::Foreign(id, system) => {
+            id => {
                 // Send the request on to the delegate
-                self.delegate.get_actor::<A, M>(Identifier::Foreign(id, system)).await
-            }
+                self.delegate.get_actor::<A, M>(id).await
+            },
         }
     }
 

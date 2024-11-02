@@ -66,7 +66,8 @@ async fn main() {
     let system = Fluxion::new("system", ());
     
     // Adding an actor to the system assigns it with an ID.
-    let id = system.add(TestActor).await.unwrap();
+    // You can also provide a name, in this case "test".
+    let id = system.add("test", TestActor).await.unwrap();
 
     // You can use this ID to retrieve a reference to the actor.
     // There are two ways to do this.
