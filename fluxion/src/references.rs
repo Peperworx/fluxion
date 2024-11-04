@@ -21,7 +21,7 @@ pub trait MessageSender<M: Message>: Send + Sync + 'static {
     async fn send(&self, message: M) -> M::Result;
 }
 
-#[derive(Clone)]
+
 pub struct LocalRef<A: Actor, D: Delegate>(pub(crate) slacktor::ActorHandle<ActorWrapper<A, D>>, pub(crate) u64);
 
 impl<A: Actor, D: Delegate> LocalRef<A, D> {
@@ -33,6 +33,11 @@ impl<A: Actor, D: Delegate> LocalRef<A, D> {
     }
 }
 
+impl<A: Actor, D: Delegate> Clone for LocalRef<A, D> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), self.1)
+    }
+}
 
 #[async_trait::async_trait]
 impl<A: Handler<M>, M: Message, D: Delegate> MessageSender<M> for LocalRef<A, D> {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.3 -- 2024-11-3
+
+Version 0.10.3 makes `LocalRef`s `Clone` implementation not depend on its generics.
+
 ## 0.10.2 -- 2024-11-3
 
 Version 0.10.2 implements `Clone` for `LocalRef`s.
