@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.2 -- 2024-11-3
+
+Version 0.10.2 implements `Clone` for `LocalRef`s.
+
 ## 0.10.1 -- 2024-11-2
 
 Version 0.10.1 adds support for naming actors, which can be useful when communicating over a network where actor id's may not be guarenteed to be consistent.
