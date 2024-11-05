@@ -1,8 +1,13 @@
 # Changelog
 
+## 0.10.5 -- 2024-11-5
+
+Version 0.10.5 changes `MessageSender`s to return a sized error type.
+This type was intentionally made to *not* be irrefutable, as this could cause breaking changes across features.
+
 ## 0.10.4 -- 2024-11-5
 
-Version 0.10.4 changes [`MessageSenders`] to also return boxed errors, enabling delegates to fail to send messages.
+Version 0.10.4 changes `MessageSenders` to also return boxed errors, enabling delegates to fail to send messages.
 Previously messages had been infallible, however this provided no way for networked delegates to fail.
 
 ## 0.10.3 -- 2024-11-3

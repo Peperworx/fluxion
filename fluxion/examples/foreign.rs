@@ -5,7 +5,7 @@
 use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
 
-use fluxion::{actor, message, Delegate, Handler, Identifier, LocalRef, Message, MessageID, MessageSender};
+use fluxion::{actor, message, Delegate, Handler, Identifier, LocalRef, Message, MessageID, MessageSendError, MessageSender};
 use maitake_sync::RwLock;
 use serde::{Deserialize, Serialize};
 use slacktor::{ActorHandle, Slacktor};
@@ -61,7 +61,7 @@ struct DelegateSender<M: Message + MessageID> {
 impl<M: Message + MessageID + Serialize> fluxion::MessageSender<M> for DelegateSender<M>
 where M::Result: for<'de> Deserialize<'de> {
    
-    async fn send(&self,message:M) -> Result<M::Result, Box<dyn std::error::Error>> {
+    async fn send(&self,message:M) -> Result<M::Result, MessageSendError> {
         // Send the message
         let res = self.other_delegate.send(DelegateMessage(self.actor_id, M::ID.to_string(), bincode::serialize(&message).unwrap())).await;
 

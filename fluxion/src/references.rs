@@ -3,9 +3,8 @@
 
 
 
-use core::error::Error;
 
-use crate::{Actor, ActorWrapper, Delegate, Handler, Message};
+use crate::{Actor, ActorWrapper, Delegate, Handler, Message, MessageSendError};
 use alloc::boxed::Box;
 
 /// # [`ActorRef`]
@@ -28,7 +27,7 @@ pub trait MessageSender<M: Message>: Send + Sync + 'static {
     /// For [`LocalRef`], the message send will never fail, however delegates may return an error upon sending.
     /// These errors are generally not recoverable, and should be interpreted as meaning that the
     /// target actor no longer exists/is no longer accessible.
-    async fn send(&self, message: M) -> Result<M::Result, Box<dyn Error>>;
+    async fn send(&self, message: M) -> Result<M::Result, MessageSendError>;
 }
 
 
@@ -53,7 +52,7 @@ impl<A: Actor, D: Delegate> Clone for LocalRef<A, D> {
 impl<A: Handler<M>, M: Message, D: Delegate> MessageSender<M> for LocalRef<A, D> {
 
     #[inline]
-    async fn send(&self, message: M) -> Result<M::Result, Box<dyn Error>> {
+    async fn send(&self, message: M) -> Result<M::Result, MessageSendError> {
         Ok(self.0.send(message).await)
     }
 }
