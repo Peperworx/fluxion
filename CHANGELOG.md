@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.4 -- 2024-11-5
+
+Version 0.10.4 changes [`MessageSenders`] to also return boxed errors, enabling delegates to fail to send messages.
+Previously messages had been infallible, however this provided no way for networked delegates to fail.
+
 ## 0.10.3 -- 2024-11-3
 
 Version 0.10.3 makes `LocalRef`s `Clone` implementation not depend on its generics.

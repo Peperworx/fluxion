@@ -61,12 +61,12 @@ struct DelegateSender<M: Message + MessageID> {
 impl<M: Message + MessageID + Serialize> fluxion::MessageSender<M> for DelegateSender<M>
 where M::Result: for<'de> Deserialize<'de> {
    
-    async fn send(&self,message:M) -> M::Result {
+    async fn send(&self,message:M) -> Result<M::Result, Box<dyn std::error::Error>> {
         // Send the message
         let res = self.other_delegate.send(DelegateMessage(self.actor_id, M::ID.to_string(), bincode::serialize(&message).unwrap())).await;
 
         // Deserialize the response
-        bincode::deserialize(&res).unwrap()
+        Ok(bincode::deserialize(&res).unwrap())
     }
 }
 
@@ -144,7 +144,7 @@ impl SerdeDelegate {
                 let decoded: M = bincode::deserialize(&next_message.0).unwrap();
 
                 // Handle the message
-                let res = actor.send(decoded).await;
+                let res = actor.send(decoded).await.expect("this delegate doesn't error");
 
                 // Send the response
                 next_message.1.send(bincode::serialize(&res).unwrap()).unwrap();
@@ -219,6 +219,6 @@ async fn main() {
     let foreign_a = system_b.get::<ActorA, MessageB>(Identifier::Foreign(actor_a, "system_a")).await.unwrap();
     let foreign_b = system_b.get::<ActorB, MessageA>(Identifier::Foreign(actor_b, "system_a")).await.unwrap();
 
-    foreign_a.send(MessageB).await;
-    foreign_b.send(MessageA).await;
+    foreign_a.send(MessageB).await.expect("this delegate doesn't error");
+    foreign_b.send(MessageA).await.expect("this delegate doesn't error");
 }

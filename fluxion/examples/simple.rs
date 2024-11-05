@@ -88,7 +88,7 @@ async fn main() {
     // This method returns the actor's response to the message.
     // In this case, because we have defined the response as the unit type,
     // we do not need to unwrap anything.
-    actor_ref.send(TestMessage).await;
+    actor_ref.send(TestMessage).await.expect("local actors will never fail to send");
 
     // We can also retrieve an actor reference using the [`Fluxion::get_local`] method.
     // This only requires the actor's type, and only works on actors runnign on the local system.
@@ -97,5 +97,5 @@ async fn main() {
     let actor = system.get_local::<TestActor>(id).await.unwrap();
 
     // Use in the same way as above
-    actor.send(TestMessage).await;
+    actor.send(TestMessage).await.expect("local actors will never fail to send");
 }

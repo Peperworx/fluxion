@@ -61,7 +61,9 @@ async fn main() {
     // Send num_messages messages.
     for i in 0..num_messages {
         // Send the message
-        let v = actor.send(TestMessage(i as u64)).await;
+        let Ok(v) = actor.send(TestMessage(i as u64)).await else {
+            unreachable!("local actors should never fail to send.")
+        };
 
         // Add the message to the output vector
         out.push(v);
