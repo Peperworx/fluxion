@@ -7,14 +7,11 @@
 use crate::{Actor, ActorWrapper, Delegate, Handler, Message, MessageSendError};
 use alloc::boxed::Box;
 
-/// # [`ActorRef`]
-/// This trait provides methods for actors to communicate with and control each other.
-pub trait ActorRef<A: Actor> {}
 
 /// # [`MessageSender`]
 /// This trait provides the ability to send a specific message type to a specific actor.
 /// This trait is only necessary because traits with generic methods are not object safe,
-/// and we need a way to be generic over multiple types of [`ActorRef`] at once.
+/// and we need a way to be generic over multiple types of actor at once.
 /// Sadly, [`async_trait`] is also required for this trait as async fns in traits are not yet object safe either.
 #[async_trait::async_trait]
 pub trait MessageSender<M: Message>: Send + Sync + 'static {

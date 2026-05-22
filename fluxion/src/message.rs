@@ -58,7 +58,7 @@ impl core::error::Error for MessageSendError {
         }
     }
 
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "description() is deprecated; use Display"
     }
 }

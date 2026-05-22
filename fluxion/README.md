@@ -28,7 +28,7 @@ Fluxion and its dependencies only depend on `core` and `alloc`. This means that 
 
 ### Executor Agnosticism
 
-Fluxion is structured such that it never needs to spawn any tasks. This means that Fluxion does not need to access any specific executor library and is completely executor agnostic with no boilerplate required. You can use Tokio, async_std, Smol, or even write your own executor and Fluxion will not care. In the provided examples, however, we do use Tokio, as it is the most popular executor.
+Fluxion is structured such that it never needs to spawn any tasks. This means that Fluxion does not need to access any specific executor library and is completely executor agnostic with no boilerplate required. You can use Tokio, `async_std`, Smol, or even write your own executor and Fluxion will not care. In the provided examples, however, we do use Tokio, as it is the most popular executor.
 
 ### Foreign Messages
 
